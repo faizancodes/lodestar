@@ -1,4 +1,4 @@
-/* Auto Interp — night and ASCII. A near-black ground, panels lifted a step at a time with hairline rules, and the
+/* Lodestar — night and ASCII. A near-black ground, panels lifted a step at a time with hairline rules, and the
    ASCII scenes as the one source of light, drawn in pale periwinkle. Three faces, one job each (see "voices" at
    the end): Geist for headings and text, everything the model writes included; Geist Mono for the instrument
    panel (what you type, controls, labels, names and numbers). */
@@ -58,9 +58,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
   color: var(--on-night);
   overflow: hidden;
 }
-.brand { position: relative; z-index: 2; }
+.brand { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; }
+.brand-mark { display: flex; color: var(--ascii); }
 .brand h1 { margin: 0; font-size: 21px; line-height: 1.1; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; }
-.brand h1 i { font-style: normal; color: var(--ascii); }
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
 .eyebrow.light { color: rgba(237, 237, 237, 0.62); }
 
