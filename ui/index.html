@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto Interp</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="side">
+  <div class="brand"><h1>Auto<br>Interp</h1></div>
+  <div class="saved">
+    <div class="side-h"><span class="eyebrow light">Saved</span></div>
+    <div id="saved-list" class="saved-list"></div>
+  </div>
+  <div class="model-card">
+    <div class="eyebrow light">Model</div>
+    <button id="model-pick" class="model-pick" aria-haspopup="listbox" aria-expanded="false">
+      <span class="mp-name">Choose a model</span><span class="mp-caret" aria-hidden="true"></span>
+    </button>
+    <div id="model-status" class="model-status"><span class="dot"></span><span class="txt">No model loaded</span></div>
+  </div>
+  <svg class="hills" id="hills" viewBox="0 0 300 120" preserveAspectRatio="none" aria-hidden="true"></svg>
+</aside>
+
+<main id="main">
+  <!-- shown until a model is ready -->
+  <section id="start" class="start">
+    <h2>Pick a model to start steering.</h2>
+    <div id="start-models" class="start-models"></div>
+    <canvas id="start-art" class="start-art" aria-hidden="true"></canvas>
+    <div id="start-status" class="start-status"></div>
+  </section>
+
+  <section id="ws" class="ws" hidden>
+    <div class="step">
+      <div class="step-h"><span class="num">1</span><h3>Change how it acts</h3></div>
+      <div class="card change">
+        <div class="ask">
+          <input id="c-input" placeholder="How should it act? e.g. talk like a pirate, or a word like cookie" spellcheck="false" autocomplete="off">
+          <button class="btn ghost" data-cancel>Stop</button>
+          <button id="c-go" class="btn">Find</button>
+        </div>
+        <div class="ex-line" id="ex-line"><span>Or try</span><div id="ex-chips" class="chips"></div></div>
+        <div id="c-status" class="status-line"></div>
+        <div id="c-results"></div>
+        <details class="adv">
+          <summary>Options</summary>
+          <label class="field">Words it must say <span class="opt">for sentences</span>
+            <input id="d-focus" placeholder="e.g. arr, matey" spellcheck="false">
+          </label>
+          <label class="field">Test questions <span class="opt">one per line</span><textarea id="d-prompts" rows="5" spellcheck="false"></textarea></label>
+          <div class="adv-grid">
+            <label class="field">Most neurons<input id="d-maxn" type="number" value="6" min="1" max="16"></label>
+            <label class="field">Neurons to test<input id="d-cands" type="number" placeholder="auto" min="8" max="128"></label>
+            <label class="field">Strengths to try<input id="d-doses" value="0.25, 0.5, 1.0"></label>
+            <label class="field">Allowed quality loss<input id="d-flu" type="number" value="0.35" step="0.05" min="0"></label>
+          </div>
+          <label class="check"><input id="w-last" type="checkbox"> Search the last layers for words <span class="opt">they tend to repeat the word</span></label>
+        </details>
+        <div id="rc" class="rc" hidden>
+          <div class="rc-h"><b>On now</b><span class="grow"></span><button id="rc-save" class="btn ghost sm">Save</button><button id="rc-clear" class="btn ghost sm">Turn all off</button></div>
+          <div id="rc-list" class="rc-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-h"><span class="num">2</span><h3>Ask it something</h3></div>
+      <div class="card try">
+        <div class="ask">
+          <input id="t-prompt" value="Describe the way you look." spellcheck="false" autocomplete="off">
+          <button class="btn ghost" data-cancel>Stop</button>
+          <button id="t-go" class="btn">Send</button>
+        </div>
+        <div class="row">
+          <div class="chips grow" id="t-chips"></div>
+          <label class="check"><input id="t-opposite" type="checkbox"> Also show the opposite</label>
+        </div>
+      </div>
+      <div id="runs" class="runs"></div>
+    </div>
+  </section>
+  <section id="abl" class="step">
+    <div class="step-h"><span class="num">3</span><h3>Shed its refusals</h3></div>
+    <div class="card abl">
+      <p class="abl-lede">Refusal is one direction the model carries in every layer, so it can be erased cleanly
+        (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>): find it with probe questions, check it,
+        then keep it for the session or bake it into a saved copy of the weights.</p>
+      <div class="abl-top">
+        <div id="abl-status" class="abl-note">Not analysed yet. Run the analysis to find where refusal lives.</div>
+        <div class="abl-acts">
+          <button id="abl-toggle" class="btn sm" hidden>Turn on</button>
+        </div>
+      </div>
+      <div id="abl-body" hidden>
+        <div id="abl-rank"></div>
+        <div class="abl-checks">
+          <div class="row tight">
+            <label class="field grow">Strength <span class="opt">how fully the direction is erased</span>
+              <input id="abl-coef" type="number" value="1" min="0.2" max="2" step="0.05">
+            </label>
+          </div>
+          <div id="abl-test-rows"></div>
+          <div id="abl-test-summary" class="status-line"></div>
+        </div>
+      </div>
+      <details class="adv">
+        <summary>Probes &amp; test questions</summary>
+        <label class="field">Probe questions it must refuse <span class="opt">one per line · the sharper the better</span>
+          <textarea id="abl-probes-harmful" rows="6" spellcheck="false"></textarea>
+        </label>
+        <label class="field">Probe questions it must answer plainly <span class="opt">one per line · everyday wording</span>
+          <textarea id="abl-probes-harmless" rows="5" spellcheck="false"></textarea>
+        </label>
+        <label class="field">Test questions for the check <span class="opt">one per line</span>
+          <textarea id="abl-test-probes" rows="3" spellcheck="false"></textarea>
+        </label>
+        <div class="row tight">
+          <button id="abl-probes-reset" class="btn ghost sm">Reset to the defaults</button>
+          <button id="abl-probes-save" class="btn ghost sm">Save probe lists</button>
+        </div>
+      </details>
+      <div class="row">
+        <button id="abl-go" class="btn">Find the refusal direction</button>
+        <button id="abl-test-go" class="btn ghost" hidden>Test it</button>
+        <button id="abl-bake" class="btn ghost" hidden>Bake into saved weights</button>
+        <button id="abl-export-stop" class="btn ghost sm" hidden>Stop writing</button>
+      </div>
+      <div id="abl-plan" class="plan" hidden>
+        <div class="plan-h"><span class="eyebrow">Abliteration plan</span><b class="plan-goal"></b><span class="plan-clock">0:00</span></div>
+        <ol class="plan-steps abl-steps">
+          <li><span>Read</span><i></i></li>
+          <li><span>Compare</span><i></i></li>
+          <li><span>Check</span><i></i></li>
+          <li><span>Bake</span><i></i></li>
+        </ol>
+        <div class="plan-now status-line"></div>
+        <div id="abl-examples" class="abl-examples"></div>
+      </div>
+      <div id="abl-export-line" class="status-line"></div>
+    </div>
+  </section>
+</main>
+
+
+<div id="model-menu" class="model-menu" role="listbox" hidden></div>
+<div id="toast" class="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

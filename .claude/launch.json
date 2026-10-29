@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "auto-interp",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "interp.app", "--server"],
+      "port": 8792
+    }
+  ]
+}
