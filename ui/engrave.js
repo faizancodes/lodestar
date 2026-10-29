@@ -1,7 +1,8 @@
-// Engraving, the way the reference etching is made: every tone is lines. Light passages are single hairlines,
-// mid-tones a woven mesh of two families of wavy lines crossing, shadows a third set on top, and even the blacks
-// are lines packed tight. One fragment shader draws it and is rendered twice per window size:
-//   --plate    ink on parchment, the page's ground, lightest in the middle of the working area where text sits
+// Engraving, the way the reference etching is made: every tone is lines. Light passages are sparse parallel
+// hairlines, mid-tones a mesh of two families of curved lines crossing, shadows a third set on top, and even the
+// blacks are lines packed tight. One fragment shader draws it and is rendered twice per window size:
+//   --plate    ink on parchment, the page's ground: almost bare paper in the column where text sits, deepening
+//              into hatching out in the margins like an engraved vignette, so reading never competes with it
 //   --ink-tex  parchment hairlines on night, the texture of every dark surface (sidebar, buttons, the user's
 //              messages, steered headers), so blacks read as engraved rather than flat
 // Both become CSS background images, so nothing runs per frame while a model works. Without WebGL the flat
@@ -12,6 +13,7 @@ const FRAG = `
 precision highp float;
 uniform vec2 res;      // canvas size, css px
 uniform vec4 area;     // the working area (x, y, w, h), css px, y down
+uniform vec2 col;      // the text column inside it: centre x and half width, css px
 uniform float dpr;
 uniform vec3 bg, fg;
 uniform vec2 tone;     // lightest and darkest tone used
@@ -44,19 +46,21 @@ void main() {
   vec2 p = vec2(gl_FragCoord.x, res.y * dpr - gl_FragCoord.y) / dpr;   // css px, y down
   vec2 uv = (p - area.xy) / area.zw;
   float cloud = fbm(p / 280.0);
-  // light falls from the upper left of the working area and fades toward its edges, under soft clouds
-  float r = length((uv - vec2(0.45, 0.36)) * vec2(1.0, 1.2));
-  float shade = clamp(mix(cloud, smoothstep(0.3, 1.1, r) * 0.85 + (cloud - 0.45) * 0.6, lit), 0.0, 1.0);
+  // the column stays light; the shading gathers outside it, heavier toward the bottom, under soft clouds
+  float edge = smoothstep(col.y - 12.0, col.y + 200.0, abs(p.x - col.x));
+  float framed = edge * (0.5 + 0.7 * (cloud - 0.3)) + 0.25 * edge * smoothstep(0.5, 1.0, uv.y);
+  float shade = clamp(mix(cloud, framed, lit), 0.0, 1.0);
   float t = mix(tone.x, tone.y, shade);
 
   float w1 = fbm(p / 240.0) * 9.0, w2 = fbm(p / 300.0 + 5.0) * 9.0;
-  float a = family(p, radians(-28.0), 3.2, clamp(0.1 + t * 0.55, 0.0, 0.7), w1, 0.32);
-  float b = family(p, radians(36.0), 3.5, clamp((t - 0.16) * 0.8, 0.0, 0.62), w2, 0.28);
+  float a = family(p, radians(-28.0), 3.2, clamp(0.1 + t * 0.55, 0.0, 0.7), w1, 0.1);
+  float b = family(p, radians(36.0), 3.5, clamp((t - 0.16) * 0.8, 0.0, 0.62), w2, 0.18);
   float c = family(p, radians(82.0), 4.0, clamp((t - 0.6) * 1.2, 0.0, 0.5), w1 * 0.5, 0.2);
   float cut = max(max(a, b), c);
 
   float grain = (hash(floor(p * dpr)) - 0.5) * 0.03;
-  gl_FragColor = vec4(mix(bg, fg, clamp(cut * strength + grain, 0.0, 1.0)), 1.0);
+  float ink = strength * mix(1.0, mix(0.4, 1.0, edge), lit);  // fainter still inside the column
+  gl_FragColor = vec4(mix(bg, fg, clamp(cut * ink + grain, 0.0, 1.0)), 1.0);
 }`;
 
 const rgb = (css) => {
@@ -95,6 +99,7 @@ function render(areaEl, look) {
   const r = areaEl.getBoundingClientRect(), u = (n) => gl.getUniformLocation(prog, n);
   gl.uniform2f(u("res"), w, h);
   gl.uniform4f(u("area"), r.left, r.top, r.width || w, r.height || h);
+  gl.uniform2f(u("col"), r.left + (r.width || w) / 2, Math.min((r.width || w) / 2 - 24, 480));  // .page is 920 wide
   gl.uniform1f(u("dpr"), dpr);
   gl.uniform3fv(u("bg"), look.bg);
   gl.uniform3fv(u("fg"), look.fg);
