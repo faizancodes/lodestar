@@ -1,5 +1,7 @@
-// Loading scene in the "squares" style: the poster's sun and engraved hills, mirrored in a rippling lake.
-// Each grid cell is a square whose area follows the scene's brightness there.
+import { drawMarks } from "./glyphs.js";
+
+// Loading scene in the ASCII-mark style: the poster's sun and engraved hills, mirrored in a rippling lake.
+// Each grid cell is a mark (dot, plus, ×, block) picked by the scene's brightness there.
 // The sun rises with load progress and pulses once when the model is ready; now and then a few stars
 // link up and a spark runs through them, like a signal passing through a network's layers.
 const W = 96, H = 32, HORIZON = 20;          // scene units (x: columns, y: rows twice as tall)
@@ -154,8 +156,7 @@ function overlay(t) {
 
 // ------------------------------------------------------------------ drawing
 function draw(ctx, t) {
-  ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
-  const o = overlay(t), skyRows = HORIZON * SY;
+  const o = overlay(t), skyRows = HORIZON * SY, grid = new Float32Array(COLS * ROWS);
   for (let gy = 0; gy < ROWS; gy++) {
     for (let gx = 0; gx < COLS; gx++) {
       let b = Math.min(1, cell(gx, gy, t));
@@ -163,11 +164,10 @@ function draw(ctx, t) {
         const v = o.get(gy * COLS + gx);
         if (v !== undefined && hill(gx / SX, gy / SY, t) === null) b = Math.max(b, v);
       }
-      if (b < 0.05) continue;
-      const s = CELL * 0.9 * Math.sqrt(b);
-      ctx.fillRect(gx * CELL + (CELL - s) / 2, gy * CELL + (CELL - s) / 2, s, s);
+      grid[gy * COLS + gx] = b;
     }
   }
+  drawMarks(ctx, grid, COLS, ROWS, CELL);
 }
 
 let raf = 0, target = 0, shown = 0;
