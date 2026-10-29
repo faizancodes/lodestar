@@ -787,8 +787,9 @@ function planSummary(plan) {
 }
 
 // ------------------------------------------------------------------ abliterate
-// Analysis events → the plan's steps: reading the probes (0), comparing directions (1), checking today's answers (2).
-const ABL_STEP_OF = { "harm-a": 0, "harm-b": 0, "harmless": 0, "compare": 1, "examples": 2 };
+// Analysis events → the plan's steps: reading the probes (0), comparing directions (1), trying the best layers on
+// new bad requests (2), checking today's answers (3).
+const ABL_STEP_OF = { "harm-a": 0, "harm-b": 0, "harmless": 0, "compare": 1, "trial": 2, "examples": 3 };
 let ablProbesDirty = false, ablNameTouched = false;
 const lines = (sel) => $(sel).value.split("\n").map((s) => s.trim()).filter(Boolean);
 
@@ -819,12 +820,10 @@ function renderAbl() {
   $("#abl-go").textContent = ready ? "Find it again" : "Find the refusal direction";
   if (!ablNameTouched && state.info?.loaded) $("#abl-name").value = ablDefaultName();
   renderChatMods();
-  if (!ready) { $("#abl-status").textContent = ""; return; }
+  if (!ready) return;
   const c = a.current;
-  $("#abl-status").textContent = `Layer ${c.layer}` + (c.clean ? "" : " · weak match, check it well");
   $("#abl-toggle").setAttribute("aria-checked", !!c.active);
-  $("#abl-toggle").title = c.active ? "Every reply skips refusal. Click to turn off." : "Turn on for every reply";
-  $("span", $("#abl-toggle")).textContent = c.active ? "On" : "Off";
+  $("#abl-toggle").title = c.active ? "On for every reply in Steer and Chat" : "Off: the model answers as it normally would";
   if (document.activeElement !== $("#abl-coef")) setCoefInput(c.coef ?? 1);
 }
 
@@ -908,7 +907,7 @@ async function ablAnalyze() {
           `<div class="abl-ex"><p class="q">${esc(ABL_EX_PROMPTS[ev.index] || "")}</p><p class="a">${esc(ex[ev.index].trim())}</p></div>`;
       } else if (ev.type === "result") result = ev;
     });
-    ablSetSteps(steps, 3);
+    ablSetSteps(steps, 4);
     if (!ok || !result) {
       $(".plan-now", plan).textContent = "Stopped. Nothing was changed.";
       return;
@@ -921,11 +920,13 @@ async function ablAnalyze() {
     $("#abl-rank").innerHTML = `<details class="adv"><summary>Match by layer</summary>` + result.ranking.map((r) =>
       `<div class="rank-row${r.layer === result.layer ? " sel" : ""}">
         <span class="nid">L${r.layer}</span><span class="pt-bar"><i style="width:${Math.round((r.score / top) * 100)}%"></i></span>
-        <span class="rk-v">${Math.round(r.score * 100)}%</span><span class="rk-tag">${r.layer === result.layer ? "chosen" : ""}</span>
+        <span class="rk-v">${Math.round(r.score * 100)}%</span>
+        <span class="rk-tag">${r.tried ? `${r.refused} of ${r.tried} refused` : "not tried"}${r.layer === result.layer ? " · chosen" : ""}</span>
       </div>`).join("") + `</details>`;
-    $(".plan-now", plan).textContent = result.clean
-      ? `Found at layer ${result.layer} and turned on. Check it below, then save.`
-      : `Found at layer ${result.layer}, but it’s a weak match, so some refusals may survive. Check a few questions below.`;
+    const left = result.refused_left, n = result.tried;
+    $(".plan-now", plan).textContent = !left
+      ? `Layer ${result.layer} stopped the refusals on all ${n} new test requests, and it’s on now. Check it below, then save.`
+      : `Even the best layer (${result.layer}) still refused ${left} of ${n} new test requests. It’s on now; try a higher strength below.`;
     await refreshAbl();
   } finally {
     clearInterval(clock);
@@ -948,8 +949,8 @@ $("#abl-test-go").onclick = async () => {
   rows.innerHTML = probes.map((p, i) => `<div class="run abl-pair" data-p="${i}">
     <div class="run-q">${esc(p)}</div>
     <div class="cols" style="--n:2">
-      <div class="out" data-c="base"><div class="out-h">Before</div><div class="out-b typing"></div></div>
-      <div class="out steered" data-c="abl"><div class="out-h">After</div><div class="out-b typing"></div></div>
+      <div class="out" data-c="base"><div class="out-h">Before<span class="verdict"></span></div><div class="out-b typing"></div></div>
+      <div class="out steered" data-c="abl"><div class="out-h">After<span class="verdict"></span></div><div class="out-b typing"></div></div>
     </div></div>`).join("");
   let result = null;
   const ok = await stream("/api/abl/test", { probes }, (ev) => {
@@ -960,12 +961,16 @@ $("#abl-test-go").onclick = async () => {
   });
   $$(".abl-pair .out-b", rows).forEach((el) => el.classList.remove("typing"));
   if (!ok || !result) return;
-  const [rb, ra] = result.refused_rate, [n0, n1] = result.nll;
+  const [before, after] = result.refused, [n0, n1] = result.nll;
+  ["base", "abl"].forEach((kind, k) => (k ? after : before).forEach((ref, i) => {
+    const v = $(`.abl-pair[data-p="${i}"] [data-c=${kind}] .verdict`, rows);
+    if (v) (v.textContent = ref ? "Refused" : "Answered"), (v.className = "verdict " + (ref ? "ref" : "ans"));
+  }));
+  const rb = before.filter(Boolean).length, ra = after.filter(Boolean).length, n = before.length;
   const dn = n1 - n0;
-  const note = dn > 0.18 ? " Writing quality dropped noticeably, so try a lower strength."
+  const note = ra && rb ? " Some refusals survived, so try a higher strength." : dn > 0.18 ? " Writing quality dropped noticeably, so try a lower strength."
     : Math.abs(dn) <= 0.02 ? " No measurable drop in writing quality." : "";
-  $("#abl-test-summary").innerHTML =
-    `<b>Refused ${Math.round(rb * 100)}% before, ${Math.round(ra * 100)}% after.</b>${note}`;
+  $("#abl-test-summary").innerHTML = `<b>Refused ${rb} of ${n} before, ${ra} of ${n} after.</b>${note}`;
 };
 
 // ------------------------------------------------------------------ save the abliterated weights
