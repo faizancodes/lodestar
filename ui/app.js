@@ -5,6 +5,7 @@ import { startAblScene } from "./ablscene.js";
 import { startSideArt } from "./glyphs.js";
 import { markSVG } from "./mark.js";
 import { drawHomeArt } from "./home.js";
+import { createDecoder } from "./decode.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -1234,10 +1235,15 @@ scroller.addEventListener("scroll", () => {
 const toBottom = (smooth) => scroller.scrollTo({ top: scroller.scrollHeight, behavior: smooth && !still() ? "smooth" : "auto" });
 $("#chat-jump").onclick = () => ((follow = true), toBottom(true));
 
+let decoder = null; // the reply being written decodes in, mark by mark
+
 function updateLastBot() {
   const el = $("#chat-log .msg.bot:last-child .md");
   const m = chat.messages[chat.messages.length - 1];
-  if (el && m.content) el.innerHTML = md(cleanReply(m.content));
+  if (el && m.content) {
+    el.innerHTML = md(cleanReply(m.content));
+    decoder?.update(el);
+  }
   if (follow) toBottom(false);
 }
 
@@ -1254,6 +1260,7 @@ async function reply() {
   const m = { role: "assistant", content: "" };
   chat.messages.push(m);
   chat.streaming = true;
+  decoder = createDecoder();
   setComposer();
   renderChat();
   follow = true;
@@ -1269,6 +1276,8 @@ async function reply() {
   if (!m.content.trim()) chat.messages.pop();
   else if (!ok) m.stopped = true;
   renderChat();
+  decoder?.update($("#chat-log .msg.bot:last-child .md")); // let the last few letters finish decoding
+  decoder = null;
   setComposer();
   if (follow) toBottom(false);
   $("#chat-input").focus();
