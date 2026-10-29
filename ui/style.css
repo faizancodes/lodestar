@@ -514,6 +514,10 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .abl-note b { color: var(--cobalt); }
 .abl-note .abl-dim { font-weight: 400; color: var(--muted); }
 .abl-steps { grid-template-columns: repeat(4, 1fr); }
+.abl-scene { display: flex; justify-content: center; margin: 8px 0 18px; }
+.abl-scene[hidden] { display: none; }
+.abl-scene canvas { display: block; width: 100%; max-width: 630px; height: auto; aspect-ratio: 150 / 40; color: var(--cobalt); animation: rise 0.25s ease-out; }
+.abl-scene canvas.swap { animation: fade-in 0.35s ease-out; }
 .abl .adv { margin: 20px 0 0; }
 .abl .adv summary { margin-bottom: 16px; }
 #abl-rank .adv { margin-top: 20px; }
