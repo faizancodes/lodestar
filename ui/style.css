@@ -1,8 +1,7 @@
 /* Auto Interp — night and ASCII. A near-black ground, panels lifted a step at a time with hairline rules, and the
    ASCII scenes as the one source of light, drawn in pale periwinkle. Three faces, one job each (see "voices" at
-   the end): Interp Matrix, the app's own dot-matrix display face, for the wordmark and page titles; Geist for
-   text and everything the model writes; Geist Mono for the instrument panel (what you type, controls, labels,
-   names and numbers). */
+   the end): Geist for headings and text, everything the model writes included; Geist Mono for the instrument
+   panel (what you type, controls, labels, names and numbers). */
 :root {
   --bg: #0a0a0a;
   --night: #070707;         /* the sidebar, code */
@@ -22,7 +21,6 @@
   --rule-2: rgba(255, 255, 255, 0.14);
   --wash: rgba(255, 255, 255, 0.05);
   --well: rgba(255, 255, 255, 0.03);
-  --display: "Interp Matrix", "Geist Mono", ui-monospace, monospace;
   --sans: "Geist", -apple-system, system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius: 6px;
@@ -61,7 +59,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .brand { position: relative; z-index: 2; }
-.brand h1 { margin: 0; font-size: 27px; line-height: 1.15; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; }
+.brand h1 { margin: 0; font-size: 21px; line-height: 1.1; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; }
 .brand h1 i { font-style: normal; color: var(--ascii); }
 .eyebrow { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .eyebrow.light { color: rgba(237, 237, 237, 0.62); }
@@ -191,7 +189,7 @@ body:not([data-tab="steer"]) .saved { display: none; }
 main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 
 .start { display: flex; flex-direction: column; max-width: 720px; margin: 5vh auto 0; animation: rise 0.25s ease-out; }
-.start h2 { margin: 0 0 28px; font-size: 34px; line-height: 1.1; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
+.start h2 { margin: 0 0 26px; font-size: 32px; line-height: 1.1; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; color: var(--text); }
 .start-models { display: grid; gap: 12px; }
 .start-model {
   display: flex;
@@ -235,7 +233,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 }
 
 .page { display: flex; flex-direction: column; gap: 44px; max-width: 920px; margin: 0 auto; }
-.page-h h2 { margin: 0; font-size: 46px; line-height: 1.05; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
+.page-h h2 { margin: 0; font-size: 40px; line-height: 1.05; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; color: var(--text); }
 .page-h p { margin: 10px 0 0; max-width: 620px; font-size: 14px; color: var(--text-2); }
 .page-h a { color: var(--accent); }
 .step.locked .card { opacity: 0.45; pointer-events: none; filter: saturate(0.6); }
@@ -636,7 +634,7 @@ main.is-chat { padding: 0; overflow: hidden; }
 .msg-note { margin-left: 6px; font-size: 11.5px; color: var(--bad); }
 
 .chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 32px; animation: rise 0.3s ease-out; }
-.chat-empty h2 { margin: 0 0 28px; font-size: 34px; line-height: 1.1; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
+.chat-empty h2 { margin: 0 0 26px; font-size: 32px; line-height: 1.1; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; color: var(--text); }
 .chat-starters { display: grid; grid-template-columns: repeat(2, minmax(0, 260px)); gap: 12px; }
 .starter {
   padding: 16px 18px; border: 1px solid var(--rule-2); border-radius: var(--radius); background: var(--panel);
@@ -683,9 +681,8 @@ main.is-chat { padding: 0; overflow: hidden; }
 
 
 /* ------------------------------------------------------------ voices */
-/* display: the dot matrix, for the wordmark and page titles only */
-h1, h2 { font-family: var(--display); }
-h3, .chat-title b { font-family: var(--sans); }
+/* headings: Geist, heavier and tighter than the text */
+h1, h2, h3, .chat-title b { font-family: var(--sans); }
 h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weight: 600; letter-spacing: -0.01em; }
 .panel-h h3, .plan-h b, .saved-model b { font-size: 15px; }
 

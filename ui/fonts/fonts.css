@@ -1,11 +1,3 @@
-/* Interp Matrix: the app's own display face, drawn dot by dot (scripts/build_matrix_font.py). */
-@font-face {
-  font-family: 'Interp Matrix';
-  font-style: normal;
-  font-weight: 400;
-  font-display: block;
-  src: url(InterpMatrix.woff2) format('woff2');
-}
 @font-face {
   font-family: 'Geist';
   font-style: normal;
