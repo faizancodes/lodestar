@@ -127,7 +127,7 @@ function renderHome() {
   $("#hc-abliterate").innerHTML = cur?.active ? `<i class="hc-on"></i>Refusals erased at layer ${cur.layer}` : cur ? "Direction saved, switched off" : "";
   const mine = (state.saved || []).filter((r) => modelName(r.model) === modelName(s.model)).length;
   $("#hc-steer").textContent = mine ? `${mine} saved` : "";
-  requestAnimationFrame(() => $$(".home-art").forEach((c) => drawHomeArt(c, c.dataset.art)));
+  requestAnimationFrame(() => $$(".home-art").forEach((c) => drawHomeArt(c, c.dataset.art, c.closest(".home-card"))));
 }
 document.addEventListener("keydown", (e) => {
   if (!e.metaKey || e.shiftKey || e.altKey) return;
