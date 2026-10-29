@@ -39,14 +39,11 @@ export function drawMarks(ctx, grid, cols, rows, cell) {
 const hash = (x, y) => { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return s - Math.floor(s); };
 
 /** The sidebar's night as a navigator's chart, where the start screen's scene is the photograph: a faint sky
- * atlas grid sweeping in from the pole, scattered stars that twinkle, and the Little Dipper, whose handle ends at
- * Polaris, the lodestar, drawn as the app's mark. Nothing turns; ~4 fps for the twinkle, paused while hidden. */
+ * atlas grid sweeping in from the pole, and scattered stars that twinkle. Nothing turns; ~4 fps for the twinkle,
+ * paused while hidden. */
 export function startSideArt(canvas) {
   const cell = 4;
-  let cols, rows, grid, ctx, navRow, dipper, pole;
-  // the Little Dipper in a unit box: Polaris at the handle's tip, then Yildun, Epsilon, Zeta and the bowl
-  const DIPPER = [[0.08, 0.02], [0.24, 0.17], [0.36, 0.32], [0.46, 0.5], [0.74, 0.5], [0.86, 0.8], [0.56, 0.84]];
-  const LINES = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]];
+  let cols, rows, grid, ctx, navRow, pole;
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
     if (!w || !h) return false;
@@ -60,8 +57,6 @@ export function startSideArt(canvas) {
     const tabs = document.querySelector(".tabs")?.getBoundingClientRect(), top = canvas.getBoundingClientRect().top;
     navRow = tabs ? (tabs.bottom - top) / cell : 0;
     pole = { x: cols * 1.25, y: -rows * 0.08 }; // the chart's pole, off past the top right, so its grid sweeps in
-    const x0 = cols * 0.1, x1 = cols * 0.88, y0 = rows * 0.46, y1 = rows * 0.74;
-    dipper = DIPPER.map(([u, v]) => [Math.round(x0 + u * (x1 - x0)), Math.round(y0 + v * (y1 - y0))]);
     return true;
   };
   const put = (x, y, b) => {
@@ -86,21 +81,6 @@ export function startSideArt(canvas) {
       const x = Math.floor(hash(i, 11) * cols), y = Math.floor(hash(i, 12) * rows);
       put(x, y, (0.12 + hash(i, 13) ** 3 * 0.45) * (0.65 + 0.35 * Math.sin(t * (0.6 + hash(i, 14)) + i)));
     }
-    // the Little Dipper: dotted lines between its stars
-    for (const [a, b] of LINES) {
-      const [ax, ay] = dipper[a], [bx, by] = dipper[b], n = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
-      for (let s = 2; s < n - 1; s += 2) put(Math.round(ax + ((bx - ax) * s) / n), Math.round(ay + ((by - ay) * s) / n), 0.32);
-    }
-    dipper.forEach(([x, y], i) => {
-      if (i === 0) return;
-      put(x, y, 0.75);
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, 0.3);
-    });
-    // Polaris, the lodestar, as the app's mark: a bright core, the north ray longest, glints on the diagonals
-    const [px, py] = dipper[0];
-    for (const [dx, dy, b] of [[0, 0, 1], [1, 0, 0.75], [-1, 0, 0.75], [0, 1, 0.75], [0, -1, 0.8], [2, 0, 0.45], [-2, 0, 0.45], [0, 2, 0.45],
-      [0, -2, 0.6], [0, -3, 0.4], [0, -4, 0.22], [3, 0, 0.2], [-3, 0, 0.2], [1, 1, 0.3], [1, -1, 0.3], [-1, 1, 0.3], [-1, -1, 0.3]]) put(px + dx, py + dy, b);
-    for (let a = 0; a < Math.PI * 2; a += 0.35) put(Math.round(px + Math.cos(a) * 6), Math.round(py + Math.sin(a) * 6), 0.2);
     ctx.fillStyle = getComputedStyle(canvas).color;
     drawMarks(ctx, grid, cols, rows, cell);
   };
