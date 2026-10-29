@@ -220,7 +220,7 @@ def _read_set(eng, prompts, stage, label, cancel):
 
 def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
     """Yields SSE-style events while working; ends with a `result` event:
-    {vec, layer, coef, ranking: [{layer, score, mag}], clean, examples: [{prompt, reply, refused}]}."""
+    {vec, layer, coef, ranking: [{layer, score, mag}], clean, examples: [{prompt, before, after, refused_before, refused_after}]}."""
     harmful = [p.strip() for p in harmful if p and p.strip()]
     harmless = [p.strip() for p in harmless if p and p.strip()]
     if len(harmful) < 10 or len(harmless) < 10:
@@ -269,34 +269,37 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             dnll = float(eng.reference_nll([[]], cancel, abl=[True])[0]) - nll0
             trials[l] = {"refused": sum(not x for x in ok), "dnll": dnll}
             yield _ev("progress", stage="trial", done=i + 1, total=len(cands))
+
+        # fewest refusals wins; a layer that makes ordinary text noticeably worse only wins if nothing else works
+        selected = min(cands, key=lambda l: (trials[l]["refused"] + (len(TRIAL_PROMPTS) if trials[l]["dnll"] > 0.5 else 0),
+                                             -float(cos[l])))
+        vec = [round(float(x), 6) for x in u_all[selected]]
+        shown = cands + [l for l in ranking if l not in cands][:max(0, 10 - len(cands))]
+        rank_rows = [{"layer": int(l), "score": round(float(cos[l]), 4), "mag": round(float(mag_all[l]), 2),
+                      **({"refused": trials[l]["refused"], "tried": len(TRIAL_PROMPTS)} if l in trials else {})}
+                     for l in shown]
+        yield _ev("ranking", layers=rank_rows, selected=selected)
+        refused_left = trials[selected]["refused"]
+        clean = refused_left == 0
+
+        # each example request answered twice in one batch: as the model is, and with the chosen layer erased
+        yield _ev("stage", stage="examples", label=f"Answering two more bad requests with and without layer {selected}")
+        eng.abl_of(u_all[selected], 1.0, selected)
+        grows = [(eng.chat_ids(p), []) for p in EXAMPLE_PROMPTS for _ in (0, 1)]
+        texts = [""] * len(grows)
+        for r, delta in eng.generate(grows, max_new=example_max_new, cancel=cancel, abl=[r % 2 == 1 for r in range(len(grows))]):
+            if r is None:
+                break
+            texts[r] += delta
+            yield _ev("exdelta", index=r // 2, kind="abl" if r % 2 else "base", delta=delta)
     finally:
         if prev:
             eng.abl_of(*prev)
         else:
             eng.clear_abl()
-
-    # fewest refusals wins; a layer that makes ordinary text noticeably worse only wins if nothing else works
-    selected = min(cands, key=lambda l: (trials[l]["refused"] + (len(TRIAL_PROMPTS) if trials[l]["dnll"] > 0.5 else 0),
-                                         -float(cos[l])))
-    vec = [round(float(x), 6) for x in u_all[selected]]
-    shown = cands + [l for l in ranking if l not in cands][:max(0, 10 - len(cands))]
-    rank_rows = [{"layer": int(l), "score": round(float(cos[l]), 4), "mag": round(float(mag_all[l]), 2),
-                  **({"refused": trials[l]["refused"], "tried": len(TRIAL_PROMPTS)} if l in trials else {})}
-                 for l in shown]
-    yield _ev("ranking", layers=rank_rows, selected=selected)
-    refused_left = trials[selected]["refused"]
-    clean = refused_left == 0
-
-    yield _ev("stage", stage="examples", label="Trying a bad request on the model as it is today")
-    grows = [(eng.chat_ids(p), []) for p in EXAMPLE_PROMPTS]
-    texts = [""] * len(grows)
-    for r, delta in eng.generate(grows, max_new=example_max_new, cancel=cancel):
-        if r is None:
-            break
-        texts[r] += delta
-        yield _ev("exdelta", index=r, delta=delta)
     verdicts = refused(texts)
-    examples = [{"prompt": p, "reply": texts[i].strip(), "refused": verdicts[i]} for i, p in enumerate(EXAMPLE_PROMPTS)]
+    examples = [{"prompt": p, "before": texts[2 * i].strip(), "after": texts[2 * i + 1].strip(),
+                 "refused_before": verdicts[2 * i], "refused_after": verdicts[2 * i + 1]} for i, p in enumerate(EXAMPLE_PROMPTS)]
 
     yield _ev("result", vec=vec, layer=selected, coef=1.0, ranking=rank_rows, clean=clean,
               top_score=round(float(cos[selected]), 4), refused_left=refused_left, tried=len(TRIAL_PROMPTS),
