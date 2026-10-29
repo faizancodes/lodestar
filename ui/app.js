@@ -2,7 +2,7 @@
 import { finishScene, setProgress, startScene, stopScene, wake } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
-import { startSideArt } from "./glyphs.js";
+import { startSideArt, startSpinner } from "./glyphs.js";
 import { markSVG } from "./mark.js";
 import { drawHomeArt } from "./home.js";
 import { createDecoder } from "./decode.js";
@@ -742,6 +742,20 @@ function planShell(plan) {
   </div>`;
 }
 
+// a plan's status line: while it runs, a lit strip with the Lodestar spinner; once it ends, plain text
+function setLive(el, text, running, html = false) {
+  if (!el) return;
+  let t = $(".pn-t", el);
+  if (!t) {
+    el.innerHTML = `<canvas class="spin" aria-hidden="true"></canvas><span class="pn-t"></span>`;
+    t = $(".pn-t", el);
+    el._spin = startSpinner($(".spin", el), () => el.classList.contains("live"));
+  }
+  html ? (t.innerHTML = text) : (t.textContent = text);
+  el.classList.toggle("live", !!running);
+  if (running) el._spin();
+}
+
 function renderPlanProgress(box, plan) {
   const on = $(".plan-steps li.on i", box);
   if (on) on.style.width = Math.round(plan.frac * 100) + "%";
@@ -774,8 +788,8 @@ function renderPlan(box, plan) {
   // the instruction changed nothing: replace the whole plan with a plain explanation and ideas that do work
   if (plan.noEffect) {
     $(".plan-steps", box).innerHTML = "";
-    $(".plan-now", box).innerHTML = `<b>This didn’t change how the model answers</b>, so there are no neurons to tune for it. ` +
-      `With your instruction, the model still gives its ordinary reply (below). Steering can shift the model’s style or topic, not add a skill or make it answer things it declines.`;
+    setLive($(".plan-now", box), `<b>This didn’t change how the model answers</b>, so there are no neurons to tune for it. ` +
+      `With your instruction, the model still gives its ordinary reply (below). Steering can shift the model’s style or topic, not add a skill or make it answer things it declines.`, false, true);
     renderExample(box, plan);
     const ex = $(".plan-ex .lbl", box);
     if (ex) ex.textContent = "The model’s ordinary answer";
@@ -798,7 +812,7 @@ function renderPlan(box, plan) {
   // stage steps, with a fill on the current one
   $(".plan-steps", box).innerHTML = STAGES.map((st, i) =>
     `<li class="${i < plan.stage || plan.done ? "done" : i === plan.stage && !plan.stopped ? "on" : ""}"><span>${st.label}</span><i style="width:${i === plan.stage ? Math.round(plan.frac * 100) : 0}%"></i></li>`).join("");
-  $(".plan-now", box).textContent = plan.stopped || (plan.done ? planSummary(plan) : (plan.label || "") + "…");
+  setLive($(".plan-now", box), plan.stopped || (plan.done ? planSummary(plan) : (plan.label || "") + "…"), !plan.stopped && !plan.done);
   renderExample(box, plan);
 
   // the table: chosen neurons first, then the strongest candidates (tested beat estimates)
@@ -999,7 +1013,7 @@ async function ablAnalyze() {
       if (ev.type === "stage") {
         ablSetSteps(steps, ABL_STEP_OF[ev.stage] ?? 0);
         ablScene.set(ABL_STEP_OF[ev.stage] ?? 0);
-        $(".plan-now", plan).textContent = ev.label + "…";
+        setLive($(".plan-now", plan), ev.label + "…", true);
       } else if (ev.type === "progress") {
         const bar = $("i", steps[ABL_STEP_OF[ev.stage] ?? 0]);
         if (bar) bar.style.width = Math.round((100 * ev.done) / ev.total) + "%";
@@ -1013,7 +1027,7 @@ async function ablAnalyze() {
     ablSetSteps(steps, 4);
     sceneBox.hidden = true;
     if (!ok || !result) {
-      $(".plan-now", plan).textContent = "Stopped. Nothing was changed.";
+      setLive($(".plan-now", plan), "Stopped. Nothing was changed.", false);
       return;
     }
     const exBox = $("#abl-examples");
@@ -1032,9 +1046,9 @@ async function ablAnalyze() {
       </div>`).join("") + `</details>`;
     const left = result.refused_left, n = result.tried;
     const at = result.coef === 1 ? "" : ` at strength ${result.coef}`;
-    $(".plan-now", plan).textContent = !left
+    setLive($(".plan-now", plan), !left
       ? `Layer ${result.layer}${at} stopped the refusals on all ${n} new test requests, and it’s on now.`
-      : `Even the best setting, layer ${result.layer}${at}, still refused ${left} of ${n} new test requests. It’s on now.`;
+      : `Even the best setting, layer ${result.layer}${at}, still refused ${left} of ${n} new test requests. It’s on now.`, false);
     await refreshAbl();
   } finally {
     clearInterval(clock);
