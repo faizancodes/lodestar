@@ -203,6 +203,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
   cursor: pointer;
   transition: border-color 0.15s, transform 0.1s;
 }
+.start-model.picked { border-color: rgba(195, 207, 245, 0.6); box-shadow: 0 0 0 1px rgba(195, 207, 245, 0.25), 0 0 32px -8px rgba(195, 207, 245, 0.45); }
 .start-model:hover { border-color: var(--accent); transform: translateY(-1px); }
 .start-model b { display: block; font-size: 17px; letter-spacing: -0.02em; }
 .start-model span { font-size: 12.5px; color: var(--muted); }

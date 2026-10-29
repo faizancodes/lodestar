@@ -16,7 +16,8 @@ const ridges = [
   (x) => HORIZON - 6 - 2.2 * Math.sin(x * 0.065 + 1.2) - 0.9 * Math.sin(x * 0.15),     // back
 ];
 
-let pulseAt = null; // time the ready pulse started
+let pulseAt = null; // time the current pulse (wake or ready) started
+let wakeRequest = false;
 
 const DRIFT = [0.9, 0.35]; // scene units per second: the near hill slides faster than the far one, for depth
 
@@ -177,10 +178,16 @@ export function setProgress(p) {
   target = Math.max(target, Math.max(0, Math.min(1, p || 0)));
 }
 
+/** One ring of light from the sun, as a load begins. */
+export function wake() {
+  wakeRequest = true;
+}
+
 /** Finish the rise and play the ready pulse; resolves when it has played. */
 export function finishScene() {
   if (!raf) return Promise.resolve();
   target = 1;
+  pulseAt = null; // a wake ring still in flight gives way to the ready one
   return new Promise((done) => {
     pulseRequest = done;
   });
@@ -209,6 +216,7 @@ export function startScene(canvas) {
     const dt = Math.min(0.2, (now - last) / 1000);
     last = now;
     const t = (now - t0) / 1000;
+    if (wakeRequest) ((pulseAt = t), (wakeRequest = false));
     shown += (target - shown) * Math.min(1, dt * (pulseRequest ? 5 : 1.8));
     const e = 1 - (1 - shown) ** 2;
     SUN.y = SUN_LOW + (SUN_HIGH - SUN_LOW) * e;
