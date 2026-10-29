@@ -148,7 +148,7 @@ body:not([data-tab="steer"]) .saved { display: none; }
 .model-status.err .dot { background: #d9826a; }
 @keyframes pulse { 50% { opacity: 0.25; } }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
-.side-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; color: var(--ascii); opacity: 0.75; }
+.side-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; color: var(--ascii); opacity: 0.38; }
 
 .model-menu {
   position: fixed;
