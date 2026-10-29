@@ -1,5 +1,7 @@
 /* Auto Interp — ink and night: an engraved plate (parchment, black ink, hatching) beside a night sky drawn in
-   ASCII marks. Type: Archivo (extended for display), Newsreader for the model's words, JetBrains Mono for numbers. */
+   ASCII marks. Three voices, one job each (see "voices" at the end): Archivo extended black for headings, the
+   poster's wordmark; Newsreader for reading, the engraving's book; JetBrains Mono for the instrument panel,
+   the ASCII: what you type, controls, labels, names and numbers. */
 :root {
   --accent: #161512;        /* the ink: buttons, marks, headings */
   --ink-deep: #000;
@@ -26,7 +28,7 @@
   --plate: none;            /* engrave.js: ink on parchment, the page's ground */
   --ink-tex: none;          /* engrave.js: hairlines on night, the texture of every dark surface */
   --engraved: var(--ink-tex) 0 0 / 100vw 100vh no-repeat, var(--night);
-  --sheet: rgba(244, 239, 228, 0.84);   /* thin paper laid on the plate: its lines show faintly through */
+  --sheet: #f4efe4;         /* paper laid on the plate, opaque so its hatched shadow stays behind it */
   --well: rgba(226, 218, 200, 0.5);
   --hatch-shadow: repeating-linear-gradient(-45deg, rgba(22, 21, 18, 0.5) 0 1px, transparent 1px 3.2px);
   --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .09 0 0 0 0 .08 0 0 0 0 .07 0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
@@ -36,10 +38,10 @@
 html, body { height: 100%; margin: 0; }
 body {
   display: flex;
-  font-family: var(--sans);
+  font-family: var(--serif);
   color: var(--ink);
   background: var(--plate) center / 100% 100% no-repeat, var(--grain), var(--cream);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
@@ -292,7 +294,7 @@ input[type="range"] { accent-color: var(--accent); }
 input[type="checkbox"] { accent-color: var(--accent); }
 output { font-family: var(--mono); font-size: 12px; min-width: 42px; text-align: right; }
 label.mini, label.check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
-kbd { margin-left: 4px; font-family: var(--sans); font-size: 11px; opacity: 0.65; }
+kbd { margin-left: 4px; font-family: var(--mono); font-size: 11px; opacity: 0.65; }
 
 .btn {
   display: inline-flex;
@@ -658,7 +660,7 @@ main.is-chat { padding: 0; overflow: hidden; }
 .composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ink-wash), 0 14px 34px -22px rgba(0, 0, 0, 0.55); }
 .composer textarea {
   display: block; width: 100%; max-height: 220px; padding: 4px 0; border: 0; border-radius: 0; background: none;
-  font-size: 15px; line-height: 1.5; resize: none; box-shadow: none !important;
+  font-size: 14px; line-height: 1.55; resize: none; box-shadow: none !important;
 }
 .composer-bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .send {
@@ -694,3 +696,35 @@ main.is-chat { padding: 0; overflow: hidden; }
   background: var(--hatch-shadow); pointer-events: none;
 }
 .step.locked .card::before { display: none; }
+
+/* ------------------------------------------------------------ voices */
+/* display: the poster's wordmark, headings only */
+h1, h2, h3, .chat-title b { font-family: var(--sans); }
+h3, .panel-h h3, .plan-h b, .saved-model b { font-weight: 800; font-stretch: 112%; letter-spacing: -0.01em; }
+
+/* reading: body text, explanations and everything the model writes are the serif set on body */
+.page-h p, .abl-lede, .status-line, .start-status, .empty, .plan-now { font-size: 15px; }
+.field { font-size: 14.5px; }
+.field .opt, label.mini, label.check { font-size: 13.5px; }
+
+/* the instrument panel: what you type, controls, labels, names and numbers */
+textarea, input, .msg.user .bubble, .run-q,
+.btn, .tab, .tab-count, .chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary, .starter, .switch,
+.side-link, .model-pick, .model-status, .mm-item, .mm-group, .start-model b, .start-model span, .start-model .go,
+.saved-item .nm, .plan-steps li, .out-h, .verdict, .pt-head, .pt-tag, .pt-lens, .pt-dose, .rk-tag,
+.lbl, .panel-b h4, #abl-rank h4, .toast, .ex-line > span, .plan-ideas > span, .result-h b, .rc-h b, .rc-row .who b,
+.found-row .who b, .out-h .insp, .eyebrow { font-family: var(--mono); }
+.tab { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+.btn { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+.btn.sm { font-size: 10.5px; }
+.chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary { font-size: 11.5px; font-weight: 500; letter-spacing: 0.01em; }
+.msg-acts button, .out-h, .plan-steps li, .lbl, .panel-b h4, .pt-head, .verdict { text-transform: uppercase; letter-spacing: 0.08em; }
+.msg-acts button { font-size: 10.5px; }
+.starter { font-size: 12.5px; font-weight: 500; line-height: 1.5; }
+.msg.user .bubble { font-size: 13.5px; line-height: 1.55; }
+textarea, input:not([type]) { font-size: 13.5px; }
+.start-model b { font-size: 15px; font-weight: 600; letter-spacing: 0; }
+.start-model span, .model-status, .saved-item .nm { font-size: 11.5px; }
+.start-model .go { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.run-q { font-size: 13px; font-weight: 600; }
+.toast { font-size: 12px; font-weight: 500; }
