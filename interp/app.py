@@ -40,7 +40,7 @@ def main():
         threading.Event().wait()
     import webview
     window = webview.create_window("Auto Interp", url, width=1440, height=920, min_size=(1100, 700),
-                                   background_color="#F8EFE0", text_select=True)
+                                   background_color="#E9E2D2", text_select=True)
     window.events.shown += lambda: _style_titlebar(window)
     webview.start()
 
@@ -62,7 +62,7 @@ def _style_titlebar(window):
         win.setAppearance_(light)
         win.setTitlebarAppearsTransparent_(True)
         win.setTitleVisibility_(AppKit.NSWindowTitleHidden)
-        win.setBackgroundColor_(AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(0xF8 / 255, 0xEF / 255, 0xE0 / 255, 1.0))
+        win.setBackgroundColor_(AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(0xE9 / 255, 0xE2 / 255, 0xD2 / 255, 1.0))
 
         # the title bar still shows a cool vibrancy material over the warm cream; hide that backdrop so the
         # window's cream background shows there instead. The traffic-light buttons (_NSThemeWidget) are untouched.

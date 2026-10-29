@@ -2,6 +2,8 @@
 import { finishScene, setProgress, startScene, stopScene } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
+import { engrave } from "./engrave.js";
+import { drawSideArt } from "./glyphs.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -114,26 +116,13 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ------------------------------------------------------------------ sidebar art
-(function hills() {
-  const svg = $("#hills"), W = 300, H = 120;
-  const ridge = (x, k) => {
-    const a = 62 - 30 * Math.exp(-((x - 205) ** 2) / 2600) - 16 * Math.exp(-((x - 70) ** 2) / 1500);
-    return a + k * 3.1 + Math.sin(x * 0.11 + k) * 0.8 + Math.sin(x * 0.037 + k * 0.6) * 1.6;
-  };
-  let p = "";
-  for (let k = 0; k < 22; k++) {
-    let d = "";
-    for (let x = -4; x <= W + 4; x += 4) {
-      const y = ridge(x, k);
-      if (y > H) continue;
-      const gap = Math.sin(x * 0.53 + k * 2.1) > 0.86; // broken lines, like an engraving
-      d += (d && !gap ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
-    }
-    p += `<path d="${d}" fill="none" stroke="#f8efe0" stroke-width="${0.55 + k * 0.03}" opacity="${0.35 + k * 0.025}"/>`;
-  }
-  const fill = `M0 ${H} ` + Array.from({ length: 77 }, (_, i) => `L${i * 4} ${ridge(i * 4, 0).toFixed(1)}`).join(" ") + ` L${W} ${H} Z`;
-  svg.innerHTML = `<path d="${fill}" fill="#183c8c" opacity=".55"/>` + p;
-})();
+{
+  const art = $("#side-art");
+  drawSideArt(art);
+  let t = 0;
+  addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => drawSideArt(art), 250); });
+}
+engrave($("#main"));
 
 // ------------------------------------------------------------------ models
 const note = (id) => state.models.presets.find((p) => p.id === id)?.note || "";
@@ -1384,8 +1373,8 @@ async function openNeuron(l, n, anchor) {
       .map((t, i) => {
         if (i < s) return "";
         const v = Math.min(1, Math.abs(a[i]) / mx);
-        const bg = a[i] >= 0 ? `rgba(31,73,163,${(v * 0.85).toFixed(2)})` : `rgba(180,83,42,${(v * 0.75).toFixed(2)})`;
-        return `<span class="tok" style="background:${bg};${v > 0.55 ? "color:#f8efe0" : ""}">${esc(t.replace(/\n/g, ""))}</span>`;
+        const bg = a[i] >= 0 ? `rgba(22,21,18,${(v * 0.8).toFixed(2)})` : `rgba(147,54,31,${(v * 0.75).toFixed(2)})`;
+        return `<span class="tok" style="background:${bg};${v > 0.55 ? "color:#f4efe4" : ""}">${esc(t.replace(/\n/g, ""))}</span>`;
       })
       .join("")}</div>`;
   }
