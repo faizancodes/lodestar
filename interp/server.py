@@ -519,7 +519,7 @@ async def abl_test(req: Request):
                 break
             texts[r] += dx
             yield {"type": "delta", "probe": r // 2, "kind": "base" if r % 2 == 0 else "abl", "delta": dx}
-        refused = [abl_mod.refusalish(t) for t in texts]
+        refused = abl_mod.refused(texts)
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
         nll1 = float(eng.reference_nll([[]], cancel, abl=[True])[0])
         yield {"type": "result", "probes": probes, "texts": [t.strip() for t in texts],
