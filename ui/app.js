@@ -775,11 +775,19 @@ function renderProof(box, plan) {
   const el = $(".plan-proof", box);
   if (!el || !plan.proof.prompt) return;
   el.hidden = false;
-  el.innerHTML = `<div class="lbl">On a question it hasn’t seen: “${esc(plan.proof.prompt)}”</div>
+  if (!el.dataset.built) { // built once, then streamed into, so both answers decode in as they're written
+    el.dataset.built = "1";
+    el.innerHTML = `<div class="lbl"></div>
     <div class="cols" style="--n:2">
-      <div class="out"><div class="out-h">Normal</div><div class="out-b">${esc((plan.proof.baseline || "").trim())}</div></div>
-      <div class="out steered"><div class="out-h">Tuned</div><div class="out-b">${esc((plan.proof.steered || "").trim())}</div></div>
+      <div class="out"><div class="out-h">Normal</div><div class="out-b" data-k="baseline"></div></div>
+      <div class="out steered"><div class="out-h">Tuned</div><div class="out-b" data-k="steered"></div></div>
     </div>`;
+  }
+  $(".lbl", el).textContent = `On a question it hasn’t seen: “${plan.proof.prompt}”`;
+  for (const k of ["baseline", "steered"]) {
+    const cell = $(`[data-k=${k}]`, el), text = (plan.proof[k] || "").trim();
+    if (cell.textContent !== text) ((cell.textContent = text), (cell._dec ??= createDecoder()).update(cell));
+  }
 }
 
 function renderPlan(box, plan) {
@@ -1030,11 +1038,14 @@ async function ablAnalyze() {
       setLive($(".plan-now", plan), "Stopped. Nothing was changed.", false);
       return;
     }
+    // the answers streamed in already; keep those boxes (and their decoding) and only fill in what's missing
     const exBox = $("#abl-examples");
-    exBox.innerHTML = ablPairs(result.examples.map((x) => x.prompt));
+    if ($$(".abl-pair", exBox).length !== result.examples.length) exBox.innerHTML = ablPairs(result.examples.map((x) => x.prompt));
     result.examples.forEach((x, i) => {
-      $(`.abl-pair[data-p="${i}"] [data-c=base] .out-b`, exBox).textContent = x.before;
-      $(`.abl-pair[data-p="${i}"] [data-c=abl] .out-b`, exBox).textContent = x.after;
+      for (const [k, text] of [["base", x.before], ["abl", x.after]]) {
+        const cell = $(`.abl-pair[data-p="${i}"] [data-c=${k}] .out-b`, exBox);
+        if (cell.textContent.trim() !== text.trim()) ((cell.textContent = text), (cell._dec ??= createDecoder()).update(cell));
+      }
     });
     ablVerdicts(exBox, result.examples.map((x) => x.refused_before), result.examples.map((x) => x.refused_after));
     const top = Math.max(result.top_score, 1e-9);
