@@ -567,14 +567,12 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .rank-row .rk-v { font-family: var(--mono); font-size: 12px; text-align: right; }
 .rank-row .rk-tag { font-size: 10.5px; color: var(--muted); text-align: right; }
 .rank-row.sel .rk-tag { color: var(--cobalt); font-weight: 700; }
-.abl-examples .lbl, .abl-checks .lbl { margin: 20px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
-.abl-ex { position: relative; margin: 0 0 12px; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 11px; background: var(--cream); }
-.abl-ex .q { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
-.abl-ex .a { margin: 0; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
-.abl-verdict { position: absolute; top: 8px; right: 10px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-.abl-verdict.ref { color: var(--rust); }
-.abl-verdict.ans { color: var(--cobalt); }
+.abl-checks .lbl { margin: 20px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
 .abl-pair { margin-top: 20px; }
+.abl-examples { display: flex; flex-direction: column; gap: 20px; }
+.abl-examples .abl-pair { margin-top: 0; }
+.abl-examples .out-b { max-height: 240px; overflow-y: auto; }
+.abl-examples:not(:empty) { margin-top: 20px; }
 .abl-checks { display: flex; flex-direction: column; gap: 24px; }
 .abl-checks > :empty { display: none; }
 .abl-checks .row.tight { margin-top: 0; }
@@ -675,4 +673,3 @@ main.is-chat { padding: 0; overflow: hidden; }
   background: var(--paper); color: var(--cobalt); font-size: 16px; cursor: pointer; transform: translateX(-50%);
   box-shadow: 0 8px 20px -12px rgba(10, 25, 60, 0.5); animation: rise 0.2s ease-out;
 }
-.abl-ex .a { max-height: 132px; overflow-y: auto; }
