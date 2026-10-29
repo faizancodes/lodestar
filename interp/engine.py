@@ -232,9 +232,18 @@ class Engine:
         flags = [bool(abl)] * n if isinstance(abl, bool) else [bool(x) for x in abl]
         return flags, any(flags)
 
-    def last_token_states(self, prompts, cancel=None, budget=6144):
-        """Residual stream at the last token of each prompt (chat templated, left padded), after every layer:
-        [n_prompts, L+1, H] float32 cpu. Index 0 is the embedding output, i>0 is the post-layer-i residual."""
+    def prompt_end_len(self):
+        """How many tokens the chat template puts after the user's words (e.g. Qwen3's
+        "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n" is 9): the common tail of two templated prompts."""
+        a, b = self.chat_ids("What is the capital of France?"), self.chat_ids("tell me a joke")
+        n = 0
+        while n < min(len(a), len(b)) and a[-1 - n] == b[-1 - n]:
+            n += 1
+        return max(1, min(n, 12))
+
+    def prompt_end_states(self, prompts, n_pos=1, cancel=None, budget=6144):
+        """Residual stream at the last n_pos tokens of each prompt (chat templated, left padded), after every layer:
+        [n_prompts, L+1, n_pos, H] float16 cpu. Index 0 is the embedding output, i>0 is the post-layer-i residual."""
         with self.lock:
             ids_list = [self.chat_ids(p) for p in prompts]
             out = []
@@ -250,11 +259,11 @@ class Engine:
                 with torch.inference_mode():
                     hs = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False,
                                     output_hidden_states=True).hidden_states
-                    last = torch.stack([h[:, -1, :] for h in hs], 1)  # [B, L+1, H]
-                    out.append(last.float().cpu())
+                    last = torch.stack([h[:, -n_pos:, :] for h in hs], 1)  # [B, L+1, n_pos, H]
+                    out.append(last.half().cpu())
                     del hs, last
             return torch.cat(out).numpy() if out else np.zeros(
-                (0, len(self.layers) + 1, int(self.layers[0].mlp.down_proj.out_features)), np.float32)
+                (0, len(self.layers) + 1, n_pos, int(self.layers[0].mlp.down_proj.out_features)), np.float16)
 
     # ---------------------------------------------------------------- hooks
     def _mlp_hook(self, i):
