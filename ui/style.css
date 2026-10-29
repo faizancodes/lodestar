@@ -721,12 +721,12 @@ main.is-chat { padding: 0; overflow: hidden; }
   background: var(--ascii); animation: pulse 0.9s infinite;
 }
 /* a character still decoding: its letter holds the space while a mark (dot, plus, ×) is drawn over it */
-.md .dc { position: relative; color: transparent; }
-.md .dc::after {
+.dc { position: relative; color: transparent; }
+.dc::after {
   content: attr(data-g); position: absolute; left: 50%; top: 0; transform: translateX(-50%);
   font-family: var(--mono); font-weight: 600; color: var(--ascii);
 }
-.md .dc.w::after, .md .dc.r::after { content: none; }
+.dc.w::after, .dc.r::after { content: none; }
 .msg.bot.typing .md > ul:last-child::after, .msg.bot.typing .md > ol:last-child::after, .msg.bot.typing .md > pre:last-child::after { content: none; }
 .dots { display: inline-flex; gap: 4px; padding: 6px 0; }
 .dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: bounce 1.1s infinite ease-in-out; }

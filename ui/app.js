@@ -752,7 +752,9 @@ function renderExample(box, plan) {
   if (!ex) return;
   ex.hidden = !plan.example;
   $(".q", ex).textContent = `“${plan.examplePrompt}”`;
-  $(".a", ex).textContent = plan.example.trim().slice(0, 320) + (plan.example.length > 320 ? "…" : "");
+  const a = $(".a", ex);
+  a.textContent = plan.example.trim().slice(0, 320) + (plan.example.length > 320 ? "…" : "");
+  (plan.decoder ??= createDecoder()).update(a); // the example decodes in as it's written, like chat replies
 }
 
 function renderProof(box, plan) {
