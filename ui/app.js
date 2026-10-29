@@ -2,7 +2,6 @@
 import { finishScene, setProgress, startScene, stopScene } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
-import { engrave } from "./engrave.js";
 import { drawSideArt } from "./glyphs.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -122,7 +121,6 @@ document.addEventListener("keydown", (e) => {
   let t = 0;
   addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => drawSideArt(art), 250); });
 }
-engrave($("#main"));
 
 // ------------------------------------------------------------------ models
 const note = (id) => state.models.presets.find((p) => p.id === id)?.note || "";
@@ -308,9 +306,9 @@ function renderStatus(s) {
     $("#start-status").textContent = s.loaded || s.status === "idle" ? "" : msg;
   }
   $("#start").classList.toggle("loading", busy);
-  if (busy) {
+  if (!s.loaded) { // the start screen's scene: at rest on the horizon, rising with the load
     startScene($("#start-art"));
-    setProgress(s.progress);
+    if (busy) setProgress(s.progress);
   } else stopScene();
   $("#start").hidden = !!s.loaded;
   showViews();
@@ -1373,8 +1371,8 @@ async function openNeuron(l, n, anchor) {
       .map((t, i) => {
         if (i < s) return "";
         const v = Math.min(1, Math.abs(a[i]) / mx);
-        const bg = a[i] >= 0 ? `rgba(22,21,18,${(v * 0.8).toFixed(2)})` : `rgba(147,54,31,${(v * 0.75).toFixed(2)})`;
-        return `<span class="tok" style="background:${bg};${v > 0.55 ? "color:#f4efe4" : ""}">${esc(t.replace(/\n/g, ""))}</span>`;
+        const bg = a[i] >= 0 ? `rgba(195,207,245,${(v * 0.85).toFixed(2)})` : `rgba(242,119,122,${(v * 0.75).toFixed(2)})`;
+        return `<span class="tok" style="background:${bg};${v > 0.55 ? "color:#0a0a0a" : ""}">${esc(t.replace(/\n/g, ""))}</span>`;
       })
       .join("")}</div>`;
   }

@@ -40,14 +40,14 @@ def main():
         threading.Event().wait()
     import webview
     window = webview.create_window("Auto Interp", url, width=1440, height=920, min_size=(1100, 700),
-                                   background_color="#E9E2D2", text_select=True)
+                                   background_color="#0A0A0A", text_select=True)
     window.events.shown += lambda: _style_titlebar(window)
     webview.start()
 
 
 def _style_titlebar(window):
-    """Give the window a cream title bar that matches the app instead of the default grey one, and hide the title
-    text. pywebview's WebKit window won't let the page draw under the bar, so the UI keeps a cream strip at the top
+    """Give the window a near-black title bar that matches the app instead of the default grey one, and hide the
+    title text. pywebview's WebKit window won't let the page draw under the bar, so the UI keeps a dark strip at the top
     (the sidebar and content start below it) and this only has to colour the bar to match. Main thread required."""
     try:
         import AppKit
@@ -58,14 +58,14 @@ def _style_titlebar(window):
         win = getattr(window, "native", None)
         if win is None:
             return
-        light = AppKit.NSAppearance.appearanceNamed_(AppKit.NSAppearanceNameAqua)
-        win.setAppearance_(light)
+        dark = AppKit.NSAppearance.appearanceNamed_(AppKit.NSAppearanceNameDarkAqua)
+        win.setAppearance_(dark)
         win.setTitlebarAppearsTransparent_(True)
         win.setTitleVisibility_(AppKit.NSWindowTitleHidden)
-        win.setBackgroundColor_(AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(0xE9 / 255, 0xE2 / 255, 0xD2 / 255, 1.0))
+        win.setBackgroundColor_(AppKit.NSColor.colorWithSRGBRed_green_blue_alpha_(0x0A / 255, 0x0A / 255, 0x0A / 255, 1.0))
 
-        # the title bar still shows a cool vibrancy material over the warm cream; hide that backdrop so the
-        # window's cream background shows there instead. The traffic-light buttons (_NSThemeWidget) are untouched.
+        # the title bar still shows a vibrancy material over the window colour; hide that backdrop so the
+        # window's own background shows there instead. The traffic-light buttons (_NSThemeWidget) are untouched.
         def hide_backdrops(view, in_titlebar=False):
             name = view.className()
             here = in_titlebar or "Titlebar" in name
