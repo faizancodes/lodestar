@@ -61,7 +61,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .brand { position: relative; z-index: 2; }
 .brand h1 { margin: 0; font-size: 21px; line-height: 1.1; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; }
 .brand h1 i { font-style: normal; color: var(--ascii); }
-.eyebrow { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
 .eyebrow.light { color: rgba(237, 237, 237, 0.62); }
 
 .saved { position: relative; z-index: 2; flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
@@ -244,7 +244,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 .step-h h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
 .num {
   display: grid; place-items: center; width: 26px; height: 26px; border-radius: 2px;
-  background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--rule-2); font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+  background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--rule-2); font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 600;
 }
 .ask { display: flex; gap: 12px; align-items: center; }
 .ask input { flex: 1; min-width: 0; padding: 12px 14px; font-size: 15px; }
@@ -691,24 +691,22 @@ h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weig
 .field { font-size: 13.5px; font-weight: 500; }
 .field .opt, label.mini, label.check { font-size: 13px; }
 
-/* the instrument panel: what you type, controls, labels, names and numbers */
-textarea, input, .msg.user .bubble, .run-q,
-.btn, .tab, .tab-count, .chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary, .starter, .switch,
-.side-link, .model-pick, .model-status, .mm-item, .mm-group, .start-model b, .start-model span, .start-model .go,
-.saved-item .nm, .plan-steps li, .out-h, .verdict, .pt-head, .pt-tag, .pt-lens, .pt-dose, .rk-tag,
-.lbl, .panel-b h4, #abl-rank h4, .toast, .ex-line > span, .plan-ideas > span, .result-h b, .rc-h b, .rc-row .who b,
-.found-row .who b, .out-h .insp, .eyebrow, .start-status { font-family: var(--mono); }
-.tab { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
-.btn.sm { font-size: 11.5px; }
-.chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary { font-size: 11.5px; font-weight: 500; letter-spacing: 0.01em; }
+/* controls and labels are Geist too; mono is kept for data: numbers, neuron ids, token readouts, code */
+.tab { font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em; }
+.btn { font-size: 13px; letter-spacing: -0.005em; }
+.btn.sm { font-size: 12px; }
+.chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary { font-size: 12.5px; font-weight: 500; }
 .out-h, .lbl, .panel-b h4, .pt-head { text-transform: none; letter-spacing: 0; }
-.verdict { text-transform: uppercase; letter-spacing: 0.08em; }
-.msg-acts button { font-size: 10.5px; }
-.starter { font-size: 12.5px; font-weight: 500; line-height: 1.5; }
-.msg.user .bubble { font-size: 13.5px; line-height: 1.55; }
-textarea, input:not([type]) { font-size: 13.5px; }
-.start-model b { font-size: 15px; font-weight: 600; letter-spacing: 0; }
-.start-model span, .model-status, .saved-item .nm { font-size: 11.5px; }
-.start-model .go { font-size: 12px; color: var(--text); }
-.run-q { font-size: 13px; font-weight: 600; }
-.toast { font-size: 12px; font-weight: 500; }
+.verdict { font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.msg-acts button { font-size: 12px; }
+.starter { font-size: 13.5px; font-weight: 500; line-height: 1.5; }
+.msg.user .bubble { font-size: 14.5px; line-height: 1.55; }
+textarea, input:not([type]) { font-size: 14px; }
+.start-model b { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.start-model span { font-size: 12.5px; }
+.model-status { font-size: 12.5px; }
+.mp-name { font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+.saved-item .nm { font-size: 13.5px; }
+.start-model .go { font-size: 13px; font-weight: 500; color: var(--text); }
+.run-q { font-size: 14px; font-weight: 600; }
+.toast { font-size: 13px; font-weight: 500; }
