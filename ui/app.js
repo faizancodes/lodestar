@@ -4,6 +4,7 @@ import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
 import { startSideArt } from "./glyphs.js";
 import { markSVG } from "./mark.js";
+import { drawHomeArt } from "./home.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -87,7 +88,7 @@ function toast(msg, err) {
 // ------------------------------------------------------------------ tabs
 const TABS = ["abliterate", "steer", "chat"];
 let tab = (() => { try { return localStorage.getItem("tab"); } catch { return null; } })();
-if (!TABS.includes(tab)) tab = "steer";
+if (!TABS.includes(tab) && tab !== "home") tab = "steer";
 
 function setTab(t) {
   tab = t;
@@ -99,6 +100,7 @@ function setTab(t) {
   });
   showViews();
   if (t === "chat" && state.info?.loaded) onChatShown();
+  if (t === "home") renderHome();
 }
 
 function showViews() {
@@ -108,10 +110,30 @@ function showViews() {
 }
 
 $$(".tab").forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+$$(".home-card").forEach((c) => (c.onclick = () => setTab(c.dataset.go)));
+$$(".hc-ic").forEach((el) => el.append($(`.tab[data-tab="${el.dataset.icon}"] svg`).cloneNode(true)));
+$("#brand").onclick = () => state.info?.loaded && setTab("home");
+$("#brand").onkeydown = (e) => (e.key === "Enter" || e.key === " ") && state.info?.loaded && setTab("home");
+
+// Home: the loaded model, and a card for each page with what it's for and where it stands.
+function renderHome() {
+  const s = state.info;
+  if (tab !== "home" || !s?.loaded) return;
+  $("#home-model").textContent = modelName(s.model);
+  const dev = { mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device;
+  $("#home-meta").textContent = [s.params && `${(s.params / 1e9).toFixed(1)}B parameters`, s.layers && `${s.layers} layers`, dev, s.dtype]
+    .filter(Boolean).join("  ·  ");
+  const cur = state.abl?.current;
+  $("#hc-abliterate").innerHTML = cur?.active ? `<i class="hc-on"></i>Refusals erased at layer ${cur.layer}` : cur ? "Direction saved, switched off" : "";
+  const mine = (state.saved || []).filter((r) => modelName(r.model) === modelName(s.model)).length;
+  $("#hc-steer").textContent = mine ? `${mine} saved` : "";
+  requestAnimationFrame(() => $$(".home-art").forEach((c) => drawHomeArt(c, c.dataset.art)));
+}
 document.addEventListener("keydown", (e) => {
   if (!e.metaKey || e.shiftKey || e.altKey) return;
   const i = ["1", "2", "3"].indexOf(e.key);
   if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
+  if (e.key === "0" && state.info?.loaded) return (e.preventDefault(), setTab("home"));
   if (e.key === "k" && tab === "chat" && state.info?.loaded) (e.preventDefault(), newChat());
 });
 
@@ -308,6 +330,7 @@ function renderStatus(s) {
         }
         $("#start").classList.remove("loading", "leaving");
         finishing = false;
+        setTab("home"); // a fresh model opens on the home screen, not whichever page was last open
         renderStatus(s);
         $$(".view:not([hidden]) > *").forEach((el, i) => {
           el.classList.remove("reveal");
@@ -391,6 +414,7 @@ async function onModelReady() {
   refreshAbl();
   try { state.examples = await api("/api/examples"); } catch { state.examples = []; }
   renderExamples();
+  renderHome();
 }
 
 // ------------------------------------------------------------------ on now
@@ -456,6 +480,7 @@ async function renderSaved() {
   const cur = state.info?.model;
   const mine = state.saved.filter((r) => !cur || modelName(r.model) === modelName(cur)).reverse(); // by name, so a copy on this Mac keeps them
   const box = $("#saved-list");
+  renderHome();
   if (!mine.length) { box.innerHTML = `<div class="saved-empty">Nothing saved yet.</div>`; return; }
   box.innerHTML = mine
     .map((r) => `<div class="saved-item${r.id === state.recipe.id ? " on" : ""}" data-id="${r.id}" role="button" tabindex="0">
@@ -829,6 +854,7 @@ async function refreshAbl() {
   const tp = $("#abl-test-probes");
   if (!tp.value.trim() && state.abl.probes.harmful.length) tp.value = defaultTestProbes().join("\n");
   renderAbl();
+  renderHome();
 }
 
 const defaultTestProbes = () => (state.abl?.probes?.harmful || []).slice(-3);

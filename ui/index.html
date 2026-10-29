@@ -10,7 +10,7 @@
 <body data-tab="steer">
 <aside class="side">
   <canvas class="side-art" id="side-art" aria-hidden="true"></canvas>
-  <div class="brand"><span class="brand-mark" id="brand-mark"></span><h1>Lodestar</h1></div>
+  <div class="brand" id="brand" role="button" tabindex="0" title="Home"><span class="brand-mark" id="brand-mark"></span><h1>Lodestar</h1></div>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-tab="abliterate">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 3.8 12 2.5l7 2.6v6.2c0 1.6-.35 3-1 4.25M15.9 19.1A13 13 0 0 1 12 21.5c-4.3-1.7-7-5.3-7-10.2V5.6"/><path d="m3 3 18 18"/></svg>
@@ -46,6 +46,40 @@
     <div id="start-models" class="start-models"></div>
     <canvas id="start-art" class="start-art" aria-hidden="true"></canvas>
     <div id="start-status" class="start-status"></div>
+  </section>
+
+  <!-- ============================================================ home: where to go once a model is ready -->
+  <section id="view-home" class="view home" data-view="home" hidden>
+    <header class="home-h">
+      <h2 id="home-model"></h2>
+      <p id="home-meta" class="home-meta"></p>
+    </header>
+    <div class="home-cards">
+      <button class="home-card" data-go="abliterate">
+        <canvas class="home-art" data-art="abliterate" aria-hidden="true"></canvas>
+        <span class="hc-b">
+          <span class="hc-t"><span class="hc-ic" data-icon="abliterate"></span>Abliterate</span>
+          <span class="hc-d">Find the direction it refuses along, erase it, and save the result as a new model.</span>
+          <span class="hc-f"><kbd>⌘1</kbd><span class="hc-s" id="hc-abliterate"></span></span>
+        </span>
+      </button>
+      <button class="home-card" data-go="steer">
+        <canvas class="home-art" data-art="steer" aria-hidden="true"></canvas>
+        <span class="hc-b">
+          <span class="hc-t"><span class="hc-ic" data-icon="steer"></span>Steer</span>
+          <span class="hc-d">Push individual neurons to change how it talks, then save what works as recipes.</span>
+          <span class="hc-f"><kbd>⌘2</kbd><span class="hc-s" id="hc-steer"></span></span>
+        </span>
+      </button>
+      <button class="home-card" data-go="chat">
+        <canvas class="home-art" data-art="chat" aria-hidden="true"></canvas>
+        <span class="hc-b">
+          <span class="hc-t"><span class="hc-ic" data-icon="chat"></span>Chat</span>
+          <span class="hc-d">Talk to it with your steering and erased refusals switched on or off.</span>
+          <span class="hc-f"><kbd>⌘3</kbd><span class="hc-s" id="hc-chat"></span></span>
+        </span>
+      </button>
+    </div>
   </section>
 
   <!-- ============================================================ abliterate -->
