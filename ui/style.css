@@ -1,7 +1,8 @@
 /* Auto Interp — night and ASCII. A near-black ground, panels lifted a step at a time with hairline rules, and the
-   ASCII scenes as the one source of light, drawn in pale periwinkle. Three voices, one job each (see "voices" at
-   the end): Instrument Serif for headings, Newsreader for reading (and everything the model writes), JetBrains
-   Mono for the instrument panel (what you type, controls, labels, names and numbers). */
+   ASCII scenes as the one source of light, drawn in pale periwinkle. Three faces, one job each (see "voices" at
+   the end): Interp Matrix, the app's own dot-matrix display face, for the wordmark and page titles; Geist for
+   text and everything the model writes; Geist Mono for the instrument panel (what you type, controls, labels,
+   names and numbers). */
 :root {
   --bg: #0a0a0a;
   --night: #070707;         /* the sidebar, code */
@@ -21,9 +22,9 @@
   --rule-2: rgba(255, 255, 255, 0.14);
   --wash: rgba(255, 255, 255, 0.05);
   --well: rgba(255, 255, 255, 0.03);
-  --serif-display: "Instrument Serif", "Newsreader", Georgia, serif;
-  --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Interp Matrix", "Geist Mono", ui-monospace, monospace;
+  --sans: "Geist", -apple-system, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius: 6px;
   --r-sm: 4px;
   --dotfill: radial-gradient(var(--ascii) 0.8px, transparent 1.15px) 0 0 / 3px 3px;  /* a bar filled with marks */
@@ -33,11 +34,11 @@
 html, body { height: 100%; margin: 0; }
 body {
   display: flex;
-  font-family: var(--serif);
+  font-family: var(--sans);
   color: var(--text);
   background: var(--bg);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -60,8 +61,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .brand { position: relative; z-index: 2; }
-.brand h1 { margin: 0; font-size: 34px; line-height: 0.95; font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.01em; }
-.brand h1 i { font-style: italic; color: var(--ascii); }
+.brand h1 { margin: 0; font-size: 27px; line-height: 1.15; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; }
+.brand h1 i { font-style: normal; color: var(--ascii); }
 .eyebrow { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .eyebrow.light { color: rgba(237, 237, 237, 0.62); }
 
@@ -190,7 +191,7 @@ body:not([data-tab="steer"]) .saved { display: none; }
 main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 
 .start { display: flex; flex-direction: column; max-width: 720px; margin: 5vh auto 0; animation: rise 0.25s ease-out; }
-.start h2 { margin: 0 0 26px; font-size: 44px; line-height: 1; font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.01em; color: var(--text); }
+.start h2 { margin: 0 0 28px; font-size: 34px; line-height: 1.1; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
 .start-models { display: grid; gap: 12px; }
 .start-model {
   display: flex;
@@ -234,7 +235,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 }
 
 .page { display: flex; flex-direction: column; gap: 44px; max-width: 920px; margin: 0 auto; }
-.page-h h2 { margin: 0; font-size: 52px; line-height: 1; font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.01em; color: var(--text); }
+.page-h h2 { margin: 0; font-size: 46px; line-height: 1.05; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
 .page-h p { margin: 10px 0 0; max-width: 620px; font-size: 14px; color: var(--text-2); }
 .page-h a { color: var(--accent); }
 .step.locked .card { opacity: 0.45; pointer-events: none; filter: saturate(0.6); }
@@ -242,7 +243,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 .step { transition: opacity 0.2s; }
 .step { display: flex; flex-direction: column; gap: 16px; }
 .step-h { display: flex; align-items: center; gap: 12px; }
-.step-h h3 { font-size: 26px; line-height: 1.1; font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.01em; color: var(--text); }
+.step-h h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
 .num {
   display: grid; place-items: center; width: 26px; height: 26px; border-radius: 2px;
   background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--rule-2); font-family: var(--mono); font-size: 12.5px; font-weight: 600;
@@ -391,7 +392,7 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .out-h .insp:hover { opacity: 1; background: rgba(127, 127, 127, 0.15); }
 .out.steered .out-h { background: rgba(195, 207, 245, 0.07); color: var(--ascii); border-color: rgba(195, 207, 245, 0.22); }
 .out.steered { border-color: var(--night); }
-.out-b { flex: 1; padding: 16px 18px; white-space: pre-wrap; font-family: var(--serif); font-size: 16px; line-height: 1.55; }
+.out-b { flex: 1; padding: 16px 18px; white-space: pre-wrap; font-size: 14.5px; line-height: 1.65; }
 .out-b.typing::after { content: "▍"; color: var(--accent); animation: pulse 0.9s infinite; }
 
 /* ------------------------------------------------------------ inline panels */
@@ -487,7 +488,7 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .plan .lbl { margin: 20px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
 .plan-ex p { margin: 0; font-size: 13.5px; line-height: 1.55; }
 .plan-ex .q { color: var(--muted); margin-bottom: 6px; }
-.plan-ex .a { padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--panel); border-radius: 0 4px 4px 0; white-space: pre-wrap; font-family: var(--serif); font-size: 15.5px; }
+.plan-ex .a { padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--panel); border-radius: 0 4px 4px 0; white-space: pre-wrap; font-size: 14.5px; }
 .plan-tbl { margin-top: 20px; }
 .pt-head, .pt-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) 104px 150px; gap: 16px; align-items: center; }
 .pt-head { padding: 0 14px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
@@ -612,10 +613,10 @@ main.is-chat { padding: 0; overflow: hidden; }
   background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--rule);
   font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
 }
-.msg.bot .md { font-family: var(--serif); font-size: 17px; line-height: 1.6; color: var(--text); word-break: break-word; }
+.msg.bot .md { font-size: 15.5px; line-height: 1.7; color: var(--text); word-break: break-word; }
 .md p { margin: 0 0 10px; }
 .md > :last-child { margin-bottom: 0; }
-.md h3, .md h4 { margin: 18px 0 6px; font-size: 22px; font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.01em; color: var(--text); }
+.md h3, .md h4 { margin: 18px 0 6px; font-size: 15.5px; font-weight: 600; color: var(--text); }
 .md ul, .md ol { margin: 0 0 10px; padding-left: 22px; }
 .md li { margin: 3px 0; }
 .md code { padding: 1px 5px; border-radius: 5px; background: var(--panel-2); font-family: var(--mono); font-size: 0.86em; }
@@ -635,7 +636,7 @@ main.is-chat { padding: 0; overflow: hidden; }
 .msg-note { margin-left: 6px; font-size: 11.5px; color: var(--bad); }
 
 .chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 32px; animation: rise 0.3s ease-out; }
-.chat-empty h2 { margin: 0 0 26px; font-size: 44px; line-height: 1; font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.01em; color: var(--text); }
+.chat-empty h2 { margin: 0 0 28px; font-size: 34px; line-height: 1.1; font-family: var(--display); font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
 .chat-starters { display: grid; grid-template-columns: repeat(2, minmax(0, 260px)); gap: 12px; }
 .starter {
   padding: 16px 18px; border: 1px solid var(--rule-2); border-radius: var(--radius); background: var(--panel);
@@ -682,15 +683,16 @@ main.is-chat { padding: 0; overflow: hidden; }
 
 
 /* ------------------------------------------------------------ voices */
-/* display: the poster's wordmark, headings only */
-h1, h2, h3, .chat-title b { font-family: var(--serif-display); }
-h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--serif-display); font-weight: 400; letter-spacing: -0.005em; }
-.panel-h h3, .plan-h b, .saved-model b { font-size: 21px; }
+/* display: the dot matrix, for the wordmark and page titles only */
+h1, h2 { font-family: var(--display); }
+h3, .chat-title b { font-family: var(--sans); }
+h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weight: 600; letter-spacing: -0.01em; }
+.panel-h h3, .plan-h b, .saved-model b { font-size: 15px; }
 
-/* reading: body text, explanations and everything the model writes are the serif set on body */
-.page-h p, .abl-lede, .status-line, .start-status, .empty, .plan-now { font-size: 15px; }
-.field { font-size: 14.5px; }
-.field .opt, label.mini, label.check { font-size: 13.5px; }
+/* reading: body text, explanations and everything the model writes are in Geist, set on body */
+.page-h p, .abl-lede, .status-line, .start-status, .empty, .plan-now { font-size: 14px; }
+.field { font-size: 13.5px; font-weight: 500; }
+.field .opt, label.mini, label.check { font-size: 13px; }
 
 /* the instrument panel: what you type, controls, labels, names and numbers */
 textarea, input, .msg.user .bubble, .run-q,
