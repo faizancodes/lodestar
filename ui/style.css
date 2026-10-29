@@ -511,7 +511,14 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .plan-steps li.on { border-color: var(--accent); color: var(--accent); }
 .plan-steps li.done { border-color: var(--accent); background: var(--accent); color: var(--bg); }
 .plan-steps li.done i { display: none; }
-.plan-now { min-height: 18px; }
+.plan-now { display: flex; align-items: center; gap: 12px; min-height: 18px; }
+.plan-now .spin { display: none; flex: none; width: 36px; height: 36px; color: var(--ascii); }
+/* while the plan runs, its status is a lit strip with the spinner, so it can't be missed */
+.plan-now.live {
+  margin-top: 4px; padding: 11px 18px 11px 12px; border: 1px solid rgba(195, 207, 245, 0.22); border-radius: var(--radius);
+  background: rgba(195, 207, 245, 0.05); color: var(--text); font-size: 15px; font-weight: 500; letter-spacing: -0.01em;
+}
+.plan-now.live .spin { display: block; }
 .plan .lbl { margin: 20px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
 .plan-ex p { margin: 0; font-size: 13.5px; line-height: 1.55; }
 .plan-ex .q { color: var(--muted); margin-bottom: 6px; }

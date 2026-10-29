@@ -100,3 +100,43 @@ export function startSideArt(canvas) {
   addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => size() && (still ? draw(0) : null), 200); });
   document.addEventListener("visibilitychange", () => !document.hidden && run());
 }
+
+/** A small Lodestar spinner: the lodestar at the centre with a star trail wheeling around it, in marks. Runs while
+ * `live()` says so and the canvas is on screen; call the returned function to start it again after it stops. */
+export function startSpinner(canvas, live) {
+  const N = 12, cell = 3;
+  const dpr = devicePixelRatio || 1;
+  canvas.width = canvas.height = N * cell * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let raf = 0, last = 0;
+  const draw = (t) => {
+    const grid = new Float32Array(N * N), c = (N - 1) / 2;
+    const put = (x, y, b) => {
+      x = Math.round(x); y = Math.round(y);
+      if (x < 0 || y < 0 || x >= N || y >= N) return;
+      if (b > grid[y * N + x]) grid[y * N + x] = b;
+    };
+    for (const [dx, dy, b] of [[0, 0, 1], [1, 0, 0.6], [-1, 0, 0.6], [0, 1, 0.6], [0, -1, 0.7], [0, -2, 0.35]]) put(c + dx, c + dy, b);
+    const orbit = (r, speed, span, peak) => { // a trail: bright at its head, fading behind it
+      const head = t * speed;
+      for (let u = 0; u <= span; u += 0.7 / r) put(c + Math.cos(head - u) * r, c + Math.sin(head - u) * r, peak * (1 - u / span) ** 1.5);
+    };
+    orbit(4.6, 3.4, 4.4, 1);
+    orbit(3.1, -2.3, 2.2, 0.45);
+    ctx.fillStyle = getComputedStyle(canvas).color;
+    drawMarks(ctx, grid, N, N, cell);
+  };
+  const tick = (now) => {
+    raf = 0;
+    if (!canvas.isConnected || !canvas.offsetParent || !live()) return;
+    raf = requestAnimationFrame(tick);
+    if (now - last < 50) return;
+    last = now;
+    draw(now / 1000);
+  };
+  const run = () => (still ? draw(1) : raf || (raf = requestAnimationFrame(tick)));
+  run();
+  return run;
+}
