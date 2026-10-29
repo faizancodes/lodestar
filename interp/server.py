@@ -423,7 +423,7 @@ def _abl_save(all_d):
 
 def abl_now():
     """The stored direction + state for the currently loaded model ({} when none)."""
-    return _abl_all().get(eng.model_id) if eng.model_id else {}
+    return (_abl_all().get(eng.model_id) or {}) if eng.model_id else {}
 
 
 def restore_for(mid):
