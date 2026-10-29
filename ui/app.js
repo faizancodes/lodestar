@@ -1,8 +1,9 @@
-// Auto Interp UI: three tabs (Abliterate, Steer, Chat) around one loaded model. Plain modules, no build step; talks to the local API in interp/server.py.
+// Lodestar UI: three tabs (Abliterate, Steer, Chat) around one loaded model. Plain modules, no build step; talks to the local API in interp/server.py.
 import { finishScene, setProgress, startScene, stopScene, wake } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
 import { drawSideArt } from "./glyphs.js";
+import { markSVG } from "./mark.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -115,6 +116,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ------------------------------------------------------------------ sidebar art
+$("#brand-mark").innerHTML = markSVG(36, 15);
 {
   const art = $("#side-art");
   drawSideArt(art);
@@ -1446,6 +1448,6 @@ async function openNeuron(l, n, anchor) {
     if ((await api("/api/abl/export")).status === "working") pollAblExport();
     if (!state.info.loaded && state.info.status !== "idle") pollStatus();
   } catch (e) {
-    toast("Can’t reach the Auto Interp engine: " + e.message, true);
+    toast("Can’t reach the Lodestar engine: " + e.message, true);
   }
 })();

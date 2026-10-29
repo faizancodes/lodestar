@@ -1,4 +1,4 @@
-"""Local HTTP API for the Auto Interp window. Streams (server-sent events) for anything that generates text or runs a
+"""Local HTTP API for the Lodestar window. Streams (server-sent events) for anything that generates text or runs a
 search; plain JSON for lookups. Serves the UI from ../ui."""
 import json
 import math
@@ -21,6 +21,7 @@ from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
 UI = ROOT / "ui"
+# the data folder keeps the app's first name, so models, recipes and directions saved before the rename stay put
 DATA = Path(os.environ.get("AUTO_INTERP_DATA", Path.home() / "Library" / "Application Support" / "Auto Interp"))
 DATA.mkdir(parents=True, exist_ok=True)
 RECIPES = DATA / "recipes.json"
@@ -213,7 +214,7 @@ async def remove_copy(req: Request):
     body = await req.json()
     d = Path(body["path"]).resolve()
     if d.parent != COPIES.resolve() or not (d / "config.json").exists():
-        raise HTTPException(400, "Only copies made by Auto Interp can be removed here.")
+        raise HTTPException(400, "Only copies made by Lodestar can be removed here.")
     if eng.model_id == str(d):
         raise HTTPException(409, "That copy is loaded right now. Load another model first.")
     shutil.rmtree(d)

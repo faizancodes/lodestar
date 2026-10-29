@@ -1,4 +1,4 @@
-"""Auto Interp as a Mac app: the API server on a background thread, the UI in a native WebKit window."""
+"""Lodestar as a Mac app: the API server on a background thread, the UI in a native WebKit window."""
 import os
 import socket
 import sys
@@ -39,7 +39,7 @@ def main():
         print(url, flush=True)
         threading.Event().wait()
     import webview
-    window = webview.create_window("Auto Interp", url, width=1440, height=920, min_size=(1100, 700),
+    window = webview.create_window("Lodestar", url, width=1440, height=920, min_size=(1100, 700),
                                    background_color="#0A0A0A", text_select=True)
     window.events.shown += lambda: _style_titlebar(window)
     webview.start()
