@@ -381,6 +381,31 @@ async def steer(req: Request):
     return sse(gen())
 
 
+@app.post("/api/chat")
+async def chat(req: Request):
+    """One assistant turn of a conversation, with the neurons that are on and (optionally) the refusal direction
+    erased."""
+    need_model()
+    body = await req.json()
+    msgs = [{"role": m["role"], "content": str(m["content"])} for m in body.get("messages") or []
+            if m.get("role") in ("system", "user", "assistant") and str(m.get("content", "")).strip()]
+    if not msgs or msgs[-1]["role"] != "user":
+        raise HTTPException(400, "The conversation must end with a user message.")
+    pid = eng.messages_ids(msgs)
+    rows = [(pid, pushes_of(body))]
+    ablate = bool(body.get("abl")) and eng.abl_vec is not None
+
+    def gen():
+        for r, x in eng.generate(rows, max_new=int(body.get("max_new", 512)),
+                                 temperature=float(body.get("temperature", 0.7)), cancel=cancel,
+                                 seed=int(time.time()), abl=[ablate]):
+            if r is None:
+                break
+            yield {"type": "delta", "delta": x}
+
+    return sse(gen())
+
+
 # ------------------------------------------------------------------ abliterate
 def _probes():
     custom = json.loads(PROBES_FILE.read_text()) if PROBES_FILE.exists() else {}
@@ -527,6 +552,8 @@ async def abl_export(req: Request):
     coef = max(0.1, min(2.0, float(body.get("coef", entry.get("coef", 1.0)))))
     base = eng.model_id.rstrip("/").split("/")[-1]
     name = f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
+    custom = re.sub(r"[^A-Za-z0-9._ -]+", "", str(body.get("name") or "")).strip(" .")
+    name = custom or name
     vec = [float(x) for x in (body.get("vec") or entry["vec"])]
     export_job.update(name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
 

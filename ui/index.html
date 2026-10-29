@@ -7,13 +7,28 @@
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-tab="steer">
 <aside class="side">
   <div class="brand"><h1>Auto<br>Interp</h1></div>
-  <div class="saved">
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="abliterate">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16 16 4M5 5h10v10H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>Abliterate</span><i class="tab-dot" id="tab-abl-dot" hidden></i>
+    </button>
+    <button class="tab" role="tab" data-tab="steer">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h9m3 0h2M3 14h2m3 0h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="13.5" cy="6" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6.5" cy="14" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      <span>Steer</span><i class="tab-count" id="tab-steer-count" hidden></i>
+    </button>
+    <button class="tab" role="tab" data-tab="chat">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 16 14H9l-3.5 2.8V14H4a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 4 4.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span>Chat</span>
+    </button>
+  </nav>
+  <div class="saved" data-for="steer">
     <div class="side-h"><span class="eyebrow light">Saved</span></div>
     <div id="saved-list" class="saved-list"></div>
   </div>
+  <div class="side-fill"></div>
   <div class="model-card">
     <div class="eyebrow light">Model</div>
     <button id="model-pick" class="model-pick" aria-haspopup="listbox" aria-expanded="false">
@@ -27,13 +42,105 @@
 <main id="main">
   <!-- shown until a model is ready -->
   <section id="start" class="start">
-    <h2>Pick a model to start steering.</h2>
+    <h2>Pick a model to start.</h2>
     <div id="start-models" class="start-models"></div>
     <canvas id="start-art" class="start-art" aria-hidden="true"></canvas>
     <div id="start-status" class="start-status"></div>
   </section>
 
-  <section id="ws" class="ws" hidden>
+  <!-- ============================================================ abliterate -->
+  <section id="view-abliterate" class="view page" data-view="abliterate" hidden>
+    <header class="page-h">
+      <h2>Abliterate</h2>
+      <p>Erase the model’s refusal direction, check the result, then save it as a new model
+        (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>).</p>
+    </header>
+
+    <div class="step" id="abl-s1">
+      <div class="step-h"><span class="num">1</span><h3>Find where refusal lives</h3>
+        <span class="grow"></span><span id="abl-status" class="abl-note"></span>
+        <button id="abl-toggle" class="switch" role="switch" aria-checked="false" hidden><i></i><span>On</span></button>
+      </div>
+      <div class="card abl">
+        <div class="row tight">
+          <button id="abl-go" class="btn">Find the refusal direction</button>
+          <button class="btn ghost" data-cancel>Stop</button>
+        </div>
+        <div id="abl-plan" class="plan" hidden>
+          <div class="plan-h"><b class="plan-goal"></b><span class="plan-clock">0:00</span></div>
+          <ol class="plan-steps abl-steps">
+            <li><span>Read</span><i></i></li>
+            <li><span>Compare</span><i></i></li>
+            <li><span>Check</span><i></i></li>
+          </ol>
+          <div class="plan-now status-line"></div>
+          <div id="abl-examples" class="abl-examples"></div>
+        </div>
+        <div id="abl-rank"></div>
+        <details class="adv">
+          <summary>Probe questions</summary>
+          <label class="field">Questions it should refuse <span class="opt">one per line</span>
+            <textarea id="abl-probes-harmful" rows="6" spellcheck="false"></textarea>
+          </label>
+          <label class="field">Everyday questions <span class="opt">one per line</span>
+            <textarea id="abl-probes-harmless" rows="5" spellcheck="false"></textarea>
+          </label>
+          <div class="row tight">
+            <button id="abl-probes-reset" class="btn ghost sm">Reset to the defaults</button>
+            <button id="abl-probes-save" class="btn ghost sm">Save probe lists</button>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="step locked" id="abl-s2">
+      <div class="step-h"><span class="num">2</span><h3>Check it</h3></div>
+      <div class="card abl">
+        <div class="abl-checks">
+          <label class="field">Strength <span class="opt">1 erases the direction fully</span>
+            <div class="slider-row">
+              <input id="abl-coef" type="range" value="1" min="0.2" max="2" step="0.05">
+              <output id="abl-coef-v">1.00</output>
+            </div>
+          </label>
+          <label class="field">Test questions <span class="opt">one per line, up to four</span>
+            <textarea id="abl-test-probes" rows="3" spellcheck="false"></textarea>
+          </label>
+          <div class="row tight">
+            <button id="abl-test-go" class="btn">Compare before and after</button>
+            <button class="btn ghost" data-cancel>Stop</button>
+          </div>
+          <div id="abl-test-summary" class="status-line"></div>
+          <div id="abl-test-rows"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step locked" id="abl-s3">
+      <div class="step-h"><span class="num">3</span><h3>Save the model</h3></div>
+      <div class="card abl">
+        <div class="save-row">
+          <label class="field grow">Name
+            <input id="abl-name" spellcheck="false" autocomplete="off">
+          </label>
+          <button id="abl-bake" class="btn">Save model</button>
+          <button id="abl-export-stop" class="btn ghost" hidden>Stop</button>
+        </div>
+        <div id="abl-export" class="export" hidden>
+          <div class="export-bar"><i></i></div>
+          <div class="export-line status-line"></div>
+        </div>
+        <div id="abl-saved" class="saved-model" hidden>
+          <div><b></b><span>On this Mac</span></div>
+          <button class="btn" id="abl-load">Load it</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ steer -->
+  <section id="view-steer" class="view page" data-view="steer" hidden>
+    <header class="page-h"><h2>Steer</h2></header>
     <div class="step">
       <div class="step-h"><span class="num">1</span><h3>Change how it acts</h3></div>
       <div class="card change">
@@ -82,64 +189,47 @@
       <div id="runs" class="runs"></div>
     </div>
   </section>
-  <section id="abl" class="step">
-    <div class="step-h"><span class="num">3</span><h3>Shed its refusals</h3></div>
-    <div class="card abl">
-      <p class="abl-lede">Refusal is one direction the model carries in every layer, so it can be erased cleanly
-        (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>): find it with probe questions, check it,
-        then keep it for the session or bake it into a saved copy of the weights.</p>
-      <div class="abl-top">
-        <div id="abl-status" class="abl-note">Not analysed yet. Run the analysis to find where refusal lives.</div>
-        <div class="abl-acts">
-          <button id="abl-toggle" class="btn sm" hidden>Turn on</button>
+
+  <!-- ============================================================ chat -->
+  <section id="view-chat" class="view chat" data-view="chat" hidden>
+    <header class="chat-h">
+      <div class="chat-title"><b id="chat-model"></b></div>
+      <div class="chat-mods" id="chat-mods"></div>
+      <button id="chat-new" class="btn ghost sm" title="New chat (⌘K)">New chat</button>
+    </header>
+    <div class="chat-scroll" id="chat-scroll">
+      <div class="chat-log" id="chat-log"></div>
+      <div class="chat-empty" id="chat-empty">
+        <h2>What’s on your mind?</h2>
+        <div class="chat-starters" id="chat-starters"></div>
+      </div>
+    </div>
+    <div class="composer-wrap">
+      <button class="jump" id="chat-jump" aria-label="Scroll to the latest message" hidden>↓</button>
+      <form class="composer" id="chat-form">
+        <textarea id="chat-input" rows="1" placeholder="Message the model" spellcheck="false"></textarea>
+        <div class="composer-bar">
+          <details class="chat-opts" id="chat-opts">
+            <summary>Settings</summary>
+            <div class="chat-opts-pop">
+              <label class="field">System prompt
+                <textarea id="chat-system" rows="3" spellcheck="false" placeholder="Optional"></textarea>
+              </label>
+              <label class="field">Temperature
+                <div class="slider-row"><input id="chat-temp" type="range" min="0" max="1.5" step="0.05" value="0.7"><output id="chat-temp-v">0.70</output></div>
+              </label>
+              <label class="field">Reply length
+                <div class="slider-row"><input id="chat-max" type="range" min="64" max="1024" step="32" value="512"><output id="chat-max-v">512</output></div>
+              </label>
+            </div>
+          </details>
+          <span class="grow"></span>
+          <button type="button" class="send stop" id="chat-stop" aria-label="Stop" hidden><i></i></button>
+          <button type="submit" class="send" id="chat-send" aria-label="Send" disabled>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4m0 0L5 9m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
-      </div>
-      <div id="abl-body" hidden>
-        <div id="abl-rank"></div>
-        <div class="abl-checks">
-          <div class="row tight">
-            <label class="field grow">Strength <span class="opt">how fully the direction is erased</span>
-              <input id="abl-coef" type="number" value="1" min="0.2" max="2" step="0.05">
-            </label>
-          </div>
-          <div id="abl-test-rows"></div>
-          <div id="abl-test-summary" class="status-line"></div>
-        </div>
-      </div>
-      <details class="adv">
-        <summary>Probes &amp; test questions</summary>
-        <label class="field">Probe questions it must refuse <span class="opt">one per line · the sharper the better</span>
-          <textarea id="abl-probes-harmful" rows="6" spellcheck="false"></textarea>
-        </label>
-        <label class="field">Probe questions it must answer plainly <span class="opt">one per line · everyday wording</span>
-          <textarea id="abl-probes-harmless" rows="5" spellcheck="false"></textarea>
-        </label>
-        <label class="field">Test questions for the check <span class="opt">one per line</span>
-          <textarea id="abl-test-probes" rows="3" spellcheck="false"></textarea>
-        </label>
-        <div class="row tight">
-          <button id="abl-probes-reset" class="btn ghost sm">Reset to the defaults</button>
-          <button id="abl-probes-save" class="btn ghost sm">Save probe lists</button>
-        </div>
-      </details>
-      <div class="row">
-        <button id="abl-go" class="btn">Find the refusal direction</button>
-        <button id="abl-test-go" class="btn ghost" hidden>Test it</button>
-        <button id="abl-bake" class="btn ghost" hidden>Bake into saved weights</button>
-        <button id="abl-export-stop" class="btn ghost sm" hidden>Stop writing</button>
-      </div>
-      <div id="abl-plan" class="plan" hidden>
-        <div class="plan-h"><span class="eyebrow">Abliteration plan</span><b class="plan-goal"></b><span class="plan-clock">0:00</span></div>
-        <ol class="plan-steps abl-steps">
-          <li><span>Read</span><i></i></li>
-          <li><span>Compare</span><i></i></li>
-          <li><span>Check</span><i></i></li>
-          <li><span>Bake</span><i></i></li>
-        </ol>
-        <div class="plan-now status-line"></div>
-        <div id="abl-examples" class="abl-examples"></div>
-      </div>
-      <div id="abl-export-line" class="status-line"></div>
+      </form>
     </div>
   </section>
 </main>
