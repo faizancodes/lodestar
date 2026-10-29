@@ -420,7 +420,10 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .out.steered .out-h { background: rgba(195, 207, 245, 0.07); color: var(--ascii); border-color: rgba(195, 207, 245, 0.22); }
 .out.steered { border-color: var(--night); }
 .out-b { flex: 1; padding: 16px 18px; white-space: pre-wrap; font-size: 14.5px; line-height: 1.65; }
-.out-b.typing::after { content: "▍"; color: var(--accent); animation: pulse 0.9s infinite; }
+.out-b.typing::after {
+  content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-left: 4px; vertical-align: 0.1em;
+  background: var(--ascii); animation: pulse 0.9s infinite;
+}
 
 /* ------------------------------------------------------------ inline panels */
 .panel {

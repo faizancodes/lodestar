@@ -1021,7 +1021,7 @@ async function ablAnalyze() {
         const box = $("#abl-examples");
         if (!box.childElementCount) box.innerHTML = ablPairs(ABL_EX_PROMPTS);
         const cell = $(`.abl-pair[data-p="${ev.index}"] [data-c=${ev.kind}] .out-b`, box);
-        if (cell) cell.textContent += ev.delta;
+        if (cell) streamInto(cell, ev.delta);
       } else if (ev.type === "result") result = ev;
     });
     ablSetSteps(steps, 4);
@@ -1091,7 +1091,7 @@ $("#abl-test-go").onclick = async () => {
   const ok = await stream("/api/abl/test", { probes }, (ev) => {
     if (ev.type === "delta") {
       const cell = $(`.abl-pair[data-p="${ev.probe}"] [data-c=${ev.kind}] .out-b`, rows);
-      if (cell) cell.textContent += ev.delta;
+      if (cell) streamInto(cell, ev.delta);
     } else if (ev.type === "result") result = ev;
   });
   $$(".abl-pair .out-b", rows).forEach((el) => el.classList.remove("typing"));
@@ -1179,7 +1179,7 @@ async function send() {
   $("#runs").prepend(run);
   const outs = Object.fromEntries(cols.map((c) => [c, $(`[data-c=${c}] .out-b`, run)]));
   const body = { prompt, max_new: 160, columns: cols, pushes: up.map((p) => ({ ...p })) };
-  await stream("/api/steer", body, (ev) => ev.type === "delta" && (outs[ev.col].textContent += ev.delta));
+  await stream("/api/steer", body, (ev) => ev.type === "delta" && streamInto(outs[ev.col], ev.delta));
   for (const c of cols) {
     outs[c].classList.remove("typing");
     const b = $(`[data-c=${c}] .insp`, run);
@@ -1295,6 +1295,12 @@ const toBottom = (smooth) => scroller.scrollTo({ top: scroller.scrollHeight, beh
 $("#chat-jump").onclick = () => ((follow = true), toBottom(true));
 
 let decoder = null; // the reply being written decodes in, mark by mark
+
+// text streamed into an output box (before and after, normal and steered) decodes in the same way
+function streamInto(el, delta) {
+  el.textContent += delta;
+  (el._dec ??= createDecoder()).update(el);
+}
 
 function updateLastBot() {
   const el = $("#chat-log .msg.bot:last-child .md");
