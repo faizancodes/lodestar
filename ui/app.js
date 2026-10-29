@@ -121,8 +121,8 @@ function renderHome() {
   if (tab !== "home" || !s?.loaded) return;
   $("#home-model").textContent = modelName(s.model);
   const dev = { mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device;
-  $("#home-meta").textContent = [s.params && `${(s.params / 1e9).toFixed(1)}B parameters`, s.layers && `${s.layers} layers`, dev, s.dtype]
-    .filter(Boolean).join("  ·  ");
+  const specs = [["Parameters", s.params && `${(s.params / 1e9).toFixed(1)}B`], ["Layers", s.layers], ["Runs on", dev], ["Precision", s.dtype]];
+  $("#home-meta").innerHTML = specs.filter(([, v]) => v).map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join("");
   const cur = state.abl?.current;
   $("#hc-abliterate").innerHTML = cur?.active ? `<i class="hc-on"></i>Refusals erased at layer ${cur.layer}` : cur ? "Direction saved, switched off" : "";
   const mine = (state.saved || []).filter((r) => modelName(r.model) === modelName(s.model)).length;

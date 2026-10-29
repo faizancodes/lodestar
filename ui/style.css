@@ -189,7 +189,11 @@ body:not([data-tab="steer"]) .saved { display: none; }
 /* ------------------------------------------------------------ home */
 .home { max-width: 920px; margin: 0 auto; padding-top: 13vh; display: flex; flex-direction: column; gap: 36px; }
 .home-h h2 { margin: 0; font-size: 40px; line-height: 1.05; font-weight: 600; letter-spacing: -0.035em; }
-.home-meta { margin: 12px 0 0; font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: pre; }
+.home-meta { display: flex; margin: 20px 0 0; }
+.home-meta div { padding: 0 24px; border-left: 1px solid var(--rule); }
+.home-meta div:first-child { padding-left: 0; border-left: 0; }
+.home-meta dt { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.home-meta dd { margin: 5px 0 0; font-size: 15px; font-weight: 500; letter-spacing: -0.01em; color: var(--text); font-variant-numeric: tabular-nums; }
 .home-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .home-card {
   display: flex; flex-direction: column; padding: 0; border: 1px solid var(--rule); border-radius: var(--radius);
