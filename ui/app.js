@@ -1,5 +1,5 @@
 // Auto Interp UI: three tabs (Abliterate, Steer, Chat) around one loaded model. Plain modules, no build step; talks to the local API in interp/server.py.
-import { finishScene, setProgress, startScene, stopScene } from "./loader.js";
+import { finishScene, setProgress, startScene, stopScene, wake } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
 import { drawSideArt } from "./glyphs.js";
@@ -251,8 +251,49 @@ document.addEventListener("click", (e) => !e.target.closest("#model-menu") && !$
 
 async function loadModel(id) {
   toggleModelMenu(false);
-  renderStatus(await api("/api/load", { model: id }));
+  const entered = enterLoading(id);
+  let s;
+  try {
+    s = await api("/api/load", { model: id });
+  } catch (e) {
+    await entered;
+    $("#start").classList.remove("loading");
+    $$(".start-model.picked").forEach((c) => c.classList.remove("picked"));
+    return toast(e.message, true);
+  }
+  await entered;
+  renderStatus(s);
   pollStatus();
+}
+
+// Picking a model from the start screen: the chosen card lights up, the title and the rest of the list fall
+// away, and the hero opens from its banner crop into the full scene as it glides to the middle, where the sun
+// wakes with a ring of light and starts to rise with the load.
+async function enterLoading(id) {
+  const start = $("#start");
+  if (start.hidden || start.classList.contains("loading")) return;
+  if (still()) return start.classList.add("loading");
+  const art = $("#start-art"), cards = $$(".start-model", start);
+  const picked = cards.find((c) => c.dataset.id === id);
+  picked?.classList.add("picked");
+  const rest = [$("h2", start), ...cards.filter((c) => c !== picked)];
+  const fall = (el, delay) => el.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(12px)" }],
+    { duration: 280, delay, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+  const outs = rest.map((el, i) => fall(el, i * 40));
+  if (picked) outs.push(fall(picked, 380));
+  await Promise.all(outs.map((a) => a.finished));
+  const first = art.getBoundingClientRect();
+  start.classList.add("loading");
+  const last = art.getBoundingClientRect();
+  outs.forEach((a) => a.cancel()); // they're hidden now; leave them ready for next time
+  picked?.classList.remove("picked");
+  // the banner was a band of the full scene (object-position 40%), so open it from that band
+  const off = (last.height - first.height) * 0.4, below = last.height - first.height - off;
+  art.animate([
+    { transform: `translateY(${first.top - last.top - off}px)`, clipPath: `inset(${off}px 0 ${below}px 0)` },
+    { transform: "none", clipPath: "inset(0 0 0 0)" },
+  ], { duration: 950, easing: "cubic-bezier(0.65, 0, 0.2, 1)" });
+  setTimeout(wake, 650);
 }
 
 let loadStart = null, loadTimer = 0, finishing = false;
