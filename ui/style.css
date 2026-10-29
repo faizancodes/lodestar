@@ -186,6 +186,30 @@ body:not([data-tab="steer"]) .saved { display: none; }
 .mm-custom input { flex: 1; min-width: 0; padding: 7px 10px; font-size: 12.5px; }
 
 /* ------------------------------------------------------------ main */
+/* ------------------------------------------------------------ home */
+.home { max-width: 920px; margin: 0 auto; padding-top: 13vh; display: flex; flex-direction: column; gap: 36px; }
+.home-h h2 { margin: 0; font-size: 40px; line-height: 1.05; font-weight: 600; letter-spacing: -0.035em; }
+.home-meta { margin: 12px 0 0; font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: pre; }
+.home-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.home-card {
+  display: flex; flex-direction: column; padding: 0; border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--panel); color: var(--text); text-align: left; cursor: pointer; overflow: hidden;
+  transition: border-color 0.2s, transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.home-card:hover, .home-card:focus-visible { border-color: rgba(195, 207, 245, 0.45); transform: translateY(-2px); outline: none; }
+.home-art { display: block; width: 100%; height: 112px; background: var(--night); border-bottom: 1px solid var(--rule); color: var(--ascii); opacity: 0.75; transition: opacity 0.2s; }
+.home-card:hover .home-art { opacity: 1; }
+.hc-b { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 18px; flex: 1; }
+.hc-t { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.hc-ic { display: flex; }
+.hc-ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hc-d { font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
+.hc-f { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 10px; font-size: 12px; color: var(--muted); }
+.hc-f kbd { margin: 0; padding: 1px 6px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); opacity: 1; font-size: 11px; color: var(--text-2); }
+.hc-s { display: inline-flex; align-items: center; gap: 6px; }
+.hc-on { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px rgba(61, 220, 132, 0.6); }
+.brand { cursor: pointer; }
+
 main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 
 .start { display: flex; flex-direction: column; max-width: 720px; margin: 5vh auto 0; animation: rise 0.25s ease-out; }
