@@ -21,6 +21,8 @@ Strength scales how much of the projection is removed (1.0 = fully; slightly und
 over overshoots past zero, which sometimes finishes off leftover refusal-inducing residue).
 """
 import re
+import sys
+import threading
 
 import numpy as np
 import torch
@@ -146,6 +148,50 @@ def refusalish(text):
     return bool(REFUSAL_RE.search(head) or SOFT_RE.search(opening))
 
 
+# The judge: a small classifier trained on refusal replies. It reads only the reply, never the request, so how bad
+# the request is can't sway it — an LLM judge was swayed, calling a plain "I can't help with that" a success when
+# the request was harmful. On XSTest's hand-labelled replies it scored 93% on the first 40 words against 88% for
+# the patterns above, which stay as the fallback and as a cross-check.
+JUDGE_ID, JUDGE_REV = "protectai/distilroberta-base-rejection-v1", "86520b5f35829cf9209a449e1716b56c70ddd802"
+JUDGE_WORDS = 40  # about what a trial generates; later words are mostly caveats that read as refusals
+_judge = None
+_judge_lock = threading.Lock()
+
+
+def _load_judge():
+    global _judge
+    with _judge_lock:
+        if _judge is None:
+            try:
+                from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+                tok = AutoTokenizer.from_pretrained(JUDGE_ID, revision=JUDGE_REV)
+                model = AutoModelForSequenceClassification.from_pretrained(JUDGE_ID, revision=JUDGE_REV).eval()
+                _judge = (tok, model, model.config.label2id["REJECTION"])
+            except Exception as e:  # offline on first run, say: the patterns still work
+                print(f"refusal judge unavailable, using patterns: {e}", file=sys.stderr)
+                _judge = False
+    return _judge
+
+
+def refused(texts):
+    """Which replies are refusals, judged on their first JUDGE_WORDS words. Runs on the CPU (a few ms a reply) so
+    it never competes with the model for the GPU."""
+    pats = [refusalish(t) for t in texts]
+    judge = _load_judge() if texts else False
+    if not judge:
+        return pats
+    tok, model, rej = judge
+    heads = [" ".join((t or "").split()[:JUDGE_WORDS]) for t in texts]
+    with torch.no_grad():
+        enc = tok(heads, return_tensors="pt", padding=True, truncation=True, max_length=128)
+        p = torch.softmax(model(**enc).logits.float(), -1)[:, rej].tolist()
+    out = [x >= 0.5 for x in p]
+    if n := sum(a != b for a, b in zip(out, pats)):
+        print(f"refusal judge and patterns disagree on {n} of {len(texts)} replies", file=sys.stderr)
+    return out
+
+
 
 def _ev(t, **kw):
     return {"type": t, **kw}
@@ -219,7 +265,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             yield _ev("stage", stage="trial", label=f"Trying layer {l} on new bad requests ({i + 1} of {len(cands)})")
             eng.abl_of(u_all[l], 1.0, l)
             texts, _ = eng.generate_text(rows, max_new=56, cancel=cancel, abl=True)
-            ok = [not refusalish(t) for t in texts]
+            ok = [not r for r in refused(texts)]
             dnll = float(eng.reference_nll([[]], cancel, abl=[True])[0]) - nll0
             trials[l] = {"refused": sum(not x for x in ok), "dnll": dnll}
             yield _ev("progress", stage="trial", done=i + 1, total=len(cands))
@@ -249,8 +295,8 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             break
         texts[r] += delta
         yield _ev("exdelta", index=r, delta=delta)
-    examples = [{"prompt": p, "reply": texts[i].strip(), "refused": refusalish(texts[i])} for i, p in
-                enumerate(EXAMPLE_PROMPTS)]
+    verdicts = refused(texts)
+    examples = [{"prompt": p, "reply": texts[i].strip(), "refused": verdicts[i]} for i, p in enumerate(EXAMPLE_PROMPTS)]
 
     yield _ev("result", vec=vec, layer=selected, coef=1.0, ranking=rank_rows, clean=clean,
               top_score=round(float(cos[selected]), 4), refused_left=refused_left, tried=len(TRIAL_PROMPTS),
