@@ -102,6 +102,7 @@ function setTab(t) {
   showViews();
   if (t === "chat" && state.info?.loaded) onChatShown();
   if (t === "home") renderHome();
+  if (t === "steer") renderSteerStatus();
 }
 
 function showViews() {
@@ -442,11 +443,12 @@ function renderRecipe() {
   $("#tab-steer-count").hidden = !items.length;
   $("#tab-steer-count").textContent = items.length;
   renderChatMods();
+  renderSteerStatus();
   $("#rc-list").innerHTML = items
     .map(
       (it, i) => `<div class="rc-row" data-i="${i}">
         <span class="who" data-k="open" title="What this neuron does"><b>${esc(labelOf(it))}</b><span class="nid">${nid(it.layer, it.neuron)}</span></span>
-        <input type="range" min="-3" max="3" step="0.05" value="${it.dose}" data-k="dose" aria-label="Strength">
+        <input class="lr" type="range" min="-3" max="3" step="0.05" value="${it.dose}" data-k="dose" aria-label="Strength">
         <span class="dose">${fmt(it.dose)}</span>
         <button class="x" data-k="rm" aria-label="Turn off">×</button>
       </div>`,
@@ -454,10 +456,31 @@ function renderRecipe() {
     .join("");
   $$(".rc-row", $("#rc-list")).forEach((row) => {
     const it = items[+row.dataset.i];
-    $("[data-k=dose]", row).oninput = (e) => ((it.dose = +e.target.value), ($(".dose", row).textContent = fmt(it.dose)));
+    const range = $("[data-k=dose]", row);
+    paintDose(range);
+    range.oninput = (e) => ((it.dose = +e.target.value), ($(".dose", row).textContent = fmt(it.dose)), paintDose(range));
     $("[data-k=rm]", row).onclick = () => (items.splice(+row.dataset.i, 1), renderRecipe(), refreshFoundRows());
     $("[data-k=open]", row).onclick = () => openNeuron(it.layer, it.neuron, row);
   });
+}
+
+// a neuron's strength fills out from the middle: periwinkle when pushed up, red when pushed down
+function paintDose(el) {
+  const v = (el.value - el.min) / (el.max - el.min);
+  el.style.setProperty("--lo", Math.min(v, 0.5) * 100 + "%");
+  el.style.setProperty("--hi", Math.max(v, 0.5) * 100 + "%");
+  el.style.setProperty("--fill", v < 0.5 ? "var(--bad)" : "var(--ascii)");
+}
+
+// the status panel: how many neurons are on, under which recipe
+function renderSteerStatus() {
+  const n = state.recipe.items.length;
+  $("#steer-status").classList.toggle("on", n > 0);
+  $("#st-s1").classList.toggle("done", n > 0);
+  const facts = [["Neurons on", n], ["Recipe", n ? state.recipe.name || "Unsaved" : "None"],
+    ["Status", n ? `<i class="hc-on"></i>Steering every reply` : "Nothing on"]];
+  $("#steer-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd${v === "None" || v === "Nothing on" ? ' class="dim"' : ""}>${typeof v === "string" && !v.startsWith("<") ? esc(v) : v}</dd></div>`).join("");
+  requestAnimationFrame(() => drawHomeArt($("#steer-status-art"), "steer", $("#steer-status")));
 }
 
 function newRecipe() {
@@ -472,6 +495,7 @@ $("#rc-save").onclick = async () => {
   const name = state.recipe.name || state.recipe.items.map(labelOf).slice(0, 3).join(" + ");
   const saved = await api("/api/recipes", { id: state.recipe.id || undefined, name, model: state.info?.model, items: state.recipe.items });
   Object.assign(state.recipe, { id: saved.id, name: saved.name });
+  renderSteerStatus();
   toast(`Saved “${saved.name}”.`);
   renderSaved();
 };

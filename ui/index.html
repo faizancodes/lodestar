@@ -90,16 +90,16 @@
         (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>).</p>
     </header>
 
-    <div class="abl-status" id="abl-status">
+    <div class="status-panel" id="abl-status">
       <canvas id="abl-status-art" aria-hidden="true"></canvas>
-      <div class="abl-status-b">
+      <div class="status-panel-b">
         <span class="eyebrow">Refusal direction</span>
-        <dl class="abl-facts" id="abl-facts"></dl>
+        <dl class="facts" id="abl-facts"></dl>
         <button id="abl-toggle" class="switch" role="switch" aria-checked="false" hidden><span>Erase refusals</span><i></i></button>
       </div>
     </div>
 
-    <div class="abl-flow">
+    <div class="flow">
       <div class="step" id="abl-s1">
         <div class="step-h"><span class="num">01</span><div><h3>Find the refusal direction</h3>
           <p class="step-sub">Reads how the model handles bad and everyday requests, then tests which layer erases its refusals. Takes a few minutes.</p></div></div>
@@ -190,53 +190,69 @@
 
   <!-- ============================================================ steer -->
   <section id="view-steer" class="view page" data-view="steer" hidden>
-    <header class="page-h"><h2>Steer</h2></header>
-    <div class="step">
-      <div class="step-h"><span class="num">1</span><h3>Change how it acts</h3></div>
-      <div class="card change">
-        <div class="ask">
-          <input id="c-input" placeholder="How should it act? e.g. talk like a pirate, or a word like cookie" spellcheck="false" autocomplete="off">
-          <button class="btn ghost" data-cancel>Stop</button>
-          <button id="c-go" class="btn">Find</button>
-        </div>
-        <div class="ex-line" id="ex-line"><span>Or try</span><div id="ex-chips" class="chips"></div></div>
-        <div id="c-status" class="status-line"></div>
-        <div id="c-results"></div>
-        <details class="adv">
-          <summary>Options</summary>
-          <label class="field">Words it must say <span class="opt">for sentences</span>
-            <input id="d-focus" placeholder="e.g. arr, matey" spellcheck="false">
-          </label>
-          <label class="field">Test questions <span class="opt">one per line</span><textarea id="d-prompts" rows="5" spellcheck="false"></textarea></label>
-          <div class="adv-grid">
-            <label class="field">Most neurons<input id="d-maxn" type="number" value="6" min="1" max="16"></label>
-            <label class="field">Neurons to test<input id="d-cands" type="number" placeholder="auto" min="8" max="128"></label>
-            <label class="field">Strengths to try<input id="d-doses" value="0.25, 0.5, 1.0"></label>
-            <label class="field">Allowed quality loss<input id="d-flu" type="number" value="0.35" step="0.05" min="0"></label>
-          </div>
-          <label class="check"><input id="w-last" type="checkbox"> Search the last layers for words <span class="opt">they tend to repeat the word</span></label>
-        </details>
-        <div id="rc" class="rc" hidden>
-          <div class="rc-h"><b>On now</b><span class="grow"></span><button id="rc-save" class="btn ghost sm">Save</button><button id="rc-clear" class="btn ghost sm">Turn all off</button></div>
-          <div id="rc-list" class="rc-list"></div>
-        </div>
+    <header class="page-h">
+      <h2>Steer</h2>
+      <p>Find the neurons behind a behaviour, push them up or down, and see how its answers change.</p>
+    </header>
+
+    <div class="status-panel" id="steer-status">
+      <canvas id="steer-status-art" aria-hidden="true"></canvas>
+      <div class="status-panel-b">
+        <span class="eyebrow">Steering</span>
+        <dl class="facts" id="steer-facts"></dl>
       </div>
     </div>
 
-    <div class="step">
-      <div class="step-h"><span class="num">2</span><h3>Ask it something</h3></div>
-      <div class="card try">
-        <div class="ask">
-          <input id="t-prompt" value="Describe the way you look." spellcheck="false" autocomplete="off">
-          <button class="btn ghost" data-cancel>Stop</button>
-          <button id="t-go" class="btn">Send</button>
-        </div>
-        <div class="row">
-          <div class="chips grow" id="t-chips"></div>
-          <label class="check"><input id="t-opposite" type="checkbox"> Also show the opposite</label>
+    <div class="flow">
+      <div class="step" id="st-s1">
+        <div class="step-h"><span class="num">01</span><div><h3>Change how it acts</h3>
+          <p class="step-sub">Describe a behaviour or a word. It searches the model for the neurons behind it and turns on the ones that work.</p></div></div>
+        <div class="card change">
+          <div class="ask">
+            <input id="c-input" placeholder="How should it act? e.g. talk like a pirate, or a word like cookie" spellcheck="false" autocomplete="off">
+            <button class="btn ghost" data-cancel>Stop</button>
+            <button id="c-go" class="btn">Find</button>
+          </div>
+          <div class="ex-line" id="ex-line"><span>Or try</span><div id="ex-chips" class="chips"></div></div>
+          <div id="c-status" class="status-line"></div>
+          <div id="c-results"></div>
+          <details class="adv">
+            <summary>Options</summary>
+            <label class="field">Words it must say <span class="opt">for sentences</span>
+              <input id="d-focus" placeholder="e.g. arr, matey" spellcheck="false">
+            </label>
+            <label class="field">Test questions <span class="opt">one per line</span><textarea id="d-prompts" rows="5" spellcheck="false"></textarea></label>
+            <div class="adv-grid">
+              <label class="field">Most neurons<input id="d-maxn" type="number" value="6" min="1" max="16"></label>
+              <label class="field">Neurons to test<input id="d-cands" type="number" placeholder="auto" min="8" max="128"></label>
+              <label class="field">Strengths to try<input id="d-doses" value="0.25, 0.5, 1.0"></label>
+              <label class="field">Allowed quality loss<input id="d-flu" type="number" value="0.35" step="0.05" min="0"></label>
+            </div>
+            <label class="check"><input id="w-last" type="checkbox"> Search the last layers for words <span class="opt">they tend to repeat the word</span></label>
+          </details>
+          <div id="rc" class="rc" hidden>
+            <div class="rc-h"><b>On now</b><span class="grow"></span><button id="rc-save" class="btn ghost sm">Save</button><button id="rc-clear" class="btn ghost sm">Turn all off</button></div>
+            <div id="rc-list" class="rc-list"></div>
+          </div>
         </div>
       </div>
-      <div id="runs" class="runs"></div>
+
+      <div class="step" id="st-s2">
+        <div class="step-h"><span class="num">02</span><div><h3>Ask it something</h3>
+          <p class="step-sub">Compare its answer with the neurons on against the model as it normally is.</p></div></div>
+        <div class="card try">
+          <div class="ask">
+            <input id="t-prompt" value="Describe the way you look." spellcheck="false" autocomplete="off">
+            <button class="btn ghost" data-cancel>Stop</button>
+            <button id="t-go" class="btn">Send</button>
+          </div>
+          <div class="row">
+            <div class="chips grow" id="t-chips"></div>
+            <label class="check"><input id="t-opposite" type="checkbox"> Also show the opposite</label>
+          </div>
+        </div>
+        <div id="runs" class="runs"></div>
+      </div>
     </div>
   </section>
 

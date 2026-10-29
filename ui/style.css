@@ -615,37 +615,37 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 #abl-test-rows { display: flex; flex-direction: column; gap: 20px; }
 
 /* the status panel: the cut-beam scene beside where the refusal direction stands, and its switch */
-.abl-status {
+.status-panel {
   display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr); margin-top: -12px;
   border: 1px solid var(--rule); border-radius: var(--radius); background: var(--panel); overflow: hidden;
   transition: border-color 0.3s;
 }
-.abl-status.on { border-color: rgba(195, 207, 245, 0.28); }
-.abl-status canvas { display: block; width: 100%; height: 100%; min-height: 150px; background: var(--night); border-right: 1px solid var(--rule); color: var(--ascii); opacity: 0.8; }
-.abl-status:hover canvas { opacity: 1; }
-.abl-status-b { display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 24px 28px; }
-.abl-facts { display: flex; margin: 0; }
-.abl-facts div { padding: 0 26px; border-left: 1px solid var(--rule); }
-.abl-facts div:first-child { padding-left: 0; border-left: 0; }
-.abl-facts dt { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
-.abl-facts dd { display: flex; align-items: center; gap: 7px; margin: 6px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.abl-facts dd.dim { font-size: 15px; font-weight: 500; color: var(--text-2); }
-.abl-status .switch { align-self: flex-start; margin-top: 4px; }
+.status-panel.on { border-color: rgba(195, 207, 245, 0.28); }
+.status-panel canvas { display: block; width: 100%; height: 100%; min-height: 150px; background: var(--night); border-right: 1px solid var(--rule); color: var(--ascii); opacity: 0.8; }
+.status-panel:hover canvas { opacity: 1; }
+.status-panel-b { display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 24px 28px; }
+.facts { display: flex; margin: 0; }
+.facts div { padding: 0 26px; border-left: 1px solid var(--rule); }
+.facts div:first-child { padding-left: 0; border-left: 0; }
+.facts dt { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.facts dd { display: flex; align-items: center; gap: 7px; margin: 6px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.facts dd.dim { font-size: 15px; font-weight: 500; color: var(--text-2); }
+.status-panel .switch { align-self: flex-start; margin-top: 4px; }
 
 /* the three steps on a rail: numbers in rings, a hairline joining them; a finished step lights up */
-.abl-flow { position: relative; display: flex; flex-direction: column; gap: 44px; padding-left: 56px; }
-.abl-flow::before { content: ""; position: absolute; left: 16px; top: 18px; bottom: 40px; width: 1px; background: linear-gradient(var(--rule-2), var(--rule) 70%, transparent); }
-.abl-flow .step-h { align-items: flex-start; }
-.abl-flow .num {
+.flow { position: relative; display: flex; flex-direction: column; gap: 44px; padding-left: 56px; }
+.flow::before { content: ""; position: absolute; left: 16px; top: 18px; bottom: 40px; width: 1px; background: linear-gradient(var(--rule-2), var(--rule) 70%, transparent); }
+.flow .step-h { align-items: flex-start; }
+.flow .num {
   position: absolute; left: -56px; top: -2px; width: 33px; height: 33px; border-radius: 50%;
   background: var(--bg); box-shadow: inset 0 0 0 1px var(--rule-2); color: var(--text-2);
   font-family: var(--mono); font-size: 11.5px; font-weight: 500;
 }
-.abl-flow .step { position: relative; }
+.flow .step { position: relative; }
 /* the next step to do: the first one before anything is found, then Check it */
-.abl-flow .step:first-child:not(.done) .num, .abl-flow .step.done + .step:not(.locked) .num { background: var(--accent); color: var(--bg); box-shadow: none; }
-.abl-flow .step.done .num { color: var(--ascii); box-shadow: inset 0 0 0 1px rgba(195, 207, 245, 0.5); }
-.abl-flow .step-h h3 { font-size: 19px; }
+.flow .step:first-child:not(.done) .num, .flow .step.done + .step:not(.locked) .num { background: var(--accent); color: var(--bg); box-shadow: none; }
+.flow .step.done .num { color: var(--ascii); box-shadow: inset 0 0 0 1px rgba(195, 207, 245, 0.5); }
+.flow .step-h h3 { font-size: 19px; }
 .step-sub { margin: 6px 0 0; max-width: 640px; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
 
 /* strength: a periwinkle fill up to a white handle, ticks below, a large readout */
@@ -664,6 +664,22 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .abl-ticks { position: absolute; left: 8px; right: 8px; bottom: 0; height: 14px; }
 .abl-ticks span { position: absolute; transform: translateX(-50%); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .abl-range output { min-width: 72px; margin-top: -2px; font-family: var(--sans); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* a neuron's strength: the fill grows out from the middle, periwinkle when pushed up, red when pushed down */
+.rc-row input.lr { -webkit-appearance: none; appearance: none; height: 20px; margin: 0; background: transparent; cursor: pointer; }
+.rc-row input.lr::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.12) var(--lo, 50%), var(--fill, var(--ascii)) var(--lo, 50%),
+    var(--fill, var(--ascii)) var(--hi, 50%), rgba(255, 255, 255, 0.12) var(--hi, 50%));
+}
+.rc-row input.lr::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5.5px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 4px rgba(195, 207, 245, 0.14);
+}
+.rc { border-top-color: var(--rule); }
+.rc-h b { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.rc-row { background: var(--well); border-color: var(--rule); }
+.rc-row:hover { border-color: var(--rule-2); }
 
 /* ------------------------------------------------------------ chat */
 main.is-chat { padding: 0; overflow: hidden; }
