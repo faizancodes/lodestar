@@ -790,7 +790,7 @@ function planSummary(plan) {
 // ------------------------------------------------------------------ abliterate
 // Analysis events → the plan's steps: reading the probes (0), comparing directions (1), trying the best layers on
 // new bad requests (2), checking today's answers (3).
-const ABL_STEP_OF = { "harm-a": 0, "harm-b": 0, "harmless": 0, "compare": 1, "trial": 2, "examples": 3 };
+const ABL_STEP_OF = { "harm-a": 0, "harm-b": 0, "harmless": 0, "compare": 1, "trial": 2, "screen": 2, "strength": 2, "examples": 3 };
 let ablProbesDirty = false, ablNameTouched = false;
 const lines = (sel) => $(sel).value.split("\n").map((s) => s.trim()).filter(Boolean);
 
@@ -934,9 +934,10 @@ async function ablAnalyze() {
         <span class="rk-tag">${r.tried ? `${r.refused} of ${r.tried} refused` : "not tried"}${r.layer === result.layer ? " · chosen" : ""}</span>
       </div>`).join("") + `</details>`;
     const left = result.refused_left, n = result.tried;
+    const at = result.coef === 1 ? "" : ` at strength ${result.coef}`;
     $(".plan-now", plan).textContent = !left
-      ? `Layer ${result.layer} stopped the refusals on all ${n} new test requests, and it’s on now.`
-      : `Even the best layer (${result.layer}) still refused ${left} of ${n} new test requests. It’s on now; try a higher strength below.`;
+      ? `Layer ${result.layer}${at} stopped the refusals on all ${n} new test requests, and it’s on now.`
+      : `Even the best setting, layer ${result.layer}${at}, still refused ${left} of ${n} new test requests. It’s on now.`;
     await refreshAbl();
   } finally {
     clearInterval(clock);
