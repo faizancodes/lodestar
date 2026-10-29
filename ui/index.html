@@ -90,85 +90,99 @@
         (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>).</p>
     </header>
 
-    <div class="step" id="abl-s1">
-      <div class="step-h"><span class="num">1</span><h3>Find where refusal lives</h3>
-        <span class="grow"></span>
+    <div class="abl-status" id="abl-status">
+      <canvas id="abl-status-art" aria-hidden="true"></canvas>
+      <div class="abl-status-b">
+        <span class="eyebrow">Refusal direction</span>
+        <dl class="abl-facts" id="abl-facts"></dl>
         <button id="abl-toggle" class="switch" role="switch" aria-checked="false" hidden><span>Erase refusals</span><i></i></button>
       </div>
-      <div class="card abl">
-        <div class="row tight">
-          <button id="abl-go" class="btn">Find the refusal direction</button>
-          <button class="btn ghost" data-cancel>Stop</button>
-        </div>
-        <div id="abl-plan" class="plan" hidden>
-          <div class="plan-h"><b class="plan-goal"></b><span class="plan-clock">0:00</span></div>
-          <ol class="plan-steps abl-steps">
-            <li><span>Read</span><i></i></li>
-            <li><span>Compare</span><i></i></li>
-            <li><span>Try layers</span><i></i></li>
-            <li><span>Check</span><i></i></li>
-          </ol>
-          <div class="abl-scene" id="abl-scene" hidden><canvas aria-hidden="true"></canvas></div>
-          <div class="plan-now status-line"></div>
-          <div id="abl-examples" class="abl-examples"></div>
-        </div>
-        <div id="abl-rank"></div>
-        <details class="adv">
-          <summary>Probe questions</summary>
-          <label class="field">Questions it should refuse <span class="opt">one per line</span>
-            <textarea id="abl-probes-harmful" rows="6" spellcheck="false"></textarea>
-          </label>
-          <label class="field">Everyday questions <span class="opt">one per line</span>
-            <textarea id="abl-probes-harmless" rows="5" spellcheck="false"></textarea>
-          </label>
-          <div class="row tight">
-            <button id="abl-probes-reset" class="btn ghost sm">Reset to the defaults</button>
-            <button id="abl-probes-save" class="btn ghost sm">Save probe lists</button>
-          </div>
-        </details>
-      </div>
     </div>
 
-    <div class="step locked" id="abl-s2">
-      <div class="step-h"><span class="num">2</span><h3>Check it</h3></div>
-      <div class="card abl">
-        <div class="abl-checks">
-          <label class="field">Strength <span class="opt">1 erases the direction fully</span>
-            <div class="slider-row">
-              <input id="abl-coef" type="range" value="1" min="0.2" max="2" step="0.05">
-              <output id="abl-coef-v">1.00</output>
-            </div>
-          </label>
-          <label class="field">Test questions <span class="opt">one per line, up to four</span>
-            <textarea id="abl-test-probes" rows="3" spellcheck="false"></textarea>
-          </label>
+    <div class="abl-flow">
+      <div class="step" id="abl-s1">
+        <div class="step-h"><span class="num">01</span><div><h3>Find the refusal direction</h3>
+          <p class="step-sub">Reads how the model handles bad and everyday requests, then tests which layer erases its refusals. Takes a few minutes.</p></div></div>
+        <div class="card abl">
           <div class="row tight">
-            <button id="abl-test-go" class="btn">Compare before and after</button>
+            <button id="abl-go" class="btn">Find it</button>
             <button class="btn ghost" data-cancel>Stop</button>
           </div>
-          <div id="abl-test-summary" class="status-line"></div>
-          <div id="abl-test-rows"></div>
+          <div id="abl-plan" class="plan" hidden>
+            <div class="plan-h"><b class="plan-goal"></b><span class="plan-clock">0:00</span></div>
+            <ol class="plan-steps abl-steps">
+              <li><span>Read</span><i></i></li>
+              <li><span>Compare</span><i></i></li>
+              <li><span>Try layers</span><i></i></li>
+              <li><span>Check</span><i></i></li>
+            </ol>
+            <div class="abl-scene" id="abl-scene" hidden><canvas aria-hidden="true"></canvas></div>
+            <div class="plan-now status-line"></div>
+            <div id="abl-examples" class="abl-examples"></div>
+          </div>
+          <div id="abl-rank"></div>
+          <details class="adv">
+            <summary>Probe questions</summary>
+            <label class="field">Questions it should refuse <span class="opt">one per line</span>
+              <textarea id="abl-probes-harmful" rows="6" spellcheck="false"></textarea>
+            </label>
+            <label class="field">Everyday questions <span class="opt">one per line</span>
+              <textarea id="abl-probes-harmless" rows="5" spellcheck="false"></textarea>
+            </label>
+            <div class="row tight">
+              <button id="abl-probes-reset" class="btn ghost sm">Reset to the defaults</button>
+              <button id="abl-probes-save" class="btn ghost sm">Save probe lists</button>
+            </div>
+          </details>
         </div>
       </div>
-    </div>
 
-    <div class="step locked" id="abl-s3">
-      <div class="step-h"><span class="num">3</span><h3>Save the model</h3></div>
-      <div class="card abl">
-        <div class="save-row">
-          <label class="field grow">Name
-            <input id="abl-name" spellcheck="false" autocomplete="off">
-          </label>
-          <button id="abl-bake" class="btn">Save model</button>
-          <button id="abl-export-stop" class="btn ghost" hidden>Stop</button>
+      <div class="step locked" id="abl-s2">
+        <div class="step-h"><span class="num">02</span><div><h3>Check it</h3>
+          <p class="step-sub">Ask a few bad requests and compare its answers with refusals erased. Raise the strength if it still refuses.</p></div></div>
+        <div class="card abl">
+          <div class="abl-checks">
+            <div class="field">Strength
+              <div class="abl-range">
+                <div class="abl-range-track">
+                  <input id="abl-coef" type="range" value="1" min="0.2" max="2" step="0.05" aria-label="Strength">
+                  <div class="abl-ticks" aria-hidden="true"><span style="left:0%">0.2</span><span style="left:44.44%">1 · full</span><span style="left:100%">2</span></div>
+                </div>
+                <output id="abl-coef-v">1.00×</output>
+              </div>
+            </div>
+            <label class="field">Test questions <span class="opt">one per line, up to four</span>
+              <textarea id="abl-test-probes" rows="3" spellcheck="false"></textarea>
+            </label>
+            <div class="row tight">
+              <button id="abl-test-go" class="btn">Compare before and after</button>
+              <button class="btn ghost" data-cancel>Stop</button>
+            </div>
+            <div id="abl-test-summary" class="status-line"></div>
+            <div id="abl-test-rows"></div>
+          </div>
         </div>
-        <div id="abl-export" class="export" hidden>
-          <div class="export-bar"><i></i></div>
-          <div class="export-line status-line"></div>
-        </div>
-        <div id="abl-saved" class="saved-model" hidden>
-          <div><b></b><span>On this Mac</span></div>
-          <button class="btn" id="abl-load">Load it</button>
+      </div>
+
+      <div class="step locked" id="abl-s3">
+        <div class="step-h"><span class="num">03</span><div><h3>Save it as a new model</h3>
+          <p class="step-sub">Writes a copy with the direction removed from its weights, so it answers this way anywhere, without this app.</p></div></div>
+        <div class="card abl">
+          <div class="save-row">
+            <label class="field grow">Name
+              <input id="abl-name" spellcheck="false" autocomplete="off">
+            </label>
+            <button id="abl-bake" class="btn">Save model</button>
+            <button id="abl-export-stop" class="btn ghost" hidden>Stop</button>
+          </div>
+          <div id="abl-export" class="export" hidden>
+            <div class="export-bar"><i></i></div>
+            <div class="export-line status-line"></div>
+          </div>
+          <div id="abl-saved" class="saved-model" hidden>
+            <div><b></b><span>On this Mac</span></div>
+            <button class="btn" id="abl-load">Load it</button>
+          </div>
         </div>
       </div>
     </div>

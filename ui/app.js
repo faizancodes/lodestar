@@ -870,9 +870,11 @@ function renderAbl() {
   $("#abl-s3").classList.toggle("locked", !ready);
   $("#abl-toggle").hidden = !ready;
   $("#abl-go").classList.toggle("ghost", ready);
-  $("#abl-go").textContent = ready ? "Find it again" : "Find the refusal direction";
+  $("#abl-go").textContent = ready ? "Find it again" : "Find it";
+  $("#abl-s1").classList.toggle("done", ready);
   if (!ablNameTouched && state.info?.loaded) $("#abl-name").value = ablDefaultName();
   renderChatMods();
+  renderAblStatus();
   if (!ready) return;
   const c = a.current;
   $("#abl-toggle").setAttribute("aria-checked", !!c.active);
@@ -880,13 +882,30 @@ function renderAbl() {
   if (document.activeElement !== $("#abl-coef")) setCoefInput(c.coef ?? 1);
 }
 
+// the status panel: where the direction is, how strongly it's erased, and the switch for it
+function renderAblStatus() {
+  const c = state.abl?.ready && state.abl.current;
+  $("#abl-status").classList.toggle("on", !!c?.active);
+  $("#abl-facts").innerHTML = c
+    ? [["Layer", c.layer], ["Strength", `${(+c.coef || 1).toFixed(2)}×`],
+       ["Status", c.active ? `<i class="hc-on"></i>Erasing refusals` : "Switched off"]]
+        .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")
+    : `<div><dt>Status</dt><dd class="dim">Not found yet</dd></div>`;
+  requestAnimationFrame(() => drawHomeArt($("#abl-status-art"), "abliterate", $("#abl-status")));
+}
+
 function setCoefInput(v) {
   $("#abl-coef").value = v;
-  $("#abl-coef-v").textContent = (+v).toFixed(2);
+  paintCoef();
+}
+function paintCoef() { // the readout, and the slider's fill up to the handle
+  const el = $("#abl-coef"), v = +el.value;
+  $("#abl-coef-v").textContent = v.toFixed(2) + "×";
+  el.style.setProperty("--pct", ((v - el.min) / (el.max - el.min)) * 100 + "%");
 }
 
 $("#abl-coef").oninput = () => {
-  $("#abl-coef-v").textContent = ablCoef().toFixed(2);
+  paintCoef();
   if (!ablNameTouched) $("#abl-name").value = ablDefaultName();
 };
 $("#abl-coef").onchange = async () => {
