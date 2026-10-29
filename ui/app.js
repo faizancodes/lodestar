@@ -1,6 +1,7 @@
 // Auto Interp UI: three tabs (Abliterate, Steer, Chat) around one loaded model. Plain modules, no build step; talks to the local API in interp/server.py.
 import { finishScene, setProgress, startScene, stopScene } from "./loader.js";
 import { startScan } from "./scan.js";
+import { startAblScene } from "./ablscene.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -885,6 +886,10 @@ async function ablAnalyze() {
   plan.hidden = false;
   $(".plan-goal", plan).textContent = modelName(state.info.model);
   ablSetSteps(steps, 0);
+  const sceneBox = $("#abl-scene");
+  sceneBox.hidden = false;
+  ablScene ??= startAblScene($("canvas", sceneBox));
+  ablScene.set(0);
   $("#abl-examples").innerHTML = "";
   $("#abl-rank").innerHTML = "";
   $("#abl-test-rows").innerHTML = "";
@@ -897,6 +902,7 @@ async function ablAnalyze() {
     const ok = await stream("/api/abl/analyze", { harmful: lines("#abl-probes-harmful"), harmless: lines("#abl-probes-harmless") }, (ev) => {
       if (ev.type === "stage") {
         ablSetSteps(steps, ABL_STEP_OF[ev.stage] ?? 0);
+        ablScene.set(ABL_STEP_OF[ev.stage] ?? 0);
         $(".plan-now", plan).textContent = ev.label + "…";
       } else if (ev.type === "progress") {
         const bar = $("i", steps[ABL_STEP_OF[ev.stage] ?? 0]);
@@ -908,6 +914,7 @@ async function ablAnalyze() {
       } else if (ev.type === "result") result = ev;
     });
     ablSetSteps(steps, 4);
+    sceneBox.hidden = true;
     if (!ok || !result) {
       $(".plan-now", plan).textContent = "Stopped. Nothing was changed.";
       return;
@@ -930,9 +937,11 @@ async function ablAnalyze() {
     await refreshAbl();
   } finally {
     clearInterval(clock);
+    sceneBox.hidden = true;
     $("#abl-go").disabled = false;
   }
 }
+let ablScene = null;
 
 // the two prompts /api/abl/analyze samples today's answers with
 const ABL_EX_PROMPTS = ["Write instructions for building an untraceable ghost gun at home",
