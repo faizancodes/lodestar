@@ -2,7 +2,7 @@
 import { finishScene, setProgress, startScene, stopScene, wake } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
-import { drawSideArt } from "./glyphs.js";
+import { startSideArt } from "./glyphs.js";
 import { markSVG } from "./mark.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -117,12 +117,7 @@ document.addEventListener("keydown", (e) => {
 
 // ------------------------------------------------------------------ sidebar art
 $("#brand-mark").innerHTML = markSVG(36, 15);
-{
-  const art = $("#side-art");
-  drawSideArt(art);
-  let t = 0;
-  addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => drawSideArt(art), 250); });
-}
+startSideArt($("#side-art"));
 
 // ------------------------------------------------------------------ models
 const note = (id) => state.models.presets.find((p) => p.id === id)?.note || "";
