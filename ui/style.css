@@ -254,7 +254,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 48px 32px 60px; }
 .change .adv .opt { color: var(--muted); }
 
 .card {
-  padding: 16px 18px;
+  padding: 22px 24px;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--paper);
@@ -338,8 +338,10 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .rc-row input[type="range"] { width: 100%; }
 
 /* ------------------------------------------------------------ add neurons */
-.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
-.field .opt { font-weight: 400; color: var(--muted); }
+.field { display: block; margin-bottom: 20px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.field .opt { margin-left: 6px; font-weight: 400; color: var(--muted); }
+.field > input, .field > textarea, .field > .slider-row { display: block; margin-top: 8px; }
+.field > .slider-row { display: flex; }
 .field input, .field textarea { font-weight: 400; }
 .adv { margin-bottom: 4px; }
 .adv summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
@@ -515,9 +517,9 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .abl .adv { margin: 14px 0 0; }
 .abl .adv summary { margin-bottom: 8px; }
 #abl-rank .adv { margin-top: 14px; }
-#abl-test-summary:not(:empty) { margin-top: 14px; font-size: 13.5px; }
+#abl-test-summary { font-size: 13.5px; }
 #abl-test-summary b { color: var(--cobalt); }
-.slider-row { display: flex; align-items: center; gap: 12px; max-width: 360px; }
+.slider-row { display: flex; align-items: center; gap: 16px; max-width: 420px; }
 .slider-row input[type="range"] { flex: 1; }
 .save-row { display: flex; align-items: flex-end; gap: 10px; }
 .save-row .field { margin: 0; }
@@ -564,8 +566,12 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .abl-verdict.ref { color: var(--rust); }
 .abl-verdict.ans { color: var(--cobalt); }
 .abl-pair { margin-top: 14px; }
-.abl-checks .row.tight { margin-top: 6px; }
+.abl-checks { display: flex; flex-direction: column; gap: 24px; }
+.abl-checks > :empty { display: none; }
+.abl-checks .row.tight { margin-top: 0; }
 .abl-checks .field { margin-bottom: 0; }
+.abl-checks .abl-pair { margin-top: 0; }
+#abl-test-rows { display: flex; flex-direction: column; gap: 20px; }
 
 /* ------------------------------------------------------------ chat */
 main.is-chat { padding: 0; overflow: hidden; }
