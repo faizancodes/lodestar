@@ -110,53 +110,51 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .saved-item .del:hover { opacity: 1; background: rgba(237, 237, 237, 0.15); }
 .saved-empty { padding: 4px 10px; font-size: 12px; opacity: 0.55; }
 
+/* The model card: one quiet panel. The model's name is the button that opens the menu, its status sits under it,
+   and a hairline below is the memory meter, drawn in marks like the scenes. */
 .model-card {
-  position: relative;
-  z-index: 2;
-  padding: 12px;
-  border: 1px solid rgba(237, 237, 237, 0.28);
-  border-radius: var(--radius);
-  background: var(--panel);
+  position: relative; z-index: 2; padding: 4px;
+  border: 1px solid var(--rule); border-radius: 8px;
+  background: rgba(17, 17, 17, 0.88); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
 }
 .model-pick {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: 8px;
-  padding: 9px 12px;
-  border: 1px solid rgba(237, 237, 237, 0.35);
-  border-radius: 4px;
-  background: rgba(237, 237, 237, 0.08);
-  color: var(--on-night);
-  font-size: 13.5px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
+  border: 0; border-radius: 5px; background: transparent; color: var(--on-night); text-align: left; cursor: pointer;
+  transition: background 0.15s;
 }
-.model-pick:hover, .model-pick[aria-expanded="true"] { border-color: var(--on-night); background: rgba(237, 237, 237, 0.14); }
+.model-pick:hover, .model-pick[aria-expanded="true"] { background: rgba(237, 237, 237, 0.07); }
 .model-pick:disabled { opacity: 0.6; cursor: default; }
-.mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mp-caret { width: 8px; height: 8px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(-135deg) translate(-2px, -2px); opacity: 0.7; }
-.model-pick[aria-expanded="true"] .mp-caret { transform: rotate(45deg) translate(-2px, -2px); }
-.model-status { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; color: rgba(237, 237, 237, 0.7); }
-.model-status .dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(237, 237, 237, 0.35); flex: none; }
-.model-status.ready .dot { background: var(--good); box-shadow: 0 0 8px rgba(61, 220, 132, 0.6); }
-.model-status.busy .dot { background: var(--on-night); animation: pulse 1s infinite; }
-.model-status.err .dot { background: #d9826a; }
+.mp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; letter-spacing: -0.015em; }
+.mp-caret {
+  flex: none; width: 6px; height: 6px; margin: 0 2px 0 4px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; opacity: 0.45;
+  transform: rotate(-45deg); transition: transform 0.15s, opacity 0.15s;
+}
+.model-pick:hover .mp-caret { opacity: 0.8; }
+.model-pick[aria-expanded="true"] .mp-caret { transform: rotate(-135deg); opacity: 0.8; }  /* points at the menu */
+.mp-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: rgba(237, 237, 237, 0.3); }
+.model-card.ready .mp-dot { background: var(--good); box-shadow: 0 0 8px rgba(61, 220, 132, 0.55); }
+.model-card.busy .mp-dot { background: var(--on-night); animation: pulse 1s infinite; }
+.model-card.err .mp-dot { background: var(--bad); }
+.model-status { font-size: 11.5px; font-weight: 400; color: rgba(237, 237, 237, 0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-card.err .model-status { color: var(--bad); }
 @keyframes pulse { 50% { opacity: 0.25; } }
 
-/* the memory meter: Lodestar's share in the scenes' periwinkle, everything else grey; amber while macOS swaps */
-.mem { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
-.mem-txt { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: rgba(237, 237, 237, 0.6); }
-.mem-n { font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.mem-bar { display: flex; height: 4px; margin-top: 6px; border-radius: 2px; background: rgba(237, 237, 237, 0.1); overflow: hidden; }
+/* Lodestar's share in the scenes' periwinkle marks, everything else in dim ones; amber while macOS swaps */
+.mem { display: flex; align-items: center; gap: 10px; margin: 2px 6px 0; padding: 9px 4px 7px; border-top: 1px solid var(--rule); }
+.mem-l { flex: none; font-size: 11px; color: rgba(237, 237, 237, 0.45); }
+.mem-bar {
+  flex: 1; display: flex; height: 6px; overflow: hidden;
+  background: radial-gradient(rgba(237, 237, 237, 0.16) 0.8px, transparent 1.15px) 0 0 / 3px 3px;
+}
 .mem-bar i { display: block; height: 100%; transition: width 0.6s ease; }
-.mem-app { background: var(--ascii); }
-.mem-rest { background: rgba(237, 237, 237, 0.32); }
-.mem.tight .mem-txt { color: var(--warn); }
-.mem.tight .mem-app, .mem.tight .mem-rest { background: var(--warn); }
-.mem.tight .mem-rest { opacity: 0.55; }
+.mem-app { background: var(--dotfill); }
+.mem-rest { background: radial-gradient(rgba(237, 237, 237, 0.5) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
+.mem-n { flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; color: rgba(237, 237, 237, 0.5); }
+.mem.tight .mem-l, .mem.tight .mem-n { color: var(--warn); }
+.mem.tight .mem-app { background: radial-gradient(var(--warn) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
+.mem.tight .mem-rest { background: radial-gradient(rgba(240, 180, 90, 0.45) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
 
 /* a question that has to be answered before going on */
 .dialog-back {
@@ -922,8 +920,6 @@ h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weig
 textarea, input:not([type]) { font-size: 14px; }
 .start-model b { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
 .start-model span { font-size: 12.5px; }
-.model-status { font-size: 12.5px; }
-.mp-name { font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
 .saved-item .nm { font-size: 13.5px; }
 .start-model .go { font-size: 13px; font-weight: 500; color: var(--text); }
 .run-q { font-size: 14px; font-weight: 600; }

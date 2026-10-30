@@ -440,8 +440,8 @@ test("memory: the meter, a model that won't fit, unload", async ({ page }) => {
   await scenario(page, "memory");
   await page.goto("/");
   await expect(page.locator("#mem")).toHaveClass(/\btight\b/);
-  await expect(page.locator("#mem .mem-txt")).toContainText("Swapping");
-  await expect(page.locator("#mem .mem-n")).toHaveText("31 GB of 32 GB");
+  await expect(page.locator("#mem .mem-l")).toHaveText("Swapping");
+  await expect(page.locator("#mem .mem-n")).toHaveText("31 / 32 GB");
 
   await page.locator("#model-pick").click();
   await page.locator('#model-menu .mm-row[data-id="Qwen/Qwen3-1.7B"] .mm-item').click();
