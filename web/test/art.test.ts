@@ -92,8 +92,11 @@ const scenarios: Record<string, Scenario> = {
     m.setProgress(0.4);
     frames(5);
 
+    m.setLayers(32, Array.from({ length: 32 }, (_, i) => Math.max(0, Math.min(1, 14.5 - i))));
+    frames(5);
+
     const done = m.finishScene();
-    frames(30);
+    frames(45);
     await done;
 
     m.stopScene();

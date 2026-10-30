@@ -13,14 +13,17 @@ push adds dose / len(layers) times the direction's contrast size to the output o
 the stream by one average difference between the concept's two poles; `erase` clamps the stream's component along it
 to where ordinary prompts sit, at every layer.
 """
+import re
 import threading
 import time
 from dataclasses import dataclass
 
 import numpy as np
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
+
+LAYER_RE = re.compile(r"\blayers\.(\d+)\.")  # a decoder layer's weights, by name ("model.layers.13.mlp.down_proj.weight")
 
 REFERENCE_TEXT = (
     "The history of the region is long and varied. Farmers settled the river valley first, then traders arrived, "
@@ -59,6 +62,9 @@ class Engine:
         self.model_id = None
         self.status = "idle"
         self.progress = None  # 0..1 while a model loads, else None
+        # while a model loads: {"stage": "open" | "weights" | "measure", "layers": L | None, "lit": [L] 0..1 | None},
+        # how far along it is and how much of each layer's weights has arrived, for the loading scene
+        self.load_state = None
         self.trace = None
 
         self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None), "dir": {layer: [B, H]}, "erase": [...]}
@@ -82,6 +88,7 @@ class Engine:
             if self.model_id == model_id and self.model is not None:
                 return self.info()
             self.status = f"loading {model_id}"
+            self.load_state = {"stage": "open", "layers": self._layer_count(model_id), "lit": None}
             self.progress = 0.0
             t0 = time.perf_counter()
             took = {}
@@ -108,6 +115,7 @@ class Engine:
 
             took["weights"] = time.perf_counter() - t0
             self.progress = 0.9
+            self.load_state = {**self.load_state, "stage": "measure"}
 
             n_params = sum(p.numel() for p in model.parameters())
             if n_params < 2.5e9:  # small models fit comfortably in fp32, which keeps gradients and lenses precise
@@ -148,23 +156,49 @@ class Engine:
             print(f"loaded {model_id}: " + ", ".join(f"{k} {v:.1f}s" for k, v in took.items()), flush=True)
 
             self.progress = None
+            self.load_state = None
             self.status = "ready"
             return self.info()
 
+    @staticmethod
+    def _layer_count(model_id):
+        """The model's number of layers from its config, before any weights load (None when it can't be read)."""
+        try:
+            cfg = AutoConfig.from_pretrained(model_id)
+            return getattr(getattr(cfg, "text_config", None) or cfg, "num_hidden_layers", None)
+        except Exception:
+            return None
+
     def _weights_progress_hook(self, factory, args, kwargs):
-        """Route transformers' "Loading weights" bar into self.progress (0.04 to 0.9 of the whole load)."""
+        """Route transformers' "Loading weights" bar into self.progress (0.04 to 0.9 of the whole load), and into
+        load_state: how much of each layer's weights has arrived, counted against the tensors each layer has."""
         bar = factory(*args, **kwargs)
         if kwargs.get("desc") != "Loading weights":
             return bar
 
         eng = self
+        names = [x[0] if isinstance(x, tuple) else x for x in list(args[0])] if args else []
+        layer_of = lambda name: int(m.group(1)) if isinstance(name, str) and (m := LAYER_RE.search(name)) else None
+        per = {}
+        for nm in names:
+            if (l := layer_of(nm)) is not None:
+                per[l] = per.get(l, 0) + 1
+
+        L = max(per) + 1 if per else eng.load_state.get("layers")
+        got = [0] * (L or 0)
+        eng.load_state = {**eng.load_state, "stage": "weights", "layers": L, "lit": [0.0] * (L or 0)}
 
         class Watched:
             def __iter__(self):
-                total = getattr(bar, "total", None) or (len(args[0]) if args else 0)
+                total = getattr(bar, "total", None) or len(names)
                 for i, x in enumerate(bar, 1):
                     if total:
                         eng.progress = 0.04 + 0.86 * i / total
+
+                    l = layer_of(x[0] if isinstance(x, tuple) else x)
+                    if l is not None and l < len(got) and per.get(l):
+                        got[l] += 1
+                        eng.load_state["lit"][l] = round(got[l] / per[l], 2)
                     yield x
 
             def __getattr__(self, k):
