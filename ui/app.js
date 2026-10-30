@@ -578,8 +578,7 @@ function renderExamples() {
     c.onclick = () => {
       state.recipe = { id: null, name: e.name, items: [], model: state.info.model };
       addItems(e.items.map((x) => ({ ...x })), true);
-      $("#t-prompt").value = e.prompt;
-      send();
+      send(e.prompt);
     };
   });
 }
@@ -886,10 +885,10 @@ function renderPlan(box, plan) {
     if (plan.done) ((plan.applied = true), renderPlan(box, plan));
     state.recipe = { id: null, name: plan.goal.slice(0, 40), items: [], model: state.info.model };
     addItems(use.map((x) => ({ layer: x.layer, neuron: x.neuron, dose: x.dose, lens: x.lens })), true);
-    if (plan.proof.prompt) $("#t-prompt").value = plan.proof.prompt;
+    const q = plan.proof.prompt || PROMPTS[0];
     // the search holds the model while it runs, so a reply can only be generated once it has finished
-    if (!plan.done) return toast("Turned on. Send a question once the search finishes, or press Stop.");
-    send();
+    if (!plan.done) return (tlSetQuestion(q), toast("Turned on. Send a question once the search finishes, or press Stop."));
+    send(q);
     requestAnimationFrame(() => $("#view-steer .step:nth-of-type(2)")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 }
@@ -1196,156 +1195,172 @@ $("#st-bake").onclick = async () => {
 };
 
 // ------------------------------------------------------------------ try it and refine
-// One question at a time, and its answer in versions. Asking gives version 1 with the neurons that are on; each
-// fix ("what should change?") retunes them and gives the next version in the same place, so the loop is always:
-// read the answer, say what's wrong, read the new one. Older versions stay a click away and can be gone back to.
-// The normal answer is generated alongside version 1 and shown only when comparing.
+// A short thread, read top to bottom like a chat: the question, the answer, then each thing you said should change
+// and the answer after it. One box at the bottom does both jobs: once there's a steered answer it takes a fix
+// ("what should change?"), which retunes the neurons and answers again; "New question" switches it back to asking.
+// Older answers fold to a few lines and can be gone back to; the normal model's answer shows on request.
 const FIX_CHIPS = ["It repeats itself", "It's too strong", "It's too weak", "It went off topic"];
-let tl = null; // { prompt, normal, abl, versions: [{ items, text, fix: { feedback, lines } | null }], at, fixing }
+let tl = null; // { prompt, normal, other, abl, versions: [{ items, text, fix: { feedback, lines } | null, note }], asking, fixing, streaming }
 const tlCompare = () => { try { return localStorage.getItem("tl-compare") === "1"; } catch { return false; } };
-
-$("#t-chips").innerHTML = PROMPTS.map((p) => `<button class="chip">${esc(p)}</button>`).join("");
-$$("#t-chips .chip").forEach((c) => (c.onclick = () => (($("#t-prompt").value = c.textContent), send())));
-$("#t-go").onclick = () => send();
-$("#t-prompt").onkeydown = (e) => { if (e.key === "Enter") send(); };
 
 const snapshot = () => state.recipe.items.map((i) => ({ ...i }));
 const nOn = (items) => `${items.length} neuron${items.length === 1 ? "" : "s"}`;
+const tlMode = () => (tl && tl.versions.length && !tl.asking ? "fix" : "ask");
 
-/** Ask the question in the box with the neurons that are on: a new question starts a new loop; asking the same one
- *  again (after changing neurons by hand) adds a version. */
-async function send() {
-  const prompt = $("#t-prompt").value.trim();
+$("#tl-form").onsubmit = (e) => {
+  e.preventDefault();
+  const text = $("#t-prompt").value.trim();
+  if (!text || busy) return;
+  if (tlMode() === "fix") runFix(text);
+  else send(text);
+};
+$("#tl-newq").onclick = () => {
+  tl.asking = tlMode() === "fix";
+  $("#t-prompt").value = "";
+  renderComposer();
+  $("#t-prompt").focus();
+};
+$("#tl-stop").onclick = () => api("/api/cancel", {});
+
+/** Puts a question in the box, ready to ask (used by examples and plans). */
+function tlSetQuestion(prompt) {
+  if (tl) tl.asking = true;
+  renderComposer();
+  $("#t-prompt").value = prompt;
+}
+
+function renderComposer() {
+  const fix = tlMode() === "fix", input = $("#t-prompt");
+  input.placeholder = fix ? "What should change?" : "Ask it something";
+  const nq = $("#tl-newq");
+  nq.hidden = !(tl && tl.versions.length);
+  nq.textContent = fix ? "New question" : "Cancel";
+  $("#t-chips").innerHTML = (fix ? FIX_CHIPS : PROMPTS).map((p) => `<button type="button" class="chip">${esc(p)}</button>`).join("");
+  $$("#t-chips .chip").forEach((c) => (c.onclick = () => {
+    if (!fix) return send(c.textContent);
+    const t = input.value.trim();
+    input.value = t ? `${t.replace(/[.\s]*$/, "")}. ${c.textContent}.` : `${c.textContent}.`;
+    input.focus();
+  }));
+}
+renderComposer();
+
+/** Asks a question with the neurons that are on: a new question starts a new thread; the same one again (after
+ *  changing neurons by hand) adds an answer to it. */
+async function send(prompt) {
+  prompt = (prompt || "").trim();
   if (!prompt || busy) return;
   const items = snapshot();
   // with no neurons on there's nothing to refine: a one-off answer (normal, or with refusals erased)
   const fresh = !tl || tl.prompt !== prompt || !items.length || !tl.versions.length;
-  if (fresh) tl = { prompt, normal: "", other: "", abl: ablActive(), versions: [], at: 0, streaming: new Set() };
-  const v = { items, text: "", fix: null };
-  if (items.length) (tl.versions.push(v), (tl.at = tl.versions.length - 1));
+  if (fresh) tl = { prompt, normal: "", other: "", abl: ablActive(), versions: [], streaming: new Set() };
+  tl.asking = false;
+  const v = { items, text: "", fix: null, note: fresh ? "" : "Asked again with the neurons on now" };
+  if (items.length) tl.versions.push(v);
   const cols = items.length ? (fresh ? ["base", "up"] : ["up"]) : tl.abl ? ["abl"] : ["base"];
   cols.forEach((c) => tl.streaming.add(c === "base" && items.length ? "normal" : "main"));
+  $("#t-prompt").value = "";
   renderTl();
   await stream("/api/steer", { prompt, max_new: 160, columns: cols, pushes: pushes(1) }, (ev) => {
     if (ev.type !== "delta") return;
     const toNormal = ev.col === "base" && items.length;
     if (toNormal) tl.normal += ev.delta; else if (items.length) v.text += ev.delta; else tl.other += ev.delta;
-    const el = $(toNormal ? "#tl .ans.normal .ans-b" : "#tl .ans.main .ans-b");
-    if (el && (toNormal || tl.at === tl.versions.indexOf(v) || !items.length)) streamInto(el, ev.delta);
+    const el = $(toNormal ? "#tl .tl-normal .tl-a-b" : "#tl .tl-a.cur .tl-a-b");
+    if (el && (toNormal || tl.versions.at(-1) === v || !items.length)) streamInto(el, ev.delta);
   });
   tl.streaming.clear();
-  renderTl(true);
-}
-
-function tlShow(i) {
-  tl.at = Math.max(0, Math.min(i, tl.versions.length - 1));
   renderTl();
 }
 
-// keep(): re-render without wiping text that is mid-decode
-function renderTl(keep = false) {
+function renderTl() {
   const box = $("#tl");
   box.hidden = !tl;
+  renderComposer();
   if (!tl) return;
-  const steered = tl.versions.length > 0, v = tl.versions[tl.at], last = tl.at === tl.versions.length - 1;
-  const cmp = steered && tlCompare();
-  const mainText = steered ? v.text : tl.other;
-  const mainName = steered ? `Version ${tl.at + 1}` : tlPlainName();
-  const typing = tl.streaming.has("main") && last ? " typing" : "";
-  if (keep && box.dataset.shown === `${tl.prompt}|${tl.at}|${tl.versions.length}`) {
-    $$(".ans-b", box).forEach((b) => b.classList.remove("typing"));
-    return bindTl(box);
+  const n = tl.versions.length, cmp = n > 0 && tlCompare();
+  let html = `<div class="tl-you">${esc(tl.prompt)}</div>`;
+  if (!n) {
+    html += `<div class="tl-a cur"><div class="tl-a-h"><span class="tl-tag">${tl.abl ? "Refusals erased" : "Normal"}</span>
+      <span class="grow"></span><button class="tl-act" data-act="inspect">Inspect</button></div>
+      <div class="tl-a-b${tl.streaming.has("main") ? " typing" : ""}"></div></div>`;
   }
-  box.dataset.shown = `${tl.prompt}|${tl.at}|${tl.versions.length}`;
-  const vers = tl.versions.length > 1
-    ? `<div class="tl-vers">${tl.versions.map((x, i) => `<button class="tl-v${i === tl.at ? " on" : ""}" data-i="${i}" title="${esc(x.fix ? x.fix.feedback : "First answer")}">v${i + 1}</button>`).join("")}</div>`
-    : "";
-  const why = v?.fix
-    ? `<div class="tl-why"><div><span class="tl-said">“${esc(v.fix.feedback)}”</span>${v.fix.lines.length ? `<ul>${v.fix.lines.map((l) => `<li>${l}</li>`).join("")}</ul>` : ""}</div>${last ? `<button class="btn ghost sm tl-undo">Undo</button>` : ""}</div>`
-    : "";
-  const old = steered && !last
-    ? `<div class="tl-old"><span>An earlier version. The neurons on now are version ${tl.versions.length}’s.</span><button class="btn ghost sm tl-back">Go back to this one</button></div>`
-    : "";
-  const fix = steered && last
-    ? `<div class="tl-fix">
-        <div class="ask"><input class="tl-in" spellcheck="false" autocomplete="off" placeholder="What should change?"><button class="btn tl-go">Fix</button></div>
-        <div class="chips">${FIX_CHIPS.map((c) => `<button class="chip">${c}</button>`).join("")}</div>
-        <div class="plan-now status-line tl-now"></div>
-        <div class="tl-aim" hidden><span class="eyebrow">Aiming for</span><div class="tl-aim-b"></div></div>
-      </div>`
-    : "";
-  box.innerHTML = `<div class="tl-h"><b class="tl-q">${esc(tl.prompt)}</b>
-      ${steered ? `<label class="check"><input type="checkbox" class="tl-cmp"${cmp ? " checked" : ""}> Compare with normal</label>` : ""}</div>
-    ${vers}
-    <div class="tl-main${cmp ? " cmp" : ""}">
-      <div class="ans main${steered ? " steered" : ""}"><div class="ans-h"><span>${mainName}</span>${steered ? `<span class="ans-n">${nOn(v.items)}</span>` : ""}<button class="insp">Inspect</button></div>
-        <div class="ans-b${typing}"></div></div>
-      ${cmp ? `<div class="ans normal"><div class="ans-h"><span>Normal</span><button class="insp">Inspect</button></div><div class="ans-b${tl.streaming.has("normal") ? " typing" : ""}"></div></div>` : ""}
-    </div>
-    ${why}${old}${fix}`;
-  $(".ans.main .ans-b", box).textContent = mainText;
-  if (cmp) $(".ans.normal .ans-b", box).textContent = tl.normal;
+  tl.versions.forEach((v, i) => {
+    const last = i === n - 1;
+    if (v.fix) {
+      html += `<div class="tl-you">${esc(v.fix.feedback)}</div>`;
+      if (v.fix.lines.length) html += `<div class="tl-chg">${v.fix.lines.join(" · ")}</div>`;
+    } else if (v.note) html += `<div class="tl-note">${esc(v.note)}</div>`;
+    const acts = last
+      ? `<button class="tl-act${cmp ? " on" : ""}" data-act="cmp">Compare with normal</button>
+         <button class="tl-act" data-act="inspect">Inspect</button>
+         ${i > 0 ? `<button class="tl-act" data-act="undo">Undo</button>` : ""}`
+      : `<button class="tl-act" data-act="inspect">Inspect</button><button class="tl-act" data-act="back">Go back to this</button>`;
+    html += `<div class="tl-a${last ? " cur" : " old"}" data-i="${i}">
+        <div class="tl-a-h"><span class="tl-tag">v${i + 1}</span><span class="tl-n">${nOn(v.items)}</span><span class="grow"></span>${acts}</div>
+        <div class="tl-a-b${last && tl.streaming.has("main") ? " typing" : ""}"></div>
+        ${last && cmp ? `<div class="tl-normal"><div class="tl-a-h"><span class="tl-tag">Normal</span></div><div class="tl-a-b${tl.streaming.has("normal") ? " typing" : ""}"></div></div>` : ""}
+      </div>`;
+  });
+  if (tl.fixing) html += `<div class="tl-you">${esc(tl.fixing)}</div><div class="tl-now status-line plan-now"></div>`;
+  box.innerHTML = html;
+  // finished answers as formatted text; one still streaming stays plain until it's done
+  const fill = (el, text) => (el.classList.contains("typing") ? (el.textContent = text) : ((el.innerHTML = md(cleanReply(text))), el.classList.add("md")));
+  if (!n) fill($(".tl-a-b", box), tl.other);
+  $$(".tl-a[data-i]", box).forEach((a) => fill($(".tl-a-b", a), tl.versions[+a.dataset.i].text));
+  if (cmp) fill($(".tl-normal .tl-a-b", box), tl.normal);
   bindTl(box);
 }
 
-const tlPlainName = () => (tl.abl ? "Refusals erased" : "Normal");
-
 function bindTl(box) {
-  const v = tl.versions[tl.at];
-  $$(".tl-v", box).forEach((b) => (b.onclick = () => tlShow(+b.dataset.i)));
-  const cb = $(".tl-cmp", box);
-  if (cb) cb.onchange = () => { try { localStorage.setItem("tl-compare", cb.checked ? "1" : "0"); } catch {} renderTl(); };
-  const [im, inn] = [$(".ans.main .insp", box), $(".ans.normal .insp", box)];
-  im.onclick = () => inspect($(".tl-main", box), tl.prompt, $(".ans.main .ans-b", box).textContent,
-    v ? v.items.map((i) => ({ layer: i.layer, neuron: i.neuron, dose: i.dose })) : [], v ? `Version ${tl.at + 1}` : tlPlainName(), tl.abl);
-  if (inn) inn.onclick = () => inspect($(".tl-main", box), tl.prompt, tl.normal, [], "Normal");
-  const back = $(".tl-back", box);
-  if (back) back.onclick = () => {
-    addItems(v.items.map((i) => ({ ...i })), true);
-    tl.versions.push({ items: v.items.map((i) => ({ ...i })), text: v.text, fix: { feedback: `Back to version ${tl.at + 1}`, lines: [] } });
-    tlShow(tl.versions.length - 1);
-  };
-  const undo = $(".tl-undo", box);
-  if (undo) undo.onclick = () => {
-    tl.versions.pop();
-    addItems(tl.versions[tl.versions.length - 1].items.map((i) => ({ ...i })), true);
-    tlShow(tl.versions.length - 1);
-  };
-  const input = $(".tl-in", box);
-  if (!input) return;
-  $$(".tl-fix .chip", box).forEach((c) => (c.onclick = () => {
-    const t = input.value.trim();
-    input.value = t ? `${t.replace(/[.\s]*$/, "")}. ${c.textContent}.` : `${c.textContent}.`;
-    input.focus();
-  }));
-  const go = () => runFix(input.value.trim());
-  $(".tl-go", box).onclick = go;
-  input.onkeydown = (e) => e.key === "Enter" && go();
+  $$(".tl-a", box).forEach((a) => {
+    const v = a.dataset.i == null ? null : tl.versions[+a.dataset.i];
+    if (a.classList.contains("old")) a.onclick = (e) => !e.target.closest("button, .panel") && a.classList.toggle("open");
+    $$(".tl-act", a).forEach((b) => (b.onclick = () => {
+      const act = b.dataset.act;
+      if (act === "inspect") {
+        inspect(a, tl.prompt, $(".tl-a-b", a).textContent,
+          v ? v.items.map((i) => ({ layer: i.layer, neuron: i.neuron, dose: i.dose })) : [], v ? `v${+a.dataset.i + 1}` : tl.abl ? "Refusals erased" : "Normal", tl.abl);
+      } else if (act === "cmp") {
+        try { localStorage.setItem("tl-compare", tlCompare() ? "0" : "1"); } catch {}
+        renderTl();
+      } else if (act === "undo") {
+        tl.versions.pop();
+        addItems(tl.versions.at(-1).items.map((i) => ({ ...i })), true);
+        renderTl();
+      } else if (act === "back") {
+        addItems(v.items.map((i) => ({ ...i })), true);
+        tl.versions.push({ items: v.items.map((i) => ({ ...i })), text: v.text, fix: null, note: `Went back to v${+a.dataset.i + 1}` });
+        renderTl();
+        $("#tl .tl-a.cur")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }));
+  });
 }
 
-// a fix: retune the neurons of the latest version toward what the person asked for, then answer again
+// a fix: retune the neurons of the latest answer toward what the person asked for, then answer again
 async function runFix(feedback) {
-  const box = $("#tl");
-  if (!feedback) return $(".tl-in", box)?.focus();
-  const v = tl.versions[tl.versions.length - 1];
+  const v = tl.versions.at(-1);
   const prev = v.items.map((i) => ({ ...i }));
-  const live = $(".tl-now", box), aim = $(".tl-aim", box), aimB = $(".tl-aim-b", box);
-  $(".tl-in", box).disabled = $(".tl-go", box).disabled = true;
   let label = "", result = null;
-  tl.fixing = true;
-  setLive(live, "Starting…", true);
+  $("#t-prompt").value = "";
+  tl.fixing = feedback;
+  renderTl();
+  const live = () => $("#tl .tl-now");
+  setLive(live(), "Starting…", true);
+  live()?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   const prompts = $("#d-prompts").value.split("\n").map((s) => s.trim()).filter(Boolean);
   const ok = await stream("/api/tune/refine", { recipe: prev, feedback, prompt: tl.prompt, bad: v.text, behavior: state.recipe.name || "", prompts }, (ev) => {
-    if (ev.type === "stage") setLive(live, (label = ev.label) + "…", true);
-    else if (ev.type === "progress") setLive(live, `${label} · ${ev.done} of ${ev.total}`, true);
-    else if (ev.type === "aim") ((aim.hidden = false), streamInto(aimB, ev.delta));
+    if (ev.type === "stage") setLive(live(), (label = ev.label) + "…", true);
+    else if (ev.type === "progress") setLive(live(), `${label} · ${ev.done} of ${ev.total}`, true);
     else if (ev.type === "result") result = ev;
   });
   tl.fixing = false;
-  if (!box.isConnected || !$(".tl-in", box)) return;
-  $(".tl-in", box).disabled = $(".tl-go", box).disabled = false;
-  if (!ok || !result) return setLive(live, "Stopped. Nothing was changed.", false);
-  if (!result.improved) return setLive(live, result.note, false);
+  const fail = !ok || !result ? "Stopped. Nothing was changed." : !result.improved ? result.note : "";
+  if (fail) {
+    renderTl();
+    $("#t-prompt").value = feedback;
+    return toast(fail, !ok);
+  }
 
   // what changed, neuron by neuron
   const key = (i) => `${i.layer}:${i.neuron}`;
@@ -1353,24 +1368,24 @@ async function runFix(feedback) {
   const lines = [];
   for (const i of prev) {
     const a = after.get(key(i)), nm = `<b>${esc(labelOf(i))}</b>`;
-    if (!a) lines.push(`Turned off ${nm}`);
-    else if (Math.abs(a.dose - i.dose) > 0.005) lines.push(`${Math.abs(a.dose) < Math.abs(i.dose) ? "Turned down" : "Turned up"} ${nm} from ${fmt(i.dose)} to ${fmt(a.dose)}`);
+    if (!a) lines.push(`${nm} off`);
+    else if (Math.abs(a.dose - i.dose) > 0.005) lines.push(`${nm} ${fmt(i.dose)} → ${fmt(a.dose)}`);
   }
-  for (const r of result.recipe) if (!known.has(key(r))) lines.push(`Added <b>${esc(labelOf(r))}</b> at ${fmt(r.dose)}`);
+  for (const r of result.recipe) if (!known.has(key(r))) lines.push(`added <b>${esc(labelOf(r))}</b> ${fmt(r.dose)}`);
   addItems(result.recipe.map((r) => ({ ...(known.get(key(r)) || { lens: r.lens }), layer: r.layer, neuron: r.neuron, dose: r.dose })), true);
   const nv = { items: snapshot(), text: "", fix: { feedback, lines } };
   tl.versions.push(nv);
-  tl.at = tl.versions.length - 1;
   tl.streaming.add("main");
   renderTl();
+  $("#tl .tl-a.cur")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   await stream("/api/steer", { prompt: tl.prompt, max_new: 160, columns: ["up"], pushes: pushes(1) }, (ev) => {
     if (ev.type !== "delta") return;
     nv.text += ev.delta;
-    const el = $("#tl .ans.main .ans-b");
-    if (el && tl.at === tl.versions.indexOf(nv)) streamInto(el, ev.delta);
+    const el = $("#tl .tl-a.cur .tl-a-b");
+    if (el && tl.versions.at(-1) === nv) streamInto(el, ev.delta);
   });
   tl.streaming.clear();
-  renderTl(true);
+  renderTl();
 }
 
 // ------------------------------------------------------------------ chat
