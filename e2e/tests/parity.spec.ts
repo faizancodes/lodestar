@@ -17,9 +17,19 @@ test("sidebar: before a model is loaded", async ({ page }) => {
   await scenario(page, "start");
   await page.goto("/");
   await expect(page.locator("#brand-mark svg")).toBeVisible();
-  await expect(page.locator('.tab[data-tab="steer"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('.tab[aria-selected="true"]')).toHaveCount(0); // nothing to show yet
   await expect(page.locator("#model-status .txt")).toHaveText("No model loaded");
   await snap(page.locator("aside.side"), "sidebar-empty");
+
+  // a tab picked now is kept for when a model is ready, and the start screen points at the models
+  await page.locator('.tab[data-tab="chat"]').click();
+  await expect(page.locator('.tab[data-tab="chat"]')).toHaveClass(/\bwant\b/);
+  await expect(page.locator("#start h2")).toHaveText("Pick a model to chat with.");
+  await expect(page.locator("#start-models")).toHaveClass(/\bnudge\b/);
+  await page.keyboard.press("Meta+1");
+  await expect(page.locator("#start h2")).toHaveText("Pick a model to abliterate.");
+  await expect(page.locator(".tab.want")).toHaveCount(1);
+  await snap(page, "start-want");
 });
 
 test("start: pick a model, load it, land on Home", async ({ page }) => {
