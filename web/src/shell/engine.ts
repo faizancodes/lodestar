@@ -96,6 +96,11 @@ export function toggleModelMenu(open?: boolean) {
 
 // ------------------------------------------------------------------ tabs
 export function setTab(t: Tab) {
+  // with no model there's nothing to show yet: remember where they're going, and point at the models (before the
+  // first status arrives, it's just the tab to show)
+  const info = get().info;
+  if (info && !info.loaded) return set({ want: t === "home" ? null : t, nudge: get().nudge + 1 });
+
   get().setTab(t); // Steer's status card redraws its scene when it's shown
   if (t === "chat" && get().info?.loaded) onChatShown();
 }
@@ -218,8 +223,9 @@ function applyStatus(s: Status) {
 
         setStart({ loading: false, leaving: false });
         finishing = false;
-        setTab("home"); // a fresh model opens on the home screen, not whichever page was last open
         flushSync(() => applyStatus(s));
+        setTab(get().want ?? "home"); // a fresh model opens on Home, or the tab picked while there was none
+        set({ want: null });
 
         const els = $$(".view:not([hidden]) > *");
         els.forEach((el) => el.classList.remove("reveal"));
