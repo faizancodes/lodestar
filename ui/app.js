@@ -949,8 +949,7 @@ function renderAblStatus() {
   const c = state.abl?.ready && state.abl.current;
   $("#abl-status").classList.toggle("on", !!c?.active);
   $("#abl-facts").innerHTML = c
-    ? [["Layer", c.layer], ["Strength", `${(+c.coef || 1).toFixed(2)}×`],
-       ["Status", c.active ? `<i class="hc-on"></i>Erasing refusals` : "Switched off"]]
+    ? [["Layer", c.layer], ["Strength", `${(+c.coef || 1).toFixed(2)}×`]] // whether it's on is the switch's job
         .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")
     : `<div><dt>Status</dt><dd class="dim">Not found yet</dd></div>`;
   requestAnimationFrame(() => drawHomeArt($("#abl-status-art"), "abliterate", $("#abl-status")));
