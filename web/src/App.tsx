@@ -6,6 +6,8 @@ import { boot, setTab, toggleModelMenu } from "./shell/engine";
 import { TABS, useApp } from "./store/app";
 import { Home } from "./views/Home";
 import { Start } from "./views/Start";
+import { Steer } from "./views/Steer";
+import { closeLast } from "./steer/panels";
 
 function useShortcuts() {
   useEffect(() => {
@@ -13,7 +15,7 @@ function useShortcuts() {
       const { info, menu } = useApp.getState();
       if (e.key === "Escape") {
         if (menu.open) toggleModelMenu(false);
-        // TODO(Phase 7): else close the top panel
+        else closeLast();
         return;
       }
       if (!e.metaKey || e.shiftKey || e.altKey) return;
@@ -42,7 +44,7 @@ export function App() {
       <main id="main" className={loaded && tab === "chat" ? "is-chat" : undefined}>
         <Start />
         <Home hidden={hidden("home")} />
-        {/* TODO(Phases 4–6): the rest of each page; only their headers so far */}
+        {/* TODO(Phases 5–6): the rest of these pages; only their headers so far */}
         <section id="view-abliterate" className="view page" data-view="abliterate" hidden={hidden("abliterate")}>
           <header className="page-h">
             <h2>Abliterate</h2>
@@ -50,12 +52,7 @@ export function App() {
               (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>).</p>
           </header>
         </section>
-        <section id="view-steer" className="view page" data-view="steer" hidden={hidden("steer")}>
-          <header className="page-h">
-            <h2>Steer</h2>
-            <p>Find the neurons behind a behaviour, push them up or down, and see how its answers change.</p>
-          </header>
-        </section>
+        <Steer hidden={hidden("steer")} />
         <section id="view-chat" className="view chat" data-view="chat" hidden={hidden("chat")}>
           <header className="chat-h">
             <div className="chat-title"><b id="chat-model" /></div>
