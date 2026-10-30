@@ -5,8 +5,20 @@ import type { Live } from "./steer";
 // Abliterate's own state. The saved direction itself (/api/abl) lives in the app store: the sidebar, Home and
 // Chat read it too. As on Steer, the parts streams write to are mutable objects, redrawn when `v` changes.
 
-/** A question with its reply before and after the refusal direction is erased, side by side. */
-export type Pair = { prompt: string; outs: { base: Sink; abl: Sink }; verdict: { base?: boolean; abl?: boolean }; typing: boolean };
+/** An answer in the try-it thread: a question with refusals erased at a strength (null for the finder's examples,
+ *  before it settles on one), and the normal answer made alongside it. `change` is the strength nudge that asked it. */
+export type Entry = {
+  prompt: string;
+  coef: number | null;
+  text: Sink;
+  normal: Sink;
+  refused: boolean | null;
+  refusedNormal: boolean | null;
+  worse: boolean; // writing got noticeably worse than the normal model's
+  change: { from: number; to: number } | null;
+  typing: boolean;
+  open: boolean; // an older answer, unfolded
+};
 type Rank = { layer: number; score: number; tried: number; refused: number };
 export type AblResult = { layer: number; coef: number; tried: number; refused_left: number; top_score: number; ranking: Rank[] };
 
@@ -15,10 +27,9 @@ type Abl = {
   harmful: string;
   harmless: string;
   dirty: boolean; // the probe lists were edited and not saved, so a refresh leaves them alone
-  testProbes: string;
+  q: string; // the try-it box
   name: string;
   nameTouched: boolean;
-  coef: string; // the strength slider
   plan: {
     shown: boolean;
     goal: string;
@@ -28,11 +39,11 @@ type Abl = {
     clock: string;
     live: Live;
     running: boolean; // Find it is disabled
+    done: boolean; // finished: the steps fold away
   };
-  examples: Pair[];
   rank: AblResult | null;
   rankN: number; // a new ranking is a new list
-  test: { pairs: Pair[]; summary: { rb: number; ra: number; n: number; note: string } | null };
+  at: Entry[] | null; // the try-it thread
 };
 
 export const useAbl = create<Abl>(() => ({
@@ -40,15 +51,13 @@ export const useAbl = create<Abl>(() => ({
   harmful: "",
   harmless: "",
   dirty: false,
-  testProbes: "",
+  q: "",
   name: "",
   nameTouched: false,
-  coef: "1",
-  plan: { shown: false, goal: "", steps: null, widths: ["", "", "", ""], scene: false, clock: "0:00", live: null, running: false },
-  examples: [],
+  plan: { shown: false, goal: "", steps: null, widths: ["", "", "", ""], scene: false, clock: "0:00", live: null, running: false, done: false },
   rank: null,
   rankN: 0,
-  test: { pairs: [], summary: null },
+  at: null,
 }));
 
 export const touchAbl = () => useAbl.setState((s) => ({ v: s.v + 1 }));

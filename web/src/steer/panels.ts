@@ -14,19 +14,19 @@ export const panelAt = (anchor: string) => get().panels.find((p) => p.anchor ===
 export const alive = (id: number) => get().panels.some((p) => p.id === id);
 
 /** Opens a panel under `anchor`, or reuses the one there; returns its id, or null when this closed it. */
-export function openPanel(anchor: string, title: string, kind: Panel["kind"], fresh = false): number | null {
+export function openPanel(anchor: string, title: string, kind: Panel["kind"]): number | null {
   const p = panelAt(anchor);
-  if (p && !fresh && p.kind === kind && p.title === title) {
+  if (p && p.kind === kind && p.title === title) {
     closePanel(p.id); // second click on the same thing closes it
     return null;
   }
   let id: number;
-  if (p && !fresh) {
+  if (p) {
     id = p.id;
     set({ panels: get().panels.map((x) => (x === p ? { ...x, kind, title } : x)) });
   } else {
     id = ++ids;
-    set({ panels: [...get().panels, { id, anchor, kind, title, body: { node: null, n: 0, reveal: false }, at: performance.now() }] });
+    set({ panels: [...get().panels, { id, anchor, kind, title, body: { node: null, n: 0, reveal: false } }] });
   }
   requestAnimationFrame(() => panelEls.get(id)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
   return id;

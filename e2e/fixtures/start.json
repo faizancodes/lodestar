@@ -20,7 +20,7 @@
     "What makes you happy?"
    ]
   },
-  "ms": 1
+  "ms": 2
  },
  {
   "method": "GET",
@@ -72,7 +72,7 @@
    "local": [],
    "copies": []
   },
-  "ms": 11
+  "ms": 56
  },
  {
   "method": "GET",
@@ -214,7 +214,7 @@
    "current": null,
    "ready": false
   },
-  "ms": 2
+  "ms": 6
  },
  {
   "method": "GET",
@@ -229,7 +229,7 @@
    "progress": null,
    "last": null
   },
-  "ms": 1
+  "ms": 3
  },
  {
   "method": "GET",
@@ -245,7 +245,7 @@
    "total": 0,
    "status": "idle"
   },
-  "ms": 3
+  "ms": 2
  },
  {
   "method": "GET",
@@ -315,7 +315,7 @@
    "local": [],
    "copies": []
   },
-  "ms": 3
+  "ms": 5
  },
  {
   "method": "POST",
@@ -332,7 +332,7 @@
    "progress": 0.04,
    "last": null
   },
-  "ms": 74
+  "ms": 104
  },
  {
   "method": "GET",
@@ -362,7 +362,7 @@
    "progress": 0.04,
    "last": null
   },
-  "ms": 716
+  "ms": 3
  },
  {
   "method": "GET",
@@ -374,25 +374,10 @@
   "response": {
    "loaded": false,
    "status": "loading Qwen/Qwen3-0.6B",
-   "progress": 0.8142765273311897,
+   "progress": 0.04,
    "last": null
   },
-  "ms": 16
- },
- {
-  "method": "GET",
-  "path": "/api/status",
-  "query": "",
-  "body": null,
-  "status": 200,
-  "type": "json",
-  "response": {
-   "loaded": false,
-   "status": "loading Qwen/Qwen3-0.6B",
-   "progress": 0.9,
-   "last": null
-  },
-  "ms": 1
+  "ms": 395
  },
  {
   "method": "GET",
@@ -407,7 +392,22 @@
    "progress": 0.9,
    "last": null
   },
-  "ms": 1
+  "ms": 3
+ },
+ {
+  "method": "GET",
+  "path": "/api/status",
+  "query": "",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": {
+   "loaded": false,
+   "status": "loading Qwen/Qwen3-0.6B",
+   "progress": 0.9,
+   "last": null
+  },
+  "ms": 2
  },
  {
   "method": "GET",
@@ -427,9 +427,9 @@
    "neurons": 3072,
    "hidden": 1024,
    "progress": null,
-   "last": "Qwen/Qwen3-0.6B"
+   "last": null
   },
-  "ms": 1
+  "ms": 3
  },
  {
   "method": "GET",
@@ -439,7 +439,7 @@
   "status": 200,
   "type": "json",
   "response": [],
-  "ms": 2
+  "ms": 5
  },
  {
   "method": "GET",
@@ -581,7 +581,7 @@
    "current": null,
    "ready": false
   },
-  "ms": 2
+  "ms": 3
  },
  {
   "method": "GET",
@@ -605,19 +605,6 @@
     ]
    }
   ],
-  "ms": 4
- },
- {
-  "method": "GET",
-  "path": "/api/directions",
-  "query": "",
-  "body": null,
-  "status": 200,
-  "type": "json",
-  "response": {
-   "directions": [],
-   "layers": 28
-  },
   "ms": 3
  },
  {
@@ -670,6 +657,19 @@
    "local": [],
    "copies": []
   },
-  "ms": 13
+  "ms": 10
+ },
+ {
+  "method": "GET",
+  "path": "/api/directions",
+  "query": "",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": {
+   "directions": [],
+   "layers": 28
+  },
+  "ms": 4
  }
 ]

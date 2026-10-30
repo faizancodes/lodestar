@@ -72,12 +72,12 @@
    "local": [],
    "copies": [
     {
-     "path": "/Users/faizanahmed/auto-interp/.claude/worktrees/qwen-activation-steering-4898d1/e2e/.data/models/parity-abliterated",
+     "path": "/private/tmp/claude-501/-Users-faizanahmed-auto-interp--claude-worktrees-qwen-activation-steering-4898d1/b45d8baf-0def-4f14-b47a-3ff336f0a6f6/scratchpad/wt/e2e/.data/models/parity-abliterated",
      "name": "parity-abliterated",
      "size": 1203564239
     },
     {
-     "path": "/Users/faizanahmed/auto-interp/.claude/worktrees/qwen-activation-steering-4898d1/e2e/.data/models/parity-steered",
+     "path": "/private/tmp/claude-501/-Users-faizanahmed-auto-interp--claude-worktrees-qwen-activation-steering-4898d1/b45d8baf-0def-4f14-b47a-3ff336f0a6f6/scratchpad/wt/e2e/.data/models/parity-steered",
      "name": "parity-steered",
      "size": 1203871658
     }
@@ -224,13 +224,13 @@
    },
    "current": {
     "layer": 6,
-    "coef": 1.5,
+    "coef": 1.25,
     "active": true,
     "clean": true
    },
    "ready": true
   },
-  "ms": 3
+  "ms": 1
  },
  {
   "method": "GET",
@@ -253,91 +253,6 @@
    "last": "Qwen/Qwen3-0.6B"
   },
   "ms": 2
- },
- {
-  "method": "GET",
-  "path": "/api/examples",
-  "query": "",
-  "body": null,
-  "status": 200,
-  "type": "json",
-  "response": [
-   {
-    "name": "Hungry",
-    "note": "Found by Describe: turns answers toward food and eating",
-    "prompt": "What should I eat for dinner tonight?",
-    "items": [
-     {
-      "layer": 9,
-      "neuron": 2578,
-      "dose": 1.2,
-      "label": "munch"
-     }
-    ]
-   }
-  ],
-  "ms": 4
- },
- {
-  "method": "GET",
-  "path": "/api/models/copy",
-  "query": "",
-  "body": null,
-  "status": 200,
-  "type": "json",
-  "response": {
-   "src": null,
-   "name": null,
-   "done": 0,
-   "total": 0,
-   "status": "idle"
-  },
-  "ms": 4
- },
- {
-  "method": "GET",
-  "path": "/api/recipes",
-  "query": "",
-  "body": null,
-  "status": 200,
-  "type": "json",
-  "response": [
-   {
-    "name": "session + sand",
-    "model": "Qwen/Qwen3-0.6B",
-    "items": [
-     {
-      "layer": 22,
-      "neuron": 1791,
-      "dose": 0.5,
-      "lens": [
-       " session",
-       "(session",
-       "session",
-       " Session",
-       " sessions",
-       "Session"
-      ]
-     },
-     {
-      "layer": 24,
-      "neuron": 490,
-      "dose": -0.42,
-      "lens": [
-       " sand",
-       " coins",
-       " candies",
-       " cookies",
-       " books",
-       " candy"
-      ]
-     }
-    ],
-    "id": "r1793337375540",
-    "created": 1793337375.5407841
-   }
-  ],
-  "ms": 7
  },
  {
   "method": "GET",
@@ -478,13 +393,98 @@
    },
    "current": {
     "layer": 6,
-    "coef": 1.5,
+    "coef": 1.25,
     "active": true,
     "clean": true
    },
    "ready": true
   },
-  "ms": 7
+  "ms": 4
+ },
+ {
+  "method": "GET",
+  "path": "/api/recipes",
+  "query": "",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": [
+   {
+    "name": "session + sand",
+    "model": "Qwen/Qwen3-0.6B",
+    "items": [
+     {
+      "layer": 22,
+      "neuron": 1791,
+      "dose": 0.5,
+      "lens": [
+       " session",
+       "(session",
+       "session",
+       " Session",
+       " sessions",
+       "Session"
+      ]
+     },
+     {
+      "layer": 24,
+      "neuron": 490,
+      "dose": -0.42,
+      "lens": [
+       " sand",
+       " coins",
+       " candies",
+       " cookies",
+       " books",
+       " candy"
+      ]
+     }
+    ],
+    "id": "r1793371127398",
+    "created": 1793371127.398792
+   }
+  ],
+  "ms": 6
+ },
+ {
+  "method": "GET",
+  "path": "/api/models/copy",
+  "query": "",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": {
+   "src": null,
+   "name": null,
+   "done": 0,
+   "total": 0,
+   "status": "idle"
+  },
+  "ms": 5
+ },
+ {
+  "method": "GET",
+  "path": "/api/examples",
+  "query": "",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": [
+   {
+    "name": "Hungry",
+    "note": "Found by Describe: turns answers toward food and eating",
+    "prompt": "What should I eat for dinner tonight?",
+    "items": [
+     {
+      "layer": 9,
+      "neuron": 2578,
+      "dose": 1.2,
+      "label": "munch"
+     }
+    ]
+   }
+  ],
+  "ms": 6
  },
  {
   "method": "GET",
@@ -496,7 +496,7 @@
   "response": {
    "kind": "abl",
    "name": "parity-abliterated",
-   "dst": "/Users/faizanahmed/auto-interp/.claude/worktrees/qwen-activation-steering-4898d1/e2e/.data/models/parity-abliterated",
+   "dst": "/private/tmp/claude-501/-Users-faizanahmed-auto-interp--claude-worktrees-qwen-activation-steering-4898d1/b45d8baf-0def-4f14-b47a-3ff336f0a6f6/scratchpad/wt/e2e/.data/models/parity-abliterated",
    "status": "done",
    "done": 55,
    "total": 55,
@@ -515,7 +515,7 @@
    "directions": [],
    "layers": 28
   },
-  "ms": 4
+  "ms": 3
  },
  {
   "method": "POST",
@@ -529,10 +529,10 @@
   "response": {
    "ok": true,
    "layer": 6,
-   "coef": 1.5,
+   "coef": 1.25,
    "active": false
   },
-  "ms": 17
+  "ms": 7
  },
  {
   "method": "POST",
@@ -554,132 +554,132 @@
   "type": "sse",
   "events": [
    {
-    "dt": 0.67,
+    "dt": 0.539,
     "data": {
      "type": "delta",
      "delta": "M"
     }
    },
    {
-    "dt": 0.727,
+    "dt": 0.577,
     "data": {
      "type": "delta",
      "delta": "ond"
     }
    },
    {
-    "dt": 0.781,
+    "dt": 0.614,
     "data": {
      "type": "delta",
      "delta": "ays"
     }
    },
    {
-    "dt": 0.836,
+    "dt": 0.653,
     "data": {
      "type": "delta",
      "delta": " are"
     }
    },
    {
-    "dt": 1.024,
+    "dt": 0.698,
     "data": {
      "type": "delta",
      "delta": " quiet"
     }
    },
    {
-    "dt": 1.276,
+    "dt": 0.737,
     "data": {
      "type": "delta",
      "delta": ","
     }
    },
    {
-    "dt": 1.335,
+    "dt": 0.779,
     "data": {
      "type": "delta",
      "delta": "  \n"
     }
    },
    {
-    "dt": 1.396,
+    "dt": 0.827,
     "data": {
      "type": "delta",
      "delta": "The"
     }
    },
    {
-    "dt": 1.496,
+    "dt": 0.871,
     "data": {
      "type": "delta",
      "delta": " world"
     }
    },
    {
-    "dt": 1.571,
+    "dt": 0.913,
     "data": {
      "type": "delta",
      "delta": " feels"
     }
    },
    {
-    "dt": 1.632,
+    "dt": 0.957,
     "data": {
      "type": "delta",
      "delta": " still"
     }
    },
    {
-    "dt": 1.716,
+    "dt": 1.001,
     "data": {
      "type": "delta",
      "delta": ","
     }
    },
    {
-    "dt": 1.772,
+    "dt": 1.048,
     "data": {
      "type": "delta",
      "delta": "  \n"
     }
    },
    {
-    "dt": 1.837,
+    "dt": 1.092,
     "data": {
      "type": "delta",
      "delta": "A"
     }
    },
    {
-    "dt": 1.944,
+    "dt": 1.143,
     "data": {
      "type": "delta",
      "delta": " quiet"
     }
    },
    {
-    "dt": 2.068,
+    "dt": 1.187,
     "data": {
      "type": "delta",
      "delta": " day"
     }
    },
    {
-    "dt": 2.157,
+    "dt": 1.226,
     "data": {
      "type": "delta",
      "delta": "."
     }
    },
    {
-    "dt": 2.234,
+    "dt": 1.263,
     "data": {
      "type": "end"
     }
    }
   ],
-  "ms": 2236
+  "ms": 1263
  },
  {
   "method": "POST",
@@ -709,76 +709,76 @@
   "type": "sse",
   "events": [
    {
-    "dt": 0.078,
+    "dt": 0.205,
     "data": {
      "type": "delta",
      "delta": "-"
     }
    },
    {
-    "dt": 0.127,
+    "dt": 0.255,
     "data": {
      "type": "delta",
      "delta": " Apple"
     }
    },
    {
-    "dt": 0.176,
+    "dt": 0.298,
     "data": {
      "type": "delta",
      "delta": "  \n"
     }
    },
    {
-    "dt": 0.245,
+    "dt": 0.34,
     "data": {
      "type": "delta",
      "delta": "-"
     }
    },
    {
-    "dt": 0.294,
+    "dt": 0.383,
     "data": {
      "type": "delta",
      "delta": " Banana"
     }
    },
    {
-    "dt": 0.359,
+    "dt": 0.431,
     "data": {
      "type": "delta",
      "delta": "  \n"
     }
    },
    {
-    "dt": 0.415,
+    "dt": 0.477,
     "data": {
      "type": "delta",
      "delta": "-"
     }
    },
    {
-    "dt": 0.465,
+    "dt": 0.522,
     "data": {
      "type": "delta",
      "delta": " Pine"
     }
    },
    {
-    "dt": 0.52,
+    "dt": 0.564,
     "data": {
      "type": "delta",
      "delta": "apple"
     }
    },
    {
-    "dt": 0.573,
+    "dt": 0.607,
     "data": {
      "type": "end"
     }
    }
   ],
-  "ms": 574
+  "ms": 608
  },
  {
   "method": "POST",
@@ -808,76 +808,76 @@
   "type": "sse",
   "events": [
    {
-    "dt": 0.289,
+    "dt": 0.082,
     "data": {
      "type": "delta",
      "delta": "-"
     }
    },
    {
-    "dt": 0.344,
+    "dt": 0.121,
     "data": {
      "type": "delta",
      "delta": " Apple"
     }
    },
    {
-    "dt": 0.397,
+    "dt": 0.161,
     "data": {
      "type": "delta",
      "delta": "  \n"
     }
    },
    {
-    "dt": 0.449,
+    "dt": 0.199,
     "data": {
      "type": "delta",
      "delta": "-"
     }
    },
    {
-    "dt": 0.553,
+    "dt": 0.235,
     "data": {
      "type": "delta",
      "delta": " Banana"
     }
    },
    {
-    "dt": 0.61,
+    "dt": 0.273,
     "data": {
      "type": "delta",
      "delta": "  \n"
     }
    },
    {
-    "dt": 0.667,
+    "dt": 0.312,
     "data": {
      "type": "delta",
      "delta": "-"
     }
    },
    {
-    "dt": 0.724,
+    "dt": 0.35,
     "data": {
      "type": "delta",
      "delta": " Pine"
     }
    },
    {
-    "dt": 0.782,
+    "dt": 0.386,
     "data": {
      "type": "delta",
      "delta": "apple"
     }
    },
    {
-    "dt": 0.836,
+    "dt": 0.428,
     "data": {
      "type": "end"
     }
    }
   ],
-  "ms": 837
+  "ms": 428
  },
  {
   "method": "POST",
@@ -891,9 +891,9 @@
   "response": {
    "ok": true,
    "layer": 6,
-   "coef": 1.5,
+   "coef": 1.25,
    "active": true
   },
-  "ms": 4
+  "ms": 3
  }
 ]

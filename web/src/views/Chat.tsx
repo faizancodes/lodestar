@@ -6,6 +6,7 @@ import {
 import { api } from "../lib/api";
 import { isDir, labelOf, modelName } from "../lib/format";
 import { ablActive, useApp } from "../store/app";
+import { SEND } from "../steer/Live";
 import { useChat, type Msg } from "../store/chat";
 
 const cancel = () => api("/api/cancel", {});
@@ -104,7 +105,7 @@ function Composer() {
           <span className="grow" />
           <button type="button" className="send stop" id="chat-stop" aria-label="Stop" hidden={!streaming} onClick={cancel}><i /></button>
           <button type="submit" className="send" id="chat-send" aria-label="Send" hidden={streaming} disabled={!input.trim()}>
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4m0 0L5 9m5-5 5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            {SEND}
           </button>
         </div>
       </form>

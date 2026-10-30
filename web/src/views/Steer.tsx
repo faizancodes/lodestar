@@ -9,12 +9,12 @@ import { findChanges, setInput } from "../steer/describe";
 import { deleteDir, dnExample, findDirection, importDirs, setDn, toggleDn, TRIES, turnOnDir, turnOnMade } from "../steer/directions";
 import { bakeSteer, cancelExport } from "../steer/exporting";
 import { FoundRow } from "../steer/Found";
-import { LiveLine, Out } from "../steer/Live";
+import { LiveLine, Out, SEND } from "../steer/Live";
 import { Plan } from "../steer/Plan";
 import { RecipeBox } from "../steer/RecipeBox";
 import { addItems, replaceRecipe } from "../steer/recipe";
-import { PROMPTS, send } from "../steer/runs";
-import { Runs } from "../steer/RunList";
+import { FIX_CHIPS, newQuestion, PROMPTS, send, submit, tlMode } from "../steer/refine";
+import { Thread } from "../steer/Thread";
 
 const cancel = () => api("/api/cancel", {});
 const n3 = { "--n": 3 } as CSSProperties;
@@ -50,8 +50,7 @@ function Examples() {
       <button key={i} className="chip ex-chip" data-i={i} title={e.note} onClick={() => {
         replaceRecipe({ id: null, name: e.name, items: [], model: useApp.getState().info!.model });
         addItems(e.items.map((x) => ({ ...x })), true);
-        useSteer.setState({ tPrompt: e.prompt });
-        send();
+        send(e.prompt);
       }}>{e.name}</button>
     ))}</div></div>
   );
@@ -159,24 +158,31 @@ function Step1() {
 }
 
 function Step2() {
-  const prompt = useSteer((s) => s.tPrompt);
+  const input = useSteer((s) => s.tInput), tl = useSteer((s) => s.tl);
+  useSteer((s) => s.v);
+  const fix = tlMode(tl) === "fix", box = useRef<HTMLInputElement>(null);
+  // a fix chip adds to what's written; a question chip asks it
+  const chip = (c: string) => {
+    if (!fix) return send(c);
+    const t = input.trim();
+    useSteer.setState({ tInput: t ? `${t.replace(/[.\s]*$/, "")}. ${c}.` : `${c}.` });
+    box.current!.focus();
+  };
   return (
     <div className="step" id="st-s2">
-      <div className="step-h"><span className="num">02</span><div><h3>Ask it something</h3>
-        <p className="step-sub">Compare its answer with the neurons on against the model as it normally is.</p></div></div>
-      <div className="card try">
-        <div className="ask">
-          <input id="t-prompt" spellCheck="false" autoComplete="off" value={prompt} onChange={(e) => useSteer.setState({ tPrompt: e.target.value })}
-            onKeyDown={(e) => { if (e.key === "Enter") send(); }} />
-          <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>
-          <button id="t-go" className="btn" onClick={() => send()}>Send</button>
+      <div className="step-h"><span className="num">02</span><div><h3>Try it and refine</h3>
+        <p className="step-sub">Ask it something. If the answer isn’t right, say what should change and it tries again.</p></div></div>
+      <Thread />
+      <form id="tl-form" className="tl-comp" autoComplete="off" onSubmit={(e) => (e.preventDefault(), submit())}>
+        <div className="composer">
+          <input id="t-prompt" ref={box} spellCheck="false" placeholder={fix ? "What should change?" : "Ask it something"} value={input}
+            onChange={(e) => useSteer.setState({ tInput: e.target.value })} />
+          <button type="button" className="tl-newq" id="tl-newq" hidden={!tl?.versions.length} onClick={newQuestion}>{fix ? "New question" : "Cancel"}</button>
+          <button type="button" className="send stop" id="tl-stop" aria-label="Stop" onClick={cancel}><i /></button>
+          <button type="submit" className="send" id="t-go" aria-label="Send">{SEND}</button>
         </div>
-        <div className="row">
-          <div className="chips grow" id="t-chips">{PROMPTS.map((p) => <button key={p} className="chip" onClick={() => (useSteer.setState({ tPrompt: p }), send())}>{p}</button>)}</div>
-          <label className="check"><input id="t-opposite" type="checkbox" /> Also show the opposite</label>
-        </div>
-      </div>
-      <Runs />
+        <div className="tl-sugg" id="t-chips">{(fix ? FIX_CHIPS : PROMPTS).map((p) => <button key={p} type="button" className="chip" onClick={() => chip(p)}>{p}</button>)}</div>
+      </form>
     </div>
   );
 }

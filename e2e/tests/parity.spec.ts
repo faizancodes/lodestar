@@ -72,7 +72,7 @@ test("shell: tabs, shortcuts, brand, model menu", async ({ page }) => {
   await expect(page.locator("#model-menu")).toBeHidden();
 });
 
-test("steer: search by word, turn neurons on, compare, inspect, fix, save", async ({ page }) => {
+test("steer: search by word, turn neurons on, try it, inspect, fix, save", async ({ page }) => {
   await scenario(page, "steer-word");
   await page.goto("/");
   await expect(page.locator("#view-steer")).toBeVisible();
@@ -96,15 +96,22 @@ test("steer: search by word, turn neurons on, compare, inspect, fix, save", asyn
   await snap(page.locator("#st-s1"), "steer-recipe");
   await snap(page.locator("#steer-status"), "steer-status-on");
 
-  await page.locator("#t-opposite").check();
-  await page.locator("#t-go").click();
-  await expect(page.locator("#runs .run")).toHaveCount(1);
+  // ask it something: the answer with the neurons on is v1, and the box now takes a fix
+  const answers = page.locator("#tl .tl-a"), cur = page.locator("#tl .tl-a.cur");
+  await page.locator("#t-chips .chip", { hasText: "Describe the way you look." }).click();
+  await expect(answers).toHaveCount(1);
   await idle(page);
-  await expect(page.locator("#runs .run .out-b").first()).not.toBeEmpty();
+  await expect(cur.locator(".tl-a-b").first()).not.toBeEmpty();
+  await expect(page.locator("#t-prompt")).toHaveAttribute("placeholder", "What should change?");
+  await snap(page.locator("#st-s2"), "steer-answer");
+  await cur.locator(".tl-act", { hasText: "Compare with normal" }).click();
+  await expect(cur.locator(".tl-normal")).toBeVisible();
   await snap(page.locator("#st-s2"), "steer-compare");
+  await cur.locator(".tl-act", { hasText: "Compare with normal" }).click();
+  await expect(cur.locator(".tl-normal")).toHaveCount(0);
 
-  // inspect the changed reply, a word in it, and a neuron from that word
-  await page.locator('#runs .run [data-c="up"] .insp').first().click();
+  // inspect the answer, a word in it, and a neuron from that word
+  await cur.locator(".tl-act", { hasText: "Inspect" }).click();
   const words = page.locator('.panel[data-kind="inspect"] .in-words .tok');
   await expect(words.first()).toBeVisible({ timeout: T });
   await snap(page.locator('.panel[data-kind="inspect"]'), "inspect");
@@ -122,20 +129,23 @@ test("steer: search by word, turn neurons on, compare, inspect, fix, save", asyn
   await page.keyboard.press("Escape");
   await expect(page.locator(".panel")).toHaveCount(0);
 
-  // say what's wrong with the changed reply
-  await page.locator("#runs .run .fix-b").first().click();
-  const fix = page.locator("#runs .run .fix").first();
-  await fix.locator(".chip", { hasText: "It's too strong" }).click();
-  await expect(fix.locator("input")).toHaveValue("It's too strong.");
-  await fix.locator(".ask .btn").click();
-  await ran(fix.locator(".fix-now"));
+  // say what should change: a fix retunes the neurons and answers again as v2, which Undo takes back
+  await page.locator("#t-chips .chip", { hasText: "It's too strong" }).click();
+  await expect(page.locator("#t-prompt")).toHaveValue("It's too strong.");
+  await page.locator("#t-go").click();
+  await expect(page.locator("#tl .tl-now")).toBeVisible();
+  await expect(page.locator("#tl .tl-now")).toHaveCount(0, { timeout: T });
+  await expect(page.locator("#tl .typing")).toHaveCount(0, { timeout: T });
   await idle(page);
-  await snap(fix, "fix-result");
-  if (await fix.locator(".fix-done").isVisible()) {
-    await fix.locator(".fix-done .btn").click();
-    await expect(fix.locator(".fix-done")).toContainText("Undone");
+  await snap(page.locator("#st-s2"), "fix-result");
+  if ((await answers.count()) === 2) {
+    await cur.locator(".tl-act", { hasText: "Undo" }).click();
+    await expect(answers).toHaveCount(1);
     await expect(rows).toHaveCount(2);
   }
+  await page.locator("#tl-newq").click();
+  await expect(page.locator("#t-prompt")).toHaveAttribute("placeholder", "Ask it something");
+  await expect(page.locator("#tl-newq")).toHaveText("Cancel");
 
   // save, clear, and bring it back from the sidebar
   await page.locator("#rc-save").click();
@@ -188,7 +198,8 @@ test("steer: find a direction, push and erase it, import, delete", async ({ page
   await page.locator("#t-prompt").fill("Should the country close its borders?");
   await page.locator("#t-go").click();
   await idle(page);
-  await snap(page.locator("#runs .run").first(), "direction-compare");
+  await expect(page.locator("#tl .tl-a.cur .tl-n")).toHaveText("1 direction");
+  await snap(page.locator("#tl"), "direction-answer");
 
   // a research file made for another model is refused with a reason
   await page.locator("#dn-path").fill("../research/political_steering/out/directions.npz");
@@ -216,10 +227,10 @@ test("steer: describe a behaviour and let it find the neurons", async ({ page })
   const apply = page.locator("#c-results .plan-apply");
   if (await apply.isVisible()) {
     await apply.click();
-    await expect(page.locator("#runs .run")).toHaveCount(1);
+    await expect(page.locator("#tl .tl-a")).toHaveCount(1);
     await idle(page);
     await snap(page.locator("#c-results .plan-foot"), "describe-applied");
-    await snap(page.locator("#runs .run").first(), "describe-compare");
+    await snap(page.locator("#tl"), "describe-answer");
   }
 });
 
@@ -236,7 +247,7 @@ test("steer: save the recipe as a new model", async ({ page }) => {
   await snap(page.locator("#st-s3"), "steer-exported");
 });
 
-test("abliterate: find the refusal direction, switch it, test, save", async ({ page }) => {
+test("abliterate: find the refusal direction, switch it, try it, save", async ({ page }) => {
   await scenario(page, "abliterate");
   await page.goto("/");
   await page.keyboard.press("Meta+1");
@@ -261,15 +272,21 @@ test("abliterate: find the refusal direction, switch it, test, save", async ({ p
   await page.locator("#abl-toggle").click();
   await expect(page.locator("#abl-toggle")).toHaveAttribute("aria-checked", "true");
 
-  await page.locator("#abl-coef").fill("1.5");
-  await expect(page.locator("#abl-coef-v")).toHaveText("1.50×");
-  await expect(page.locator("#abl-name")).toHaveValue(/-abliterated-1\.5$/);
-  await expect(page.locator("#abl-facts")).toContainText("1.50×", { timeout: T });
-
-  await page.locator("#abl-test-go").click();
-  await expect(page.locator("#abl-test-summary")).not.toBeEmpty({ timeout: T });
+  // try it: the finder's two examples open the thread; ask one of the suggestions, then make it stronger
+  const answers = page.locator("#at .tl-a"), cur = page.locator("#at .tl-a.cur");
+  await expect(answers).toHaveCount(2);
+  await snap(page.locator("#abl-s2"), "abl-examples");
+  await page.locator("#abl-sugg .chip").first().click();
+  await expect(answers).toHaveCount(3);
   await idle(page);
-  await snap(page.locator("#abl-s2"), "abl-tested");
+  await expect(cur.locator(".tl-n").first()).toHaveText(/^(Refused|Answered)/);
+  await cur.locator(".tl-act", { hasText: "Stronger" }).click();
+  await expect(page.locator("#at .tl-note")).toContainText("Stronger");
+  await expect(answers).toHaveCount(4);
+  await idle(page);
+  await expect(page.locator("#abl-facts")).toContainText((await cur.locator(".tl-tag").first().textContent())!);
+  await expect(page.locator("#abl-name")).toHaveValue(/-abliterated/);
+  await snap(page.locator("#abl-s2"), "abl-tried");
 
   await page.locator("#abl-name").fill("parity-abliterated");
   await page.locator("#abl-bake").click();
