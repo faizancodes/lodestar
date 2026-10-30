@@ -416,20 +416,32 @@ async function onModelReady() {
   refreshAbl();
   try { state.examples = await api("/api/examples"); } catch { state.examples = []; }
   renderExamples();
+  refreshDirs();
   renderHome();
 }
 
 // ------------------------------------------------------------------ on now
-const labelOf = (it) => it.label || (it.lens?.[0] || "").trim() || nid(it.layer, it.neuron);
+// a recipe holds neurons ({layer, neuron, dose}) and directions ({kind: "dir", dir, name, layers, dose, op}), where
+// a direction is pushed along (dose in units of its own size) or erased back to ordinary text (dose 1 = fully)
+const isDir = (it) => it.kind === "dir";
+const itemKey = (it) => (isDir(it) ? `d:${it.dir}` : `${it.layer}:${it.neuron}`);
+const dirReady = (it) => !!state.dirs?.find((d) => d.id === it.dir && d.ready);
+const labelOf = (it) => isDir(it) ? it.name || it.dir : it.label || (it.lens?.[0] || "").trim() || nid(it.layer, it.neuron);
+const bandText = (ls = []) => {
+  const st = ls.length > 1 ? ls[1] - ls[0] : 1;
+  return ls.length > 2 && ls.every((l, i) => !i || l - ls[i - 1] === st) ? `L${ls[0]}–${ls.at(-1)}${st > 1 ? ` /${st}` : ""}` : ls.map((l) => `L${l}`).join(" ");
+};
 
 function pushes(sign = 1) {
-  return state.recipe.items.map((i) => ({ layer: i.layer, neuron: i.neuron, dose: sign * i.dose }));
+  return state.recipe.items.map((i) => isDir(i)
+    ? { kind: "dir", dir: i.dir, layers: i.layers, op: i.op, dose: sign * i.dose, enabled: dirReady(i) && (sign > 0 || i.op !== "erase") }
+    : { layer: i.layer, neuron: i.neuron, dose: sign * i.dose }).filter((p) => p.enabled !== false);
 }
 
 function addItems(items, replace = false) {
   if (replace) state.recipe.items = [];
   for (const it of items) {
-    const ex = state.recipe.items.find((i) => i.layer === it.layer && i.neuron === it.neuron);
+    const ex = state.recipe.items.find((i) => itemKey(i) === itemKey(it));
     if (ex) ex.dose = it.dose;
     else state.recipe.items.push({ ...it });
   }
@@ -446,7 +458,7 @@ function renderRecipe() {
   renderSteerStatus();
   $("#rc-list").innerHTML = items
     .map(
-      (it, i) => `<div class="rc-row" data-i="${i}">
+      (it, i) => isDir(it) ? dirRow(it, i) : `<div class="rc-row" data-i="${i}">
         <span class="who" data-k="open" title="What this neuron does"><b>${esc(labelOf(it))}</b><span class="nid">${nid(it.layer, it.neuron)}</span></span>
         <input class="lr" type="range" min="-3" max="3" step="0.05" value="${it.dose}" data-k="dose" aria-label="Strength">
         <span class="dose">${fmt(it.dose)}</span>
@@ -456,12 +468,43 @@ function renderRecipe() {
     .join("");
   $$(".rc-row", $("#rc-list")).forEach((row) => {
     const it = items[+row.dataset.i];
+    if (isDir(it)) return bindDirRow(row, it);
     const range = $("[data-k=dose]", row);
     paintDose(range);
     range.oninput = (e) => ((it.dose = +e.target.value), ($(".dose", row).textContent = fmt(it.dose)), paintDose(range));
     $("[data-k=rm]", row).onclick = () => (items.splice(+row.dataset.i, 1), renderRecipe(), refreshFoundRows());
     $("[data-k=open]", row).onclick = () => openNeuron(it.layer, it.neuron, row);
   });
+}
+
+// a direction's row: its layers (editable), push or erase, and a wider strength range than a neuron's
+function dirRow(it, i) {
+  const ok = dirReady(it), er = it.op === "erase";
+  return `<div class="rc-row dir${ok ? "" : " gone"}" data-i="${i}">
+    <span class="who static" title="${ok ? esc(it.name) : "Not on this model"}"><b>${esc(labelOf(it))}</b><span class="nid">direction</span></span>
+    <span class="row tight"><input class="band" data-k="band" value="${esc(it.layers.join(" "))}" title="Layers" spellcheck="false">
+      <span class="seg"><button data-op="push"${er ? "" : ' class="on"'}>Push</button><button data-op="erase"${er ? ' class="on"' : ""}>Erase</button></span></span>
+    <input class="lr" type="range" min="${er ? 0 : -8}" max="${er ? 1 : 8}" step="${er ? 0.05 : 0.25}" value="${it.dose}" data-k="dose" aria-label="Strength">
+    <span class="dose">${fmt(it.dose, er ? 2 : 1)}</span>
+    <button class="x" data-k="rm" aria-label="Turn off">×</button>
+  </div>`;
+}
+function bindDirRow(row, it) {
+  const items = state.recipe.items, range = $("[data-k=dose]", row), er = it.op === "erase";
+  paintDose(range);
+  range.oninput = (e) => ((it.dose = +e.target.value), ($(".dose", row).textContent = fmt(it.dose, er ? 2 : 1)), paintDose(range));
+  $("[data-k=rm]", row).onclick = () => (items.splice(+row.dataset.i, 1), renderRecipe());
+  $("[data-k=band]", row).onchange = (e) => {
+    const L = state.dirLayers || 0, ls = [...new Set((e.target.value.match(/\d+/g) || []).map(Number))].filter((l) => l < L).sort((a, b) => a - b);
+    if (ls.length) it.layers = ls;
+    e.target.value = it.layers.join(" ");
+  };
+  $$("[data-op]", row).forEach((b) => (b.onclick = () => {
+    if (it.op === b.dataset.op) return;
+    it.op = b.dataset.op;
+    it.dose = it.op === "erase" ? 1 : 4;
+    renderRecipe();
+  }));
 }
 
 // a neuron's strength fills out from the middle: periwinkle when pushed up, red when pushed down
@@ -485,7 +528,8 @@ function renderSteerStatus() {
   title.textContent = n ? state.recipe.name || "Unsaved recipe" : "No recipe on";
   title.title = title.textContent;
   title.classList.toggle("dim", !n || !state.recipe.name);
-  const facts = [["Neurons on", n], ["Status", n ? `<i class="hc-on"></i>Steering every reply` : "Off"]];
+  const nd = state.recipe.items.filter(isDir).length;
+  const facts = [...(n - nd ? [["Neurons on", n - nd]] : []), ...(nd ? [["Directions on", nd]] : []), ...(n ? [] : [["Neurons on", 0]]), ["Status", n ? `<i class="hc-on"></i>Steering every reply` : "Off"]];
   $("#steer-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd${v === "Off" ? ' class="dim"' : ""}>${v}</dd></div>`).join("");
   requestAnimationFrame(() => drawHomeArt($("#steer-status-art"), "steer", $("#steer-status")));
 }
@@ -583,6 +627,101 @@ function renderExamples() {
     };
   });
 }
+
+// ------------------------------------------------------------------ directions
+// A direction is the difference between how the model carries two sides of something (two personas, or two kinds of
+// prompt), read off its residual stream. Pushing along it over a band of middle layers moves the whole behaviour.
+async function refreshDirs() {
+  try {
+    const r = await api("/api/directions");
+    state.dirs = r.directions;
+    state.dirLayers = r.layers;
+  } catch { state.dirs = []; }
+  renderDirChips();
+  renderRecipe();
+}
+
+function renderDirChips() {
+  const ds = state.dirs || [];
+  $("#dir-line").hidden = !state.info?.loaded;
+  $("#dir-chips").innerHTML = ds.map((d) => `<button class="chip dir-chip${d.ready ? "" : " gone"}" data-id="${esc(d.id)}" title="${esc(bandText(d.band))}${d.auc != null ? ` · separates ${Math.round(d.auc * 100)}%` : ""}">${esc(d.name)}<span class="del" aria-label="Delete"> ×</span></button>`).join("")
+    + `<button class="chip dir-new" id="dir-new">New</button>`;
+  $$("#dir-chips .dir-chip").forEach((c) => {
+    const d = ds.find((x) => x.id === c.dataset.id);
+    c.onclick = () => d.ready && addItems([{ kind: "dir", dir: d.id, name: d.name, layers: [...d.band], op: "push", dose: 4 }]);
+    $(".del", c).onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete the direction “${d.name}”?`)) return;
+      try { await api(`/api/directions/${encodeURIComponent(d.id)}`, null, "DELETE"); } catch (err) { return toast(err.message, true); }
+      refreshDirs();
+    };
+  });
+  $("#dir-new").onclick = () => (($("#dn").hidden = !$("#dn").hidden), $("#dn").hidden || $("#dn-name").focus());
+}
+
+let dnKind = "persona", dnMade = null;
+$$("#dn-kind button").forEach((b) => (b.onclick = () => {
+  dnKind = b.dataset.k;
+  $$("#dn-kind button").forEach((x) => x.classList.toggle("on", x === b));
+  $("#dn-pos-opt").textContent = $("#dn-neg-opt").textContent = dnKind === "persona" ? "one system prompt per line" : "one prompt per line";
+}));
+$("#dn-close").onclick = () => ($("#dn").hidden = true);
+$("#dn-ex").onclick = async () => {
+  let ex;
+  try { ex = (await api("/api/directions/defaults")).example; } catch (e) { return toast(e.message, true); }
+  $("#dn-kind [data-k=persona]").click();
+  $("#dn-name").value = ex.name;
+  $("#dn-pos").value = ex.pos.join("\n");
+  $("#dn-neg").value = ex.neg.join("\n");
+};
+
+const dnLines = (sel) => $(sel).value.split("\n").map((x) => x.trim()).filter(Boolean);
+$("#dn-go").onclick = async () => {
+  if (busy) return;
+  const pos = dnLines("#dn-pos"), neg = dnLines("#dn-neg"), name = $("#dn-name").value.trim();
+  if (!name) return $("#dn-name").focus();
+  if (pos.length < 2 || neg.length < 2) return toast("Give each side at least two lines.", true);
+  const live = $("#dn-status"), tries = $("#dn-tries");
+  $("#dn-result").hidden = true;
+  dnMade = null;
+  let label = "";
+  setLive(live, "Starting…", true);
+  const ok = await stream("/api/directions/extract", { name, kind: dnKind, pos, neg }, (ev) => {
+    if (ev.type === "stage") {
+      setLive(live, (label = ev.label) + "…", true);
+      if (ev.stage === "try") {
+        $("#dn-result").hidden = false;
+        $("#dn-facts").innerHTML = "";
+        $("#dn-q").textContent = "";
+        tries.innerHTML = [-4, 0, 4].map((k) => `<div class="out${k ? " steered" : ""}"><div class="out-h">${k ? fmt(k, 0) : "Normal"}</div><div class="out-b typing"></div></div>`).join("");
+      }
+    } else if (ev.type === "progress") setLive(live, `${label} · ${ev.done} of ${ev.total}`, true);
+    else if (ev.type === "trydelta") streamInto($$(".out-b", tries)[ev.index], ev.delta);
+    else if (ev.type === "result") dnMade = ev;
+  });
+  $$(".out-b", tries).forEach((b) => b.classList.remove("typing"));
+  if (!ok || !dnMade) return setLive(live, "Stopped. Nothing was saved.", false);
+  const m = dnMade, band = m.band, at = (a) => Math.min(...band.map((l) => a[l]));
+  setLive(live, "", false);
+  $("#dn-q").textContent = m.prompt;
+  $("#dn-facts").innerHTML = [["Layers", bandText(band)], ["Separates", `${Math.round(at(m.auc) * 100)}%`], ["Split agreement", at(m.cos_split).toFixed(2)]]
+    .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+  refreshDirs();
+};
+$("#dn-on").onclick = () => {
+  const e = dnMade?.entry;
+  if (e) addItems([{ kind: "dir", dir: e.id, name: e.name, layers: [...dnMade.band], op: "push", dose: 4 }]);
+};
+$("#dn-import").onclick = async () => {
+  const path = $("#dn-path").value.trim();
+  if (!path || busy) return $("#dn-path").focus();
+  setLive($("#dn-status"), "Importing…", true);
+  try {
+    const r = await api("/api/directions/import", { path });
+    setLive($("#dn-status"), `Imported ${r.added.map((d) => d.name).join(", ") || "nothing"}.`, false);
+  } catch (e) { return setLive($("#dn-status"), e.message, false); }
+  refreshDirs();
+};
 
 // one box: a word or two searches by word, a sentence searches by behaviour
 const isWord = (s) => s.split(/\s+/).length <= 2 && !/[.!?,:]/.test(s);
@@ -1266,8 +1405,9 @@ function openFix(run, prompt, bad) {
 
 async function runFix(box, prompt, bad, feedback) {
   if (!feedback) return $("input", box).focus();
-  if (!state.recipe.items.length) return toast("Turn on some neurons first.", true);
-  const prev = state.recipe.items.map((i) => ({ ...i }));
+  const prev = state.recipe.items.filter((i) => !isDir(i)).map((i) => ({ ...i }));
+  if (!prev.length) return toast("Fix retunes neurons, and none are on. Change a direction's strength instead.", true);
+  const dirsOn = () => state.recipe.items.filter(isDir);
   const live = $(".fix-now", box), aim = $(".fix-aim", box), aimB = $(".fix-aim-b", box), done = $(".fix-done", box);
   aim.hidden = done.hidden = true;
   aimB.textContent = "";
@@ -1296,12 +1436,12 @@ async function runFix(box, prompt, bad, feedback) {
     else if (Math.abs(a.dose - i.dose) > 0.005) lines.push(`${Math.abs(a.dose) < Math.abs(i.dose) ? "Turned down" : "Turned up"} ${nm} from ${fmt(i.dose)} to ${fmt(a.dose)}`);
   }
   for (const r of result.recipe) if (!known.has(key(r))) lines.push(`Added <b>${esc(labelOf(r))}</b> at ${fmt(r.dose)}`);
-  addItems(result.recipe.map((r) => ({ ...(known.get(`${r.layer}:${r.neuron}`) || { lens: r.lens }), layer: r.layer, neuron: r.neuron, dose: r.dose })), true);
+  addItems([...result.recipe.map((r) => ({ ...(known.get(`${r.layer}:${r.neuron}`) || { lens: r.lens }), layer: r.layer, neuron: r.neuron, dose: r.dose })), ...dirsOn()], true);
   setLive(live, "Fixed. The same question runs again above, with the new neurons.", false);
   done.hidden = false;
   done.innerHTML = `<ul>${lines.map((l) => `<li>${l}</li>`).join("")}</ul><button class="btn ghost sm">Undo</button>`;
   $(".btn", done).onclick = () => {
-    addItems(prev, true);
+    addItems([...prev, ...dirsOn()], true);
     done.innerHTML = `<span class="status-line">Undone: the neurons are back as they were.</span>`;
   };
   $("#t-prompt").value = prompt;
@@ -1358,8 +1498,9 @@ function renderChatMods() {
   const chips = [];
   if (state.abl?.ready && state.abl.current)
     chips.push(`<button class="mod${ablActive() ? " on" : ""}" data-mod="abl" title="Erase the refusal direction in replies">Refusals erased</button>`);
-  const n = state.recipe.items.length;
-  if (n) chips.push(`<button class="mod${chat.steer ? " on" : ""}" data-mod="steer" title="${esc(state.recipe.items.map(labelOf).join(", "))}">Steered · ${n} neuron${n > 1 ? "s" : ""}</button>`);
+  const n = state.recipe.items.length, nd = state.recipe.items.filter(isDir).length, nn = n - nd;
+  const what = [nn && `${nn} neuron${nn > 1 ? "s" : ""}`, nd && `${nd} direction${nd > 1 ? "s" : ""}`].filter(Boolean).join(", ");
+  if (n) chips.push(`<button class="mod${chat.steer ? " on" : ""}" data-mod="steer" title="${esc(state.recipe.items.map(labelOf).join(", "))}">Steered · ${what}</button>`);
   box.innerHTML = chips.join("");
   $$(".mod", box).forEach((b) => (b.onclick = () => {
     if (b.dataset.mod === "abl") return setAblActive(!ablActive());

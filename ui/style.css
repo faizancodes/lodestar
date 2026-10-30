@@ -894,3 +894,27 @@ textarea, input:not([type]) { font-size: 14px; }
 .start-model .go { font-size: 13px; font-weight: 500; color: var(--text); }
 .run-q { font-size: 14px; font-weight: 600; }
 .toast { font-size: 13px; font-weight: 500; }
+
+/* ------------------------------------------------------------ directions */
+.dn { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--rule); }
+.dn-h { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.dn-h b { font-size: 13.5px; }
+.dn-poles { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.dn-poles textarea { width: 100%; }
+.dn .row.tight { flex-wrap: nowrap; }
+.dn-path { flex: none; width: 260px !important; padding: 6px 10px !important; font-family: var(--mono); font-size: 12px; }
+.dn #dn-status:not(:empty) { margin-top: 14px; }
+.dn-facts { margin: 18px 0; }
+.dn-facts dd { font-family: var(--mono); font-size: 15px; }
+.dn .cols .out-b { font-size: 13px; }
+.chip.dir-chip { font-weight: 600; }
+.chip.dir-chip.gone { opacity: 0.45; }
+.chip.dir-new { border-style: dashed; }
+.rc-row.dir { grid-template-columns: minmax(0, 1.1fr) auto minmax(120px, 1fr) 46px 26px; }
+.rc-row.gone { opacity: 0.5; }
+.rc-row .who.static { cursor: default; }
+.rc-row .who.static:hover b { text-decoration: none; }
+.rc-row .band { width: 128px; padding: 4px 7px !important; font-family: var(--mono); font-size: 11px; }
+.rc-row .seg button { padding: 2px 8px; font-size: 11px; }
+@media (max-width: 720px) { .dn-poles { grid-template-columns: 1fr; } }
+.chip.dir-chip .del { opacity: 0.5; } .chip.dir-chip .del:hover { opacity: 1; color: var(--bad); }

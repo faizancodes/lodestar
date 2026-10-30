@@ -215,6 +215,7 @@
             <button id="c-go" class="btn">Find</button>
           </div>
           <div class="ex-line" id="ex-line"><span>Or try</span><div id="ex-chips" class="chips"></div></div>
+          <div class="ex-line" id="dir-line" hidden><span>Directions</span><div id="dir-chips" class="chips"></div></div>
           <div id="c-status" class="status-line"></div>
           <div id="c-results"></div>
           <details class="adv">
@@ -231,6 +232,26 @@
             </div>
             <label class="check"><input id="w-last" type="checkbox"> Search the last layers for words <span class="opt">they tend to repeat the word</span></label>
           </details>
+          <div id="dn" class="dn" hidden>
+            <div class="dn-h"><b>New direction</b><span class="grow"></span>
+              <div class="seg" id="dn-kind"><button data-k="persona" class="on">Personas</button><button data-k="topic">Prompts</button></div>
+              <button id="dn-ex" class="btn ghost sm">Example</button><button id="dn-close" class="x" aria-label="Close">×</button></div>
+            <label class="field">Name<input id="dn-name" placeholder="e.g. Nationalist" spellcheck="false"></label>
+            <div class="dn-poles">
+              <label class="field">Toward <span class="opt" id="dn-pos-opt">one system prompt per line</span><textarea id="dn-pos" rows="4" spellcheck="false"></textarea></label>
+              <label class="field">Away from <span class="opt" id="dn-neg-opt">one system prompt per line</span><textarea id="dn-neg" rows="4" spellcheck="false"></textarea></label>
+            </div>
+            <div class="row tight"><button id="dn-go" class="btn">Find direction</button><button class="btn ghost" data-cancel>Stop</button>
+              <span class="grow"></span>
+              <input id="dn-path" class="dn-path" placeholder="or import a .npz path" spellcheck="false"><button id="dn-import" class="btn ghost sm">Import</button></div>
+            <div id="dn-status" class="status-line"></div>
+            <div id="dn-result" hidden>
+              <dl class="facts dn-facts" id="dn-facts"></dl>
+              <div class="run-q" id="dn-q"></div>
+              <div class="cols" style="--n:3" id="dn-tries"></div>
+              <div class="row"><button id="dn-on" class="btn">Turn on</button></div>
+            </div>
+          </div>
           <div id="rc" class="rc" hidden>
             <div class="rc-h"><b>On now</b><span class="grow"></span><button id="rc-save" class="btn ghost sm">Save</button><button id="rc-clear" class="btn ghost sm">Turn all off</button></div>
             <div id="rc-list" class="rc-list"></div>

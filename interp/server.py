@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import abl as abl_mod
+from . import directions as dir_mod
 from . import discover
 from .engine import Cancelled, Engine, Push
 
@@ -61,6 +62,7 @@ EXAMPLES = {
 }
 
 eng = Engine()
+dirs = dir_mod.Library(DATA / "directions", eng)
 cancel = threading.Event()
 app = FastAPI()
 
@@ -114,7 +116,28 @@ def need_model():
 
 
 def pushes_of(body):
-    return [Push.of(p) for p in body.get("pushes") or [] if p.get("enabled", True)]
+    out = [Push.of(p) for p in body.get("pushes") or [] if p.get("enabled", True)]
+    L = len(eng.layers) if eng.model is not None else 0
+    for p in out:
+        if p.mode not in ("dir", "erase"):
+            continue
+        if p.mode == "erase":
+            p.dose = min(max(p.dose, 0.0), 1.0)  # 1 = fully back to ordinary text; past that it overshoots
+        if p.dir_id not in eng.dirs:
+            raise HTTPException(409, f"This model has no direction called “{p.dir_id}”.")
+        if not all(0 <= l < L for l in p.layers) or (p.mode == "dir" and not p.layers):
+            raise HTTPException(400, f"Pick layers between 0 and {L - 1} for “{p.dir_id}”.")
+    return out
+
+
+def _reverse(p):
+    """The opposite of a push: add and direction doses flip sign, a multiplier mirrors around 1 (ablate x0 <-> double
+    x2). Erasing has no opposite: exaggerating the component at every layer compounds into noise, so it's dropped."""
+    if p.mode == "erase":
+        return None
+    if p.mode == "mul":
+        return Push(p.layer, p.neuron, 2 - p.dose, p.mode)
+    return Push(p.layer, p.neuron, -p.dose, p.mode, p.dir_id, p.layers)
 
 
 # ------------------------------------------------------------------ models
@@ -232,6 +255,7 @@ async def load(req: Request):
         try:
             eng.load(mid)
             restore_for(mid)
+            dirs.load()
             LAST_MODEL.write_text(mid)
         except Exception as e:
             traceback.print_exc()
@@ -363,8 +387,7 @@ async def steer(req: Request):
     pushes = pushes_of(body)
     pid = eng.chat_ids(body["prompt"], system=body.get("system") or None, history=body.get("history"))
     cols = body.get("columns", ["up", "base", "down"])
-    # reversed: add pushes flip sign; a multiplier mirrors around 1 (ablate x0 <-> double x2)
-    inv = [Push(p.layer, p.neuron, -p.dose if p.mode == "add" else 2 - p.dose, p.mode) for p in pushes]
+    inv = [q for q in map(_reverse, pushes) if q is not None]
     # "abl" erases the model's refusal direction with no neuron pushes; when ablation is on, the changed column
     # carries it too and the normal/opposite columns stay untouched
     active = bool(abl_now().get("active"))
@@ -604,8 +627,15 @@ async def steer_export(req: Request):
     """Save the model with a recipe built into its weights, and its refusals erased too if that's switched on."""
     need_model()
     body = await req.json()
+    raw = body.get("items") or []
+    if any(i.get("kind") == "dir" and i.get("op") == "erase" for i in raw):
+        raise HTTPException(409, "An erased direction can't be built into the weights yet. Switch it to a push or "
+                                 "turn it off first.")
     items = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"])}
-             for i in body.get("items") or [] if i.get("neuron") is not None and i.get("mode", "add") == "add"]
+             for i in raw if i.get("kind") != "dir" and i.get("neuron") is not None and i.get("mode", "add") == "add"]
+    items += [{"kind": "dir", "dir": str(i["dir"]), "layers": [int(l) for l in i["layers"]], "dose": float(i["dose"])}
+              for i in raw if i.get("kind") == "dir"]
+    pushes_of({"pushes": items})  # the directions must exist for this model
     if not items:
         raise HTTPException(409, "Turn on some neurons first: there is nothing to build in yet.")
     entry = abl_now()
@@ -657,7 +687,7 @@ async def tune_refine(req: Request):
     need_model()
     body = await req.json()
     recipe = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"]), "lens": i.get("lens") or []}
-              for i in body.get("recipe") or []]
+              for i in body.get("recipe") or [] if i.get("kind") != "dir"]
     if not recipe:
         raise HTTPException(409, "Turn on some neurons first: there is nothing to fix yet.")
     if not (body.get("feedback") or "").strip():
@@ -669,6 +699,101 @@ async def tune_refine(req: Request):
         eng, recipe, feedback=body["feedback"], prompt=body["prompt"], bad=body.get("bad") or "",
         behavior=body.get("behavior") or None, prompts=others, abl=bool(abl_now().get("active")),
         target_tokens=budget["target_tokens"] or 48, n_new=8 if big else 12, rounds=2 if big else 3, cancel=cancel))
+
+
+# ------------------------------------------------------------------ directions
+def _dir_row(e):
+    d = eng.dirs.get(e["id"])
+    m = e.get("metrics") or {}
+    auc = m.get("auc") or []
+    band = e.get("band") or []
+    return {k: e.get(k) for k in ("id", "name", "kind", "band", "created", "pos", "neg")} | {
+        "ready": d is not None, "auc": round(min(auc[l] for l in band), 2) if auc and band else None}
+
+
+@app.get("/api/directions")
+def directions_list():
+    need_model()
+    return {"directions": [_dir_row(e) for e in dirs.index()], "layers": len(eng.layers)}
+
+
+@app.get("/api/directions/defaults")
+def directions_defaults():
+    return {"questions": dir_mod.DEFAULT_QUESTIONS, "example": dir_mod.EXAMPLE}
+
+
+@app.get("/api/directions/{did}")
+def direction_detail(did: str):
+    need_model()
+    e = next((e for e in dirs.index() if e["id"] == did), None)
+    if e is None:
+        raise HTTPException(404, "No such direction.")
+    return e
+
+
+@app.post("/api/directions/extract")
+async def directions_extract(req: Request):
+    need_model()
+    body = await req.json()
+    return sse(dir_mod.extract(eng, dirs, body, cancel, try_prompt=(body.get("try_prompt") or "").strip() or None))
+
+
+@app.post("/api/directions/import")
+async def directions_import(req: Request):
+    need_model()
+    body = await req.json()
+    path = Path(str(body.get("path") or "")).expanduser()
+    if not path.is_file():
+        raise HTTPException(400, f"No file at {path}.")
+    try:
+        added = dirs.import_npz(path, body.get("names") or None, cancel)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    return {"added": [_dir_row(e) for e in added]}
+
+
+@app.patch("/api/directions/{did}")
+async def directions_update(did: str, req: Request):
+    need_model()
+    body = await req.json()
+    band = body.get("band")
+    if band is not None:
+        band = sorted({int(l) for l in band})
+        if not band or not all(0 <= l < len(eng.layers) for l in band):
+            raise HTTPException(400, f"Pick layers between 0 and {len(eng.layers) - 1}.")
+    try:
+        return _dir_row(dirs.update(did, name=(body.get("name") or "").strip() or None, band=band))
+    except KeyError:
+        raise HTTPException(404, "No such direction.")
+
+
+@app.delete("/api/directions/{did}")
+def directions_delete(did: str):
+    need_model()
+    dirs.delete(did)
+    return {"ok": True}
+
+
+@app.post("/api/directions/try")
+async def directions_try(req: Request):
+    """One prompt under one direction at several doses, side by side: a sweep without building a recipe."""
+    need_model()
+    body = await req.json()
+    did = str(body["dir"])
+    if did not in eng.dirs:
+        raise HTTPException(409, f"This model has no direction called “{did}”.")
+    layers = tuple(int(l) for l in body.get("layers") or eng.dirs[did]["band"])
+    doses = [float(x) for x in body.get("doses") or dir_mod.TRY_DOSES][:6]
+    pid = eng.chat_ids(body["prompt"], system=body.get("system") or None)
+    rows = [(pid, [Push(None, None, k, "dir", did, layers)] if k else []) for k in doses]
+
+    def gen():
+        for r, x in eng.generate(rows, max_new=int(body.get("max_new", 160)), cancel=cancel):
+            if r is None:
+                break
+            yield {"type": "delta", "index": r, "dose": doses[r], "delta": x}
+
+    return sse(gen())
 
 
 # ------------------------------------------------------------------ recipes

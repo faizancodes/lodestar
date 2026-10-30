@@ -385,9 +385,16 @@ def _orth_in(W, v, coef):
 def steer_biases(eng, items):
     """A recipe's add-pushes as the constant each one adds to the residual stream, summed per layer: {layer: [hidden]}.
     Pushing neuron n by dose adds dose·unit to its activation at every position, so down_proj adds that times its
-    column n."""
+    column n. A direction push adds dose/len(layers) times its contrast size along the direction at each of its layers."""
     out = {}
     for it in items:
+        if it.get("kind") == "dir":
+            d = eng.dirs[it["dir"]]
+            for l in it["layers"]:
+                l = int(l)
+                b = float(it["dose"]) / len(it["layers"]) * d["mag"][l] * d["unit"][l].detach().float().cpu()
+                out[l] = out.get(l, 0) + b
+            continue
         l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
         col = eng.layers[l].mlp.down_proj.weight[:, n].detach().float().cpu()
         out[l] = out.get(l, 0) + dose * float(eng.unit[l, n]) * col
@@ -472,7 +479,7 @@ def _build_in_steering(model, layers, biases, v=None, coef=1.0, fitted=None):
         raise ValueError("This kind of model has no bias to hold steering, so it can't be saved with it built in.")
     if any(l + 1 >= len(layers) or getattr(getattr(layers[l + 1], "self_attn", None), "o_proj", None) is None
            for l in biases):
-        raise ValueError("A neuron in this recipe is in a layer whose push can't be built into the weights.")
+        raise ValueError("A push in this recipe is in a layer whose push can't be built into the weights.")
     cfg.attention_bias = True
     for layer in layers:
         attn = getattr(layer, "self_attn", None)
