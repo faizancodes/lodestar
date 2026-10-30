@@ -67,9 +67,13 @@ def focus_pattern(focus):
     return re.compile(r"\b(?:" + "|".join(re.escape(w) for w in words) + r")\w*", re.I) if words else None
 
 
+CJK = "\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af"
+WORDS = re.compile(f"[{CJK}]|[^\\W{CJK}]+")  # words, and each Chinese/Japanese/Korean character on its own
+
+
 def variety(text):
     """Share of distinct words in a reply (1 for short replies); loops like "cookie cookie cookie" score near 0."""
-    w = re.findall(r"\w+", text.lower())
+    w = WORDS.findall(text.lower())
     return len(set(w)) / len(w) if len(w) >= 8 else 1.0
 
 
@@ -369,3 +373,181 @@ def _public(recipe):
     return [{"layer": c["layer"], "neuron": c["neuron"], "dose": round(float(c["dose"]), 3), "mode": "add",
              "dj": round(float(c.get("dj", 0)), 4), "dfluency": round(float(c.get("dfluency", 0)), 4), "hit": c.get("hit"),
              "lens": c.get("lens", [])} for c in recipe]
+
+
+def fix_instruction(behavior, feedback):
+    """The system prompt that writes the answers a fix aims for: the recipe's behaviour, if it has one, plus what the
+    person said was wrong, phrased so the model corrects for it rather than discussing it."""
+    head = f"Follow this in every reply, without mentioning it: {behavior.strip()}\n\n" if behavior and behavior.strip() else ""
+    return (head + "An earlier reply was criticised like this: \"" + feedback.strip() + "\". Write your reply so that "
+            "criticism no longer applies, without mentioning it.")
+
+
+def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl=False, contrast=0.5,
+           fluency_budget=0.35, target_tokens=None, n_new=10, rounds=3, cancel=None):
+    """Fix a recipe from a person's complaint about one steered reply. Yields events, ending with "result".
+
+    1. Aim. The model, told the recipe's behaviour and the complaint as a system prompt (no neurons on), writes the
+       reply it should have given to `prompt` and to a few other questions. The current recipe's own replies are the
+       counterexamples: the bad reply the person saw, and its replies to the other questions.
+    2. Gradient, taken with the recipe on, of J = logp(aimed replies) - contrast * logp(current replies), over every
+       neuron: where to go from here, not from the unsteered model.
+    3. Edits, each actually measured: every neuron in the recipe turned off, down or up; the whole recipe weaker or
+       stronger; and the strongest new neurons from the gradient. The best edit that raises J (less a fluency
+       penalty) is kept, and the best few are tried again on top of it, for up to `rounds` rounds.
+
+    Moving away from the bad replies only counts until they're as unlikely as the unsteered model finds them;
+    beyond that, J would reward any change that stops them, a different loop included. And since likelihood can't
+    see loops, the top few edits each round also write short replies, and repetition costs them."""
+    recipe = [dict(c) for c in recipe]
+    asks = [prompt] + [p for p in prompts if p.strip() and p.strip() != prompt.strip()]
+    system = fix_instruction(behavior, feedback)
+    cut = slice(0, target_tokens)
+
+    def push_set(r):
+        return [Push(c["layer"], c["neuron"], c["dose"]) for c in r if abs(c["dose"]) > 1e-6]
+
+    # ---- 1. what to aim for, and what the recipe does now
+    yield _ev("stage", stage="aim", label="Writing the answer it should have given")
+    rows = [(eng.chat_ids(p, system=system), []) for p in asks] + [(eng.chat_ids(p), push_set(recipe)) for p in asks[1:]]
+    texts = [""] * len(rows)
+    for r, delta in eng.generate(rows, max_new=72, cancel=cancel, abl=abl or None):
+        if r is None:
+            break
+        texts[r] += delta
+        if r == 0:
+            yield _ev("aim", delta=delta)
+    aims, now = [t.strip() for t in texts[:len(asks)]], [bad] + [t.strip() for t in texts[len(asks):]]
+    keep = [i for i, t in enumerate(aims) if t]
+    if not keep or not aims[0]:
+        yield _ev("result", recipe=_public(recipe), changes=[], improved=False,
+                  note="It couldn't write a better answer from that. Try saying what you want instead.")
+        return
+
+    def rows_of(texts_):
+        out = []
+        for i in keep:
+            pid = eng.chat_ids(asks[i])
+            out.append((pid + eng.encode(texts_[i])[cut], len(pid)))
+        return out
+
+    t_rows, b_rows = rows_of(aims), rows_of(now)
+    nll0 = float(eng.reference_nll([[]], cancel)[0])
+    floor = eng.score([(ids, s, []) for ids, s in b_rows], cancel, abl=[abl] * len(b_rows) if abl else None)
+    ask_ids = [eng.chat_ids(asks[i]) for i in keep]
+
+    def looping(texts_):
+        """0 for varied replies, up to ~0.7 for ones stuck repeating a word; steep, since a loop ruins a reply."""
+        return float(np.mean([max(0.0, 0.7 - variety(t)) for t in texts_])) if texts_ else 0.0
+
+    def loops(sets):
+        """Repetition in short replies to every question, per recipe (0 = varied)."""
+        rows_ = [(pid, push_set(r)) for r in sets for pid in ask_ids]
+        texts_ = eng.generate_text(rows_, max_new=32, cancel=cancel, abl=[abl] * len(rows_) if abl else None)[0]
+        n = len(ask_ids)
+        return [looping(texts_[k * n:(k + 1) * n]) for k in range(len(sets))]
+
+    def scores(sets):
+        """Penalised J per recipe (list of item dicts), batched."""
+        out = []
+        for k in range(0, len(sets), 6):
+            part = [push_set(r) for r in sets[k:k + 6]]
+            rows_ = []
+            for ps in part:
+                rows_ += [(ids, s, ps) for ids, s in t_rows] + [(ids, s, ps) for ids, s in b_rows]
+            sc = eng.score(rows_, cancel, abl=[abl] * len(rows_) if abl else None)
+            nll = eng.reference_nll(part, cancel, abl=[abl] * len(part) if abl else None)
+            n = len(t_rows)
+            for j in range(len(part)):
+                blk = sc[j * 2 * n:(j + 1) * 2 * n]
+                jv = float(blk[:n].mean() - contrast * np.maximum(blk[n:], floor).mean())
+                out.append(jv - max(0.0, float(nll[j]) - nll0 - fluency_budget) * 2.0)
+        return out
+
+    # ---- 2. which way to go from here
+    yield _ev("stage", stage="attribute", label="Working out which neurons to change")
+    items = [(ids, s, 1.0) for ids, s in t_rows] + [(ids, s, -contrast) for ids, s in b_rows]
+    grad = None
+    for i, it in enumerate(items):
+        g = eng.attribute([it], cancel, pushes=push_set(recipe), abl=abl)
+        grad = g if grad is None else grad + g
+        yield _ev("progress", stage="attribute", done=i + 1, total=len(items))
+    N = grad.shape[1]
+    have = {(c["layer"], c["neuron"]) for c in recipe}
+    new, per = [], {}
+    for i in np.argsort(-np.abs(grad).ravel()):
+        l, n = int(i // N), int(i % N)
+        if (l, n) in have or per.get(l, 0) >= 3:
+            continue
+        per[l] = per.get(l, 0) + 1
+        new.append({"layer": l, "neuron": n, "sign": 1 if grad[l, n] > 0 else -1})
+        if len(new) >= n_new:
+            break
+    for c in new:
+        c["lens"] = eng.lens(c["layer"], c["neuron"], 6)["up" if c["sign"] > 0 else "down"]
+
+    # ---- 3. edits, measured
+    def edits_for(r):
+        out = []
+        for c in r:
+            for k, what in ((0.0, "off"), (0.5, "down"), (1.6, "up")):
+                out.append(("scale", (c["layer"], c["neuron"]), k, what))
+        out += [("all", None, 0.4, "much weaker"), ("all", None, 0.7, "weaker"), ("all", None, 1.35, "stronger")]
+        for c in new:
+            if (c["layer"], c["neuron"]) not in {(x["layer"], x["neuron"]) for x in r}:
+                out += [("add", c, c["sign"] * d, "added") for d in (0.3, 0.6)]
+        return out
+
+    def apply(r, e):
+        kind, ref, k, _ = e
+        r = [dict(c) for c in r]
+        if kind == "all":
+            for c in r:
+                c["dose"] *= k
+        elif kind == "scale":
+            r = [dict(c, dose=c["dose"] * k) if (c["layer"], c["neuron"]) == ref else c for c in r]
+            r = [c for c in r if abs(c["dose"]) > 1e-6]
+        else:
+            r.append({"layer": ref["layer"], "neuron": ref["neuron"], "dose": k, "lens": ref["lens"]})
+        return r
+
+    yield _ev("stage", stage="test", label="Testing changes to the neurons")
+    loop0 = loops([recipe])[0]
+    s0 = best = scores([recipe])[0]
+    cur, log = recipe, []
+    for rnd in range(rounds):
+        es = edits_for(cur)
+        on = {(c["layer"], c["neuron"]) for c in cur}
+        es = [e for e in es if (e[0] == "all") or (e[0] == "scale" and e[1] in on)
+              or (e[0] == "add" and (e[1]["layer"], e[1]["neuron"]) not in on)]
+        es = [e for e in es if apply(cur, e)]  # a fix keeps some steering: turning it all off isn't a fix
+        if not es:
+            break
+        sc = []
+        for k in range(0, len(es), 6):
+            sc += scores([apply(cur, e) for e in es[k:k + 6]])
+            yield _ev("progress", stage="test", done=min(k + 6, len(es)), total=len(es), round=rnd + 1)
+        # the likeliest few write short replies; one that loops more than the recipe does now is out, whatever
+        # its likelihood (a loop can score well by avoiding the bad reply), and less looping always wins
+        top = [int(i) for i in np.argsort(sc)[::-1][:5]]
+        top += [i for i, e in enumerate(es) if e[0] == "all" and i not in top]  # turning it all down is always a candidate
+        lp = dict(zip(top, loops([apply(cur, es[i]) for i in top])))
+        ok = [i for i in top if lp[i] <= max(loop0, 0.05) + 1e-9]
+        if not ok:
+            break
+        bi = min(ok, key=lambda i: (round(lp[i], 1), -sc[i]))
+        if sc[bi] <= best + 0.004 and lp[bi] >= loop0 - 0.05:
+            break
+        best, cur, loop0 = sc[bi], apply(cur, es[bi]), lp[bi]
+        log.append(es[bi])
+        yield _ev("recipe", recipe=_public(cur))
+
+    changes = []
+    for kind, ref, k, what in log:
+        if kind == "all":
+            changes.append({"what": what})
+        else:
+            l, n = (ref["layer"], ref["neuron"]) if kind == "add" else ref
+            changes.append({"what": what, "layer": l, "neuron": n})
+    yield _ev("result", recipe=_public(cur), changes=changes, improved=bool(log), j0=s0, j=best,
+              note=None if log else "Nothing it tried fixed that. Try describing the problem another way.")
