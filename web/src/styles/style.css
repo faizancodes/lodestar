@@ -17,6 +17,7 @@
   --good: #3ddc84;
   --bad: #f2777a;
   --bad-wash: rgba(242, 119, 122, 0.12);
+  --warn: #f0b45a;          /* memory running short */
   --rule: rgba(255, 255, 255, 0.08);
   --rule-2: rgba(255, 255, 255, 0.14);
   --wash: rgba(255, 255, 255, 0.05);
@@ -144,6 +145,36 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .model-status.busy .dot { background: var(--on-night); animation: pulse 1s infinite; }
 .model-status.err .dot { background: #d9826a; }
 @keyframes pulse { 50% { opacity: 0.25; } }
+
+/* the memory meter: Lodestar's share in the scenes' periwinkle, everything else grey; amber while macOS swaps */
+.mem { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.mem-txt { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: rgba(237, 237, 237, 0.6); }
+.mem-n { font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mem-bar { display: flex; height: 4px; margin-top: 6px; border-radius: 2px; background: rgba(237, 237, 237, 0.1); overflow: hidden; }
+.mem-bar i { display: block; height: 100%; transition: width 0.6s ease; }
+.mem-app { background: var(--ascii); }
+.mem-rest { background: rgba(237, 237, 237, 0.32); }
+.mem.tight .mem-txt { color: var(--warn); }
+.mem.tight .mem-app, .mem.tight .mem-rest { background: var(--warn); }
+.mem.tight .mem-rest { opacity: 0.55; }
+
+/* a question that has to be answered before going on */
+.dialog-back {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px;
+  background: rgba(0, 0, 0, 0.55); animation: fade-in 0.15s ease-out;
+}
+.dialog {
+  width: min(440px, 100%); padding: 22px 24px 20px; border: 1px solid var(--rule-2); border-radius: 10px;
+  background: var(--panel); box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.7); animation: rise 0.2s ease-out;
+}
+.dialog h3 { margin: 0 0 8px; font-size: 17px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+.dialog p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
+.dialog .dialog-note { margin-top: 14px; color: var(--muted); }
+.fit-who { margin-top: 16px; padding: 12px 14px; border-radius: var(--radius); background: var(--well); box-shadow: inset 0 0 0 1px var(--rule); }
+.fit-who .eyebrow { margin-bottom: 8px; }
+.fit-proc { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 13px; color: var(--text); }
+.fit-proc .mem-n { font-size: 12px; color: var(--warn); }
+.dialog-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 .side-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; color: var(--ascii); opacity: 0.4; }
 
@@ -801,6 +832,8 @@ main.is-chat { padding: 0; overflow: hidden; }
 .msg-acts button:hover { background: var(--wash); color: var(--accent); }
 .msg-note { margin-left: 6px; font-size: 11.5px; color: var(--bad); }
 .msg-none { margin: 0; font-style: italic; color: var(--muted); }
+.msg-rate { margin-left: 8px; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.msg-rate:empty { display: none; }
 
 /* Compare: one reply per column, side by side, stacking when the window is narrow */
 .chat-log.wide { max-width: 1180px; }

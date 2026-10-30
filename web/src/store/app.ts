@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { load, save } from "../lib/storage";
-import type { Abl, CopyJob, Direction, Example, Models, Probes, Recipe, Status } from "../lib/types";
+import type { Abl, CopyJob, Direction, Example, Fit, Memory, Models, Probes, Recipe, Status } from "../lib/types";
 
 export const TABS = ["abliterate", "steer", "chat"] as const;
 export type Tab = (typeof TABS)[number] | "home";
@@ -34,6 +34,8 @@ type App = {
   toast: Toast | null;
   start: Start;
   menu: Menu;
+  memory: Memory | null;
+  fitWarn: { id: string; fit: Fit } | null; // a model that may not fit, waiting on Load anyway or Cancel
 
   setTab: (t: Tab) => void;
   setBusy: (b: boolean) => void;
@@ -57,6 +59,8 @@ export const useApp = create<App>((set) => ({
   toast: null,
   start: { loading: false, leaving: false, picked: null, status: "" },
   menu: { open: false, left: 0, bottom: 0, maxHeight: 0 },
+  memory: null,
+  fitWarn: null,
 
   setTab: (tab) => {
     save("tab", tab);

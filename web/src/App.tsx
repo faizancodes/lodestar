@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { FitWarn } from "./components/FitWarn";
 import { ModelMenu } from "./components/ModelMenu";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
@@ -15,9 +16,10 @@ import { closeLast } from "./steer/panels";
 // Registered as the app loads, not in an effect: React's first render can land after the page's load event, and a
 // shortcut pressed before then would be lost.
 document.addEventListener("keydown", (e) => {
-  const { info, menu, tab } = useApp.getState();
+  const { info, menu, tab, fitWarn } = useApp.getState();
   if (e.key === "Escape") {
-    if (menu.open) toggleModelMenu(false);
+    if (fitWarn) useApp.setState({ fitWarn: null });
+    else if (menu.open) toggleModelMenu(false);
     else closeLast();
     return;
   }
@@ -51,6 +53,7 @@ export function App() {
         <Chat hidden={hidden("chat")} />
       </main>
       <ModelMenu />
+      <FitWarn />
       <Toast />
     </>
   );
