@@ -265,8 +265,8 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
                              n_pos)
 
     safe_mean = H.mean(0, dtype=np.float32)
-    u_a, mag_a = diff_dirs(A, safe_mean)
-    u_b, mag_b = diff_dirs(B, safe_mean)
+    u_a, _ = diff_dirs(A, safe_mean)
+    u_b, _ = diff_dirs(B, safe_mean)
     cos = np.abs(np.clip((u_a * u_b).sum(1), -1.0, 1.0))  # [L+1]; index 0 is the embedding itself
     ranking = sorted(range(1, L), key=lambda l: -float(cos[l]))
     selected = int(ranking[0])
@@ -361,7 +361,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
 
     yield _ev("result", vec=vec, layer=selected, coef=coef, ranking=rank_rows, clean=clean,
               top_score=round(float(cos[selected]), 4), refused_left=refused_left, tried=len(TRIAL_PROMPTS),
-              examples=examples, n_harmful=len(harmful), n_harmless=len(harmless))
+              examples=examples)
 
 
 def _orth_out(W, v, coef):

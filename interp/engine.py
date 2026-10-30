@@ -71,8 +71,6 @@ class Engine:
         self._deltas = None  # per-layer [N] tensors requiring grad, for attribution
         self._cap_acts = None  # {layer: [T, N] cpu} during a trace
         self._cap_resid = None  # {layer: [T, H]} during a trace or norm measurement
-        self._cap_mlp_norm = None
-        self._cap_attn_norm = None
         self._handles = []
 
     # ---------------------------------------------------------------- loading
@@ -118,12 +116,7 @@ class Engine:
             self.backbone = getattr(model, model.base_model_prefix)  # the transformer without the vocabulary head
             for i, layer in enumerate(self.layers):
                 self._handles.append(layer.mlp.down_proj.register_forward_pre_hook(self._mlp_hook(i)))
-                self._handles.append(layer.mlp.down_proj.register_forward_hook(self._mlp_out_hook(i)))
                 self._handles.append(layer.register_forward_hook(self._resid_hook(i)))
-                attn = getattr(layer, "self_attn", None)
-                o = getattr(attn, "o_proj", None) if attn is not None else None
-                if o is not None:
-                    self._handles.append(o.register_forward_hook(self._attn_out_hook(i)))
             self._use_builtin_steering(model_id)
             t1 = time.perf_counter()
             with torch.no_grad():
@@ -320,18 +313,6 @@ class Engine:
             return (h,) if changed else None
         return hook
 
-    def _mlp_out_hook(self, i):
-        def hook(mod, inp, out):
-            if self._cap_mlp_norm is not None:
-                self._cap_mlp_norm[i] = out[0].detach().float().norm(dim=-1).cpu()
-        return hook
-
-    def _attn_out_hook(self, i):
-        def hook(mod, inp, out):
-            if self._cap_attn_norm is not None:
-                self._cap_attn_norm[i] = out[0].detach().float().norm(dim=-1).cpu()
-        return hook
-
     def _resid_hook(self, i):
         def hook(mod, inp, out):
             h = out[0] if isinstance(out, tuple) else out
@@ -422,11 +403,10 @@ class Engine:
         return st or None
 
     # ---------------------------------------------------------------- tokens
-    def chat_ids(self, prompt, system=None, history=None):
+    def chat_ids(self, prompt, system=None):
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})
-        msgs += history or []
         msgs.append({"role": "user", "content": prompt})
         return self.messages_ids(msgs)
 
@@ -526,23 +506,20 @@ class Engine:
 
     # ---------------------------------------------------------------- tracing
     def run_trace(self, prompt_ids, response_ids, pushes=None, topk_lens=5, abl=False):
-        """One forward pass over prompt + response, capturing every neuron at every token, MLP/attention write norms,
-        and the logit lens at every layer. Stored on self.trace for later queries."""
+        """One forward pass over prompt + response, capturing every neuron at every token and the logit lens at every
+        layer. Stored on self.trace for later queries."""
         with self.lock:
             ids = list(prompt_ids) + list(response_ids)
             L = len(self.layers)
-            self._cap_acts, self._cap_resid, self._cap_mlp_norm, self._cap_attn_norm = {}, {}, {}, {}
+            self._cap_acts, self._cap_resid = {}, {}
             self._push_state = self._make_push_state([pushes or []], 1)
             if abl:
                 self._abl_mask = torch.ones(1, dtype=torch.bool, device=self.dev)
                 self._abl_any = True
             try:
                 with torch.inference_mode():
-                    out = self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False)
-                    final_lp = torch.log_softmax(out.logits[0].float(), -1)
-                    # logprob the model gave each actual next token
-                    nxt = torch.tensor(ids[1:], device=self.dev)
-                    tok_lp = final_lp[:-1].gather(-1, nxt[:, None])[:, 0].cpu().numpy()
+                    # the hooks capture what's needed; the model's own logits aren't
+                    self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)
                     lens_ids, lens_p = [], []
                     for l in range(L):
                         r = self._cap_resid[l]
@@ -553,21 +530,15 @@ class Engine:
                         lens_p.append(top.values.cpu().numpy())
                         del lg, p
                 acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
-                resid_norm = np.stack([self._cap_resid[l].float().norm(dim=-1).cpu().numpy() for l in range(L)])
-                mlp_norm = np.stack([self._cap_mlp_norm[l].numpy() for l in range(L)])
-                attn_norm = (np.stack([self._cap_attn_norm[l].numpy() for l in range(L)])
-                             if len(self._cap_attn_norm) == L else None)
             finally:
-                self._cap_acts = self._cap_resid = self._cap_mlp_norm = self._cap_attn_norm = None
+                self._cap_acts = self._cap_resid = None
                 self._push_state = None
                 self._abl_mask = None
                 self._abl_any = False
             impact_scale = (self.dnorm / self.resid_p50[:, None]).cpu().numpy().astype(np.float32)  # [L, N]
             self.trace = {
                 "ids": ids, "n_prompt": len(prompt_ids), "tokens": self.token_strs(ids), "acts": acts,
-                "impact_scale": impact_scale, "resid_norm": resid_norm, "mlp_norm": mlp_norm,
-                "attn_norm": attn_norm, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
-                "tok_lp": tok_lp,
+                "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
             }
             return self.trace
 
@@ -610,20 +581,6 @@ class Engine:
             up = logits[0].topk(k).indices.tolist()
             down = logits[1].topk(k).indices.tolist()
         return {"up": [self.tok.decode([t]) for t in up], "down": [self.tok.decode([t]) for t in down]}
-
-    def read(self, layer, n, ids, pushes=None):
-        """Per-token activation of neuron (layer, n) on token ids."""
-        with self.lock:
-            self._cap_acts = {}
-            self._push_state = self._make_push_state([pushes or []], 1)
-            try:
-                with torch.inference_mode():
-                    # only layers up to `layer` matter; the full pass is still cheap at these sizes
-                    self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)
-                return self._cap_acts[layer][:, n].numpy()
-            finally:
-                self._cap_acts = None
-                self._push_state = None
 
     # ---------------------------------------------------------------- scoring
     def _batches(self, rows, budget=6144):

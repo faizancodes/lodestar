@@ -31,7 +31,7 @@ export type Plan = {
   clock: string;
   renders: number; // full redraws, which rebuild the stage steps (progress alone doesn't)
 };
-export type Results = { n: number; word?: (NeuronRow & { score: number; dose: number })[]; plan?: Plan };
+type Results = { n: number; word?: (NeuronRow & { score: number; dose: number })[]; plan?: Plan };
 
 export type Fix = {
   open: boolean;

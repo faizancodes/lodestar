@@ -131,7 +131,6 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         return rows
 
     tr_t, tr_b = tf_rows(train, "target"), tf_rows(train, "baseline")
-    te_t, te_b = tf_rows(test, "target"), tf_rows(test, "baseline")
 
     def objective(pushes_list, t_rows, b_rows):
         """J for each push set in pushes_list, evaluated in one batched pass."""
@@ -150,9 +149,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     # ---- baseline numbers
     yield _ev("stage", stage="baseline", label="Measuring the normal model")
     j0 = float(objective([[]], tr_t, tr_b)[0])
-    j0_test = float(objective([[]], te_t, te_b)[0])
     nll0 = float(eng.reference_nll([[]], cancel)[0])
-    yield _ev("baseline", j=j0, j_test=j0_test, ref_nll=nll0)
 
     # ---- attribution
     yield _ev("stage", stage="attribute", label=f"Estimating the effect of all {eng.dnorm.shape[0] * eng.dnorm.shape[1]:,} neurons")
@@ -164,9 +161,6 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         yield _ev("progress", stage="attribute", done=i + 1, total=len(items))
     grad /= len(train)
     L, N = grad.shape
-    # layer-by-layer profile of where the effect lives (sum of the top positive attributions per layer)
-    per_layer = np.sort(np.abs(grad), axis=1)[:, -32:].sum(1)
-    yield _ev("attribution", per_layer=per_layer.tolist())
 
     # what the system prompt itself changes inside the model, on the same target text
     patch = None
@@ -186,7 +180,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     cap = max(4, n_candidates // 4)
     per, cands, seen = {}, [], set()
 
-    def take(order, limit, source):
+    def take(order, limit):
         added = 0
         for i in order:
             l, n = int(i // N), int(i % N)
@@ -194,15 +188,14 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
                 continue
             seen.add((l, n))
             per[l] = per.get(l, 0) + 1
-            cands.append({"layer": l, "neuron": n, "est": float(grad[l, n]), "sign": 1 if grad[l, n] > 0 else -1,
-                          "source": source})
+            cands.append({"layer": l, "neuron": n, "est": float(grad[l, n]), "sign": 1 if grad[l, n] > 0 else -1})
             added += 1
             if added >= limit:
                 return
 
     if patch is not None:
-        take(np.argsort(-patch.ravel()), n_candidates // 2, "patch")
-    take(np.argsort(-np.abs(grad).ravel()), n_candidates - len(cands), "gradient")
+        take(np.argsort(-patch.ravel()), n_candidates // 2)
+    take(np.argsort(-np.abs(grad).ravel()), n_candidates - len(cands))
     for c in cands:
         c["lens"] = eng.lens(c["layer"], c["neuron"], 6)["up" if c["sign"] > 0 else "down"]
     yield _ev("candidates", candidates=[_cand(c) for c in cands])
@@ -286,57 +279,52 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         n_hit = min(10, len(cands))
         yield _ev("stage", stage="hits", label=f"Checking which of the best {n_hit} make the model say your words")
         (hit0, deg0), = hits([[]])
-        yield _ev("hits_baseline", hit=hit0)
         for k, c in enumerate(cands[:n_hit]):
             sets = [[Push(c["layer"], c["neuron"], c["sign"] * d)] for d in doses]
             scores, js, rates = evaluate(sets)
             bi = int(np.argmax(scores))
-            c.update(score=scores[bi], hit=rates[bi], dose=c["sign"] * doses[bi], dj=float(js[bi] - j0))
+            c.update(score=scores[bi], dose=c["sign"] * doses[bi], dj=float(js[bi] - j0))
             yield _ev("progress", stage="hits", done=k + 1, total=n_hit)
         for c in cands[n_hit:]:
             c["score"] = -1e9  # not generated with; never outranks a measured candidate (finite: it goes out as JSON)
         cands.sort(key=lambda c: -c["score"])
-    yield _ev("verified", candidates=[_cand(c) for c in cands], hit0=hit0)
+    yield _ev("verified", candidates=[_cand(c) for c in cands])
 
     # ---- greedy combination
     yield _ev("stage", stage="combine", label="Combining neurons that work well together")
     floor = (hit0 - deg0) if pattern is not None else 0.002
     pool = [c for c in cands if c["score"] > floor][:pool_size if pattern is None else min(6, pool_size)]
     if not pool:
-        yield _ev("result", recipe=[], j0=j0, j=j0, j_test0=j0_test, j_test=j0_test, hit0=hit0,
+        yield _ev("result", recipe=[],
                   note="No neuron moved the model toward your examples. Try other wording or more test questions.")
         return
     recipe = [dict(pool[0])]
-    best_score, best_j = pool[0]["score"], j0 + pool[0]["dj"]
-    yield _ev("recipe", recipe=_public(recipe), j=best_j, hit=pool[0].get("hit"))
+    best_score = pool[0]["score"]
+    yield _ev("recipe", recipe=_public(recipe))
     remaining = pool[1:]
     while len(recipe) < max_neurons and remaining:
         # stacked pushes add up, so each addition goes in a little gentler; the strength stage retunes the whole
         cur = [Push(c["layer"], c["neuron"], c["dose"]) for c in recipe]
         sets = [cur + [Push(c["layer"], c["neuron"], c["dose"] * 0.75)] for c in remaining]
-        scores, js, rates = evaluate(sets)
+        scores, _, _ = evaluate(sets)
         bi = int(np.argmax(scores))
         if scores[bi] <= best_score + 0.004:
             break
         c = remaining[bi]
         recipe.append(dict(c, dose=c["dose"] * 0.75))
         remaining = [r for r in remaining if r is not c]
-        best_score, best_j = scores[bi], js[bi]
-        yield _ev("recipe", recipe=_public(recipe), j=float(best_j), hit=rates[bi])
+        best_score = scores[bi]
+        yield _ev("recipe", recipe=_public(recipe))
 
     # ---- overall strength
     yield _ev("stage", stage="scale", label="Finding the best overall strength")
     scales = [0.5, 0.75, 1.0, 1.25, 1.5] + ([2.0] if pattern is not None else [])
-    scores, js, rates = evaluate([[Push(c["layer"], c["neuron"], c["dose"] * k) for c in recipe] for k in scales])
+    scores, _, _ = evaluate([[Push(c["layer"], c["neuron"], c["dose"] * k) for c in recipe] for k in scales])
     bi = int(np.argmax(scores))
     for c in recipe:
         c["dose"] *= scales[bi]
     final = [Push(c["layer"], c["neuron"], c["dose"]) for c in recipe]
-    j_final = float(objective([final], tr_t, tr_b)[0])
-    j_test = float(objective([final], te_t, te_b)[0])
-    f_final = float(eng.reference_nll([final], cancel)[0])
-    hit_train = rates[bi]
-    yield _ev("recipe", recipe=_public(recipe), j=j_final, scale=scales[bi], hit=hit_train)
+    yield _ev("recipe", recipe=_public(recipe))
 
     # ---- proof on held-out prompts, no system prompt anywhere
     yield _ev("stage", stage="proof", label="Trying the recipe on questions it hasn't seen")
@@ -353,26 +341,23 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
                   delta=delta)
     extra = {}
     if pattern is not None:
-        extra = dict(hit0=hit0, hit=hit_train,
-                     hit_test0=sum(clean_hit(pattern, t) for t in texts[0::2]) / len(test),
+        extra = dict(hit_test0=sum(clean_hit(pattern, t) for t in texts[0::2]) / len(test),
                      hit_test=sum(clean_hit(pattern, t) for t in texts[1::2]) / len(test))
-    yield _ev("result", recipe=_public(recipe), j0=j0, j=j_final, j_test0=j0_test, j_test=j_test,
-              ref_nll0=nll0, ref_nll=f_final, train=len(train), test=len(test), **extra)
+    yield _ev("result", recipe=_public(recipe), **extra)
 
 
 def _cand(c):
     """A candidate as the plan shows it: estimate first, tested dose and effect once measured."""
-    out = {k: c[k] for k in ("layer", "neuron", "sign", "est", "source", "lens") if k in c}
-    for k in ("dose", "dj", "dfluency", "hit"):
+    out = {k: c[k] for k in ("layer", "neuron", "sign", "est", "lens") if k in c}
+    for k in ("dose", "dj", "dfluency"):
         if c.get(k) is not None:
             out[k] = round(float(c[k]), 4)
     return out
 
 
 def _public(recipe):
-    return [{"layer": c["layer"], "neuron": c["neuron"], "dose": round(float(c["dose"]), 3), "mode": "add",
-             "dj": round(float(c.get("dj", 0)), 4), "dfluency": round(float(c.get("dfluency", 0)), 4), "hit": c.get("hit"),
-             "lens": c.get("lens", [])} for c in recipe]
+    return [{"layer": c["layer"], "neuron": c["neuron"], "dose": round(float(c["dose"]), 3),
+             "dfluency": round(float(c.get("dfluency", 0)), 4), "lens": c.get("lens", [])} for c in recipe]
 
 
 def fix_instruction(behavior, feedback):
@@ -490,16 +475,16 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
     def edits_for(r):
         out = []
         for c in r:
-            for k, what in ((0.0, "off"), (0.5, "down"), (1.6, "up")):
-                out.append(("scale", (c["layer"], c["neuron"]), k, what))
-        out += [("all", None, 0.4, "much weaker"), ("all", None, 0.7, "weaker"), ("all", None, 1.35, "stronger")]
+            for k in (0.0, 0.5, 1.6):
+                out.append(("scale", (c["layer"], c["neuron"]), k))
+        out += [("all", None, k) for k in (0.4, 0.7, 1.35)]
         for c in new:
             if (c["layer"], c["neuron"]) not in {(x["layer"], x["neuron"]) for x in r}:
-                out += [("add", c, c["sign"] * d, "added") for d in (0.3, 0.6)]
+                out += [("add", c, c["sign"] * d) for d in (0.3, 0.6)]
         return out
 
     def apply(r, e):
-        kind, ref, k, _ = e
+        kind, ref, k = e
         r = [dict(c) for c in r]
         if kind == "all":
             for c in r:
@@ -513,8 +498,8 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
 
     yield _ev("stage", stage="test", label="Testing changes to the neurons")
     loop0 = loops([recipe])[0]
-    s0 = best = scores([recipe])[0]
-    cur, log = recipe, []
+    best = scores([recipe])[0]
+    cur, improved = recipe, False
     for rnd in range(rounds):
         es = edits_for(cur)
         on = {(c["layer"], c["neuron"]) for c in cur}
@@ -539,15 +524,8 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         if sc[bi] <= best + 0.004 and lp[bi] >= loop0 - 0.05:
             break
         best, cur, loop0 = sc[bi], apply(cur, es[bi]), lp[bi]
-        log.append(es[bi])
+        improved = True
         yield _ev("recipe", recipe=_public(cur))
 
-    changes = []
-    for kind, ref, k, what in log:
-        if kind == "all":
-            changes.append({"what": what})
-        else:
-            l, n = (ref["layer"], ref["neuron"]) if kind == "add" else ref
-            changes.append({"what": what, "layer": l, "neuron": n})
-    yield _ev("result", recipe=_public(cur), changes=changes, improved=bool(log), j0=s0, j=best,
-              note=None if log else "Nothing it tried fixed that. Try describing the problem another way.")
+    yield _ev("result", recipe=_public(cur), improved=improved,
+              note=None if improved else "Nothing it tried fixed that. Try describing the problem another way.")

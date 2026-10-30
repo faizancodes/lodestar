@@ -183,28 +183,17 @@ class Library:
         self._put(entry, unit, mag, self._neutral(cancel=cancel))
         return entry
 
-    def update(self, did, **kw):
-        idx = self.index()
-        e = next((e for e in idx if e["id"] == did), None)
-        if e is None:
-            raise KeyError(did)
-        e.update({k: v for k, v in kw.items() if v is not None})
-        self._write_index(idx)
-        if did in self.eng.dirs and kw.get("band"):
-            self.eng.dirs[did]["band"] = list(kw["band"])
-        return e
-
     def delete(self, did):
         self._write_index([e for e in self.index() if e["id"] != did])
         (self.dir / f"{did}.safetensors").unlink(missing_ok=True)
         self.eng.dirs.pop(did, None)
 
-    def import_npz(self, path, names=None, cancel=None):
+    def import_npz(self, path, cancel=None):
         """Directions saved by the research harness (research/political_steering/out/directions.npz): `name` [L, H]
         and `name_mag` [L] for each concept. Returns the new index entries."""
         D = np.load(path)
         L = len(self.eng.layers)
-        names = names or [k for k in D.files if not k.endswith("_mag") and f"{k}_mag" in D.files]
+        names = [k for k in D.files if not k.endswith("_mag") and f"{k}_mag" in D.files]
         taken = {e["id"] for e in self.index()}
         out = []
         for n in names:
@@ -306,10 +295,10 @@ def suggest_band(auc, dprime):
 
 
 # ------------------------------------------------------------------ extraction
-def extract(eng, lib, spec, cancel=None, try_prompt=None, max_new=110):
-    """Find, check and save a direction. spec: {name, kind: "persona"|"topic", pos: [...], neg: [...],
-    questions?: [...]}; persona poles are system prompts (one per paraphrase), topic poles are prompts.
-    Yields SSE-style events and ends with `result`: {entry, metrics, tries}."""
+def extract(eng, lib, spec, cancel=None, max_new=110):
+    """Find, check and save a direction. spec: {name, kind: "persona"|"topic", pos: [...], neg: [...]}; persona
+    poles are system prompts (one per paraphrase), read on DEFAULT_QUESTIONS; topic poles are prompts. Yields
+    SSE-style events and ends with `result`: {entry, band, prompt, auc, cos_split}."""
     name = (spec.get("name") or "").strip() or "Direction"
     kind = spec.get("kind", "persona")
     pos = [s.strip() for s in spec.get("pos") or [] if s and s.strip()]
@@ -318,7 +307,7 @@ def extract(eng, lib, spec, cancel=None, try_prompt=None, max_new=110):
     P = eng.prompt_end_len()
 
     if kind == "persona":
-        qs = [q.strip() for q in spec.get("questions") or DEFAULT_QUESTIONS if q and q.strip()]
+        qs = DEFAULT_QUESTIONS
         if not pos or not neg:
             raise ValueError("Write at least one system prompt for each side.")
         if len(qs) < 8:
@@ -332,7 +321,7 @@ def extract(eng, lib, spec, cancel=None, try_prompt=None, max_new=110):
         sets = {"pos": [conv(s, q) for s in tr_pos for q in q_tr], "neg": [conv(s, q) for s in tr_neg for q in q_tr],
                 "pos_ho": [conv(s, q) for s in ho_pos for q in q_ho], "neg_ho": [conv(s, q) for s in ho_neg for q in q_ho]}
         half_of = lambda i: (i % len(q_tr)) < len(q_tr) // 2  # split halves by question, across paraphrases
-        try_q = try_prompt or q_ho[0]
+        try_q = q_ho[0]
     else:
         if len(pos) < 6 or len(neg) < 6:
             raise ValueError("Give at least six prompts on each side.")
@@ -341,7 +330,7 @@ def extract(eng, lib, spec, cancel=None, try_prompt=None, max_new=110):
         sets = {"pos": [conv(q) for q in pos[:-hp]], "neg": [conv(q) for q in neg[:-hn]],
                 "pos_ho": [conv(q) for q in pos[-hp:]], "neg_ho": [conv(q) for q in neg[-hn:]]}
         half_of = lambda i: i < len(pos[:-hp]) // 2
-        try_q = try_prompt or neg[-1]
+        try_q = neg[-1]
 
     total = sum(len(v) for v in sets.values())
     done = 0
@@ -382,16 +371,12 @@ def extract(eng, lib, spec, cancel=None, try_prompt=None, max_new=110):
     auc = np.array([_auc(pp[:, l], pn[:, l]) for l in range(L)])
     dprime = (pp.mean(0) - pn.mean(0)) / np.sqrt(0.5 * (pp.var(0) + pn.var(0)) + 1e-9)
     band = suggest_band(auc, dprime)
-    metrics = {"cos_split": cos, "auc": auc, "dprime": dprime, "mag": mag}
-    yield _ev("metrics", band=band, **metrics)
 
     yield _ev("stage", stage="save", label="Saving")
     taken = {e["id"] for e in lib.index()}
     entry = {"id": make_id(name, taken), "name": name, "kind": kind, "pos": pos, "neg": neg, "band": band,
              "metrics": {"auc": [round(float(x), 3) for x in auc], "cos_split": [round(float(x), 3) for x in cos],
                          "dprime": [round(float(x), 2) for x in dprime]}}
-    if kind == "persona":
-        entry["questions"] = spec.get("questions") or None
     entry = lib.save(entry, unit, mag, cancel)
 
     # one held-out question pushed both ways and left alone, in one batch
@@ -400,11 +385,8 @@ def extract(eng, lib, spec, cancel=None, try_prompt=None, max_new=110):
 
     ids = eng.chat_ids(try_q)
     rows = [(ids, [Push(None, None, k, "dir", entry["id"], tuple(band))] if k else []) for k in TRY_DOSES]
-    texts = [""] * len(rows)
     for r, delta in eng.generate(rows, max_new=max_new, cancel=cancel):
         if r is None:
             break
-        texts[r] += delta
         yield _ev("trydelta", index=r, dose=TRY_DOSES[r], delta=delta)
-    yield _ev("result", entry=entry, band=band, prompt=try_q,
-              tries=[{"dose": k, "text": t.strip()} for k, t in zip(TRY_DOSES, texts)], **metrics)
+    yield _ev("result", entry=entry, band=band, prompt=try_q, auc=auc, cos_split=cos)

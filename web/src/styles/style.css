@@ -88,8 +88,6 @@ body:not([data-tab="steer"]) .saved { display: none; }
 }
 .tab.on .tab-count { background: var(--night); color: var(--on-night); }
 .side-h { display: flex; align-items: baseline; justify-content: space-between; padding: 0 6px 6px; }
-.side-link { border: 0; background: none; color: var(--on-night); font-size: 12px; font-weight: 700; cursor: pointer; opacity: 0.8; }
-.side-link:hover { opacity: 1; text-decoration: underline; }
 .saved-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .saved-item {
   display: flex;
@@ -401,8 +399,6 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .found-row .dir { grid-row: 1 / span 2; grid-column: 2; font-family: var(--mono); font-size: 11.5px; color: var(--text-2); }
 .found-row .btn { grid-row: 1 / span 2; grid-column: 3; }
 .found-row.in .btn { opacity: 0.4; pointer-events: none; }
-.result-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 20px; }
-.result-h b { font-size: 13.5px; }
 
 /* ------------------------------------------------------------ try it */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
@@ -562,12 +558,6 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .plan-now b { color: var(--accent); }
 
 /* ------------------------------------------------------------ abliterate */
-.abl-lede { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
-.abl-lede a { color: var(--accent); }
-.abl-top { display: flex; align-items: center; gap: 12px; }
-.abl-note { font-size: 12.5px; font-weight: 600; color: var(--muted); }
-.abl-note b { color: var(--accent); }
-.abl-note .abl-dim { font-weight: 400; color: var(--muted); }
 .abl-steps { grid-template-columns: repeat(4, 1fr); }
 .abl-scene { display: flex; justify-content: center; margin: 8px 0 18px; }
 .abl-scene[hidden] { display: none; }
@@ -871,7 +861,7 @@ h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weig
 .panel-h h3, .plan-h b, .saved-model b { font-size: 15px; }
 
 /* reading: body text, explanations and everything the model writes are in Geist, set on body */
-.page-h p, .abl-lede, .status-line, .start-status, .empty, .plan-now { font-size: 14px; }
+.page-h p, .status-line, .start-status, .empty, .plan-now { font-size: 14px; }
 .field { font-size: 13.5px; font-weight: 500; }
 .field .opt, label.mini, label.check { font-size: 13px; }
 

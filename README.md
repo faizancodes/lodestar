@@ -76,8 +76,7 @@ norm, so dose 1.0 moves the residual stream about one typical residual's length 
    with the extra loss on a neutral passage. First-order estimates often fail at real doses, so this step decides.
 5. **Combination.** Verified neurons are stacked greedily, each kept only if it adds to J, then the recipe's overall
    strength is tuned.
-6. **Proof.** The recipe runs on the held-out prompts with no system prompt, beside the untouched model, and the
-   held-out score is reported.
+6. **Proof.** The recipe runs on the held-out prompts with no system prompt, beside the untouched model.
 
 What to expect: small models spread most personas over many neurons, so a 0.6B recipe shifts tone and likelihood more
 than it produces a full character. The neuron-zoo results used a 4B model. Raise `max neurons`, loosen the fluency

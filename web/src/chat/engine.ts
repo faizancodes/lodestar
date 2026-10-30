@@ -15,7 +15,7 @@ const set = useChat.setState;
 const toast = (msg: string, err = false) => app().toastMsg(msg, err);
 
 export const STARTERS = ["Explain how a rainbow forms", "Write a haiku about Mondays", "Give me three dinner ideas", "What would you do with a free afternoon?"];
-export const DOTS = `<span class="dots"><i></i><i></i><i></i></span>`;
+const DOTS = `<span class="dots"><i></i><i></i><i></i></span>`;
 export const replyHtml = (m: Msg) => (m.content ? md(cleanReply(m.content)) : DOTS);
 
 const scroller = () => document.getElementById("chat-scroll")!;
