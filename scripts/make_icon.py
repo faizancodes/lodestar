@@ -1,7 +1,8 @@
-"""Draws Lodestar's app icon and saves it as .icns: a long exposure of the night sky. Star trails, drawn in the app's
-ASCII marks, wheel around the lodestar: a crisp four-point star (its north ray longest) with a soft periwinkle glow,
-on a deep blue-black tile cut to macOS's rounded-square shape. Small sizes get their own simpler drawing (the star and a trail or two) so
-they stay crisp in the menu bar and Finder rather than turning into a grey smudge.
+"""Draws Lodestar's app icon and saves it as .icns: the app's mark, as the sidebar shows it. A compass star drawn in
+the app's ASCII marks, its north ray breaking out through a dotted ring that holds ticks at the other three points,
+glowing softly on a deep blue-black tile cut to macOS's rounded-square shape. The star is web/src/art/mark.ts's
+compassStar, on the same 15-cell grid the sidebar draws it on, so it reads as one bold mark from the Dock down to the
+menu bar.
 
   uv run --with pillow python scripts/make_icon.py out.icns
   uv run --with pillow python scripts/make_icon.py preview.png 512     # one size, as a png
@@ -60,6 +61,30 @@ def marks(draw, grid, n, cell, ox, oy):
                 draw.rectangle([cx - h, cy - h, cx + h, cy + h], fill=INK + (255,))
 
 
+SPAN = 31  # the mark is designed on a 31×31 grid, centre at 15 (web/src/art/mark.ts)
+
+
+def _ray(along, across, length, w):
+    return 0 if along < 0 or along > length else math.exp(-abs(across) / w) * (1 - along / length) ** 0.8
+
+
+def _star(x, y, up, side, down, diag):
+    r = math.hypot(x, y)
+    return max(
+        1 if r < 1.5 else 0, 0.55 * math.exp(-r / 2.4),
+        _ray(-y, x, up, 0.55), _ray(y, x, down, 0.55), _ray(x, y, side, 0.55), _ray(-x, y, side, 0.55),
+        *(0.72 * _ray((a * x + b * y) / math.sqrt(2), (a * x - b * y) / math.sqrt(2), diag, 0.45)
+          for a, b in ((1, 1), (1, -1), (-1, 1), (-1, -1))))
+
+
+def compass_star(x, y):
+    """Brightness 0..1 of the mark at (x, y), both in -15..15: the same function as compassStar in mark.ts."""
+    r = math.hypot(x, y)
+    ring = 0.24 if abs(r - 12.5) < 0.5 and round(math.atan2(y, x) * 12) % 2 == 0 else 0
+    ticks = 0.85 if abs(r - 12.5) < 1.2 and (abs(y) < 0.6 or (abs(x) < 0.6 and y > 0)) else 0  # none at north
+    return max(_star(x, y, 15.5, 8, 8, 6.5), ring, ticks)
+
+
 def draw(px):
     ss = 2 if px >= 256 else 4
     s = px * ss
@@ -74,80 +99,46 @@ def draw(px):
         k = y / s
         sd.line([(0, y), (s, y)], fill=tuple(round(TOP[c] + (BOTTOM[c] - TOP[c]) * k) for c in range(3)))
 
-    cx, cy = s / 2, s * 0.47
+    cx, cy = s / 2, s / 2
     halo = Image.new("L", (s, s), 0)
-    ImageDraw.Draw(halo).ellipse([cx - tile * 0.42, cy - tile * 0.42, cx + tile * 0.42, cy + tile * 0.42], fill=255)
+    ImageDraw.Draw(halo).ellipse([cx - tile * 0.4, cy - tile * 0.4, cx + tile * 0.4, cy + tile * 0.4], fill=255)
     halo = halo.filter(ImageFilter.GaussianBlur(tile * 0.18))
     sky = Image.composite(Image.new("RGB", (s, s), CORE), sky, halo.point(lambda v: v * 0.55))
 
-    # the long exposure, in marks: trails around the lodestar, then the star itself
-    n = 15 if small else 37
-    cell = tile / n
+    # the mark, in cells: the 31-unit design across most of the tile, each cell the brightest point it covers
+    nd = 15  # cells across the design, as the sidebar's mark
+    design = tile * 0.8
+    cell = design / nd
+    n = math.ceil(tile / cell) | 1  # cells across the tile, odd so one sits on the centre
+    ox, oy = cx - n * cell / 2, cy - n * cell / 2
+    k = SPAN / nd
     grid = [[0.0] * n for _ in range(n)]
-    c0, r0 = (n - 1) / 2, (n - 1) / 2 - n * 0.03  # the lodestar sits a touch above centre
-
-    def put(i, j, b):
-        i, j = round(i), round(j)
-        if 0 <= i < n and 0 <= j < n and b > grid[j][i]:
+    for j in range(n):
+        for i in range(n):
+            b = 0.0
+            for v in range(3):
+                for u in range(3):
+                    b = max(b, compass_star((i - n / 2 + (u + 0.5) / 3) * k, (j - n / 2 + (v + 0.5) / 3) * k))
             grid[j][i] = b
 
-    rings = [4.6, 6.4] if small else [6, 8, 10, 12, 14, 16]
-    for k, r in enumerate(rings):
-        for seg in range(1 if small else 2):
-            head = 0.3 + k * 1.05 + seg * math.pi  # heads spread evenly around, every trail turning the same way
-            length = 1.5 if small else 1.25 + hash01(k, seg, 2) * 0.7
-            peak = 0.5 if small else 0.34 + hash01(k, seg, 3) * 0.24  # dots and pluses: the star leads
-
-            u = 0.0
-            while u <= length:
-                put(c0 + math.cos(head - u) * r, r0 + math.sin(head - u) * r, peak * (1 - u / length) ** 1.3)
-                u += 0.5 / r
+    if not small:  # a few faint stars in the sky beyond the ring
+        for q in range(40):
+            i, j = int(hash01(q, 1) * n), int(hash01(q, 2) * n)
+            if math.hypot(i - n / 2, j - n / 2) * k > 15.5 and grid[j][i] == 0:
+                grid[j][i] = 0.08 + 0.14 * hash01(q, 3)
 
     art = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    marks(ImageDraw.Draw(art), grid, n, cell, inset, inset)
+    marks(ImageDraw.Draw(art), grid, n, cell, ox, oy)
 
-    # the lodestar: a soft glow, then a crisp four-point star with fine diagonal glints
-    gx, gy = inset + (c0 + 0.5) * cell, inset + (r0 + 0.5) * cell
-    R = tile * (0.3 if small else 0.27)  # north ray length
-
+    # a soft glow behind the centre
     glow = Image.new("RGBA", (s, s), INK + (0,))
-    gr = R * 0.55
-    ImageDraw.Draw(glow).ellipse([gx - gr, gy - gr, gx + gr, gy + gr], fill=INK + (190,))
-    glow = glow.filter(ImageFilter.GaussianBlur(gr * 0.7))
-
-    sparkle = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    sp = ImageDraw.Draw(sparkle)
-    tips = [(0, -R), (R * 0.62, 0), (0, R * 0.7), (-R * 0.62, 0)]  # north longest
-    waist = R * 0.075  # how far the concave sides pull toward the centre
-
-    def quad(a, b, ctrl, steps=40):
-        return [((1 - t) ** 2 * a[0] + 2 * (1 - t) * t * ctrl[0] + t * t * b[0],
-                 (1 - t) ** 2 * a[1] + 2 * (1 - t) * t * ctrl[1] + t * t * b[1]) for t in (i / steps for i in range(steps + 1))]
-
-    pts = []
-    for k in range(4):
-        a, b = tips[k], tips[(k + 1) % 4]
-        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-        m = math.hypot(*mid) or 1
-        pts += quad(a, b, (mid[0] / m * waist, mid[1] / m * waist))
-
-    if not small:
-        for a in (math.pi / 4, 3 * math.pi / 4, 5 * math.pi / 4, 7 * math.pi / 4):  # glints between the rays
-            L = R * 0.42
-            sp.line([gx, gy, gx + math.cos(a) * L, gy + math.sin(a) * L], fill=INK + (190,), width=max(1, round(s / 400)))
-
-    sp.polygon([(gx + x, gy + y) for x, y in pts], fill=(236, 240, 255, 255))
-
-    core = Image.new("RGBA", (s, s), (255, 255, 255, 0))
-    cr = R * 0.1
-    ImageDraw.Draw(core).ellipse([gx - cr, gy - cr, gx + cr, gy + cr], fill=(255, 255, 255, 255))
-    core = core.filter(ImageFilter.GaussianBlur(cr * 0.6))
+    gr = design * 0.14
+    ImageDraw.Draw(glow).ellipse([cx - gr, cy - gr, cx + gr, cy + gr], fill=INK + (120,))
+    glow = glow.filter(ImageFilter.GaussianBlur(gr * 0.9))
 
     out = sky.convert("RGBA")
-    out.alpha_composite(art)
     out.alpha_composite(glow)
-    out.alpha_composite(sparkle)
-    out.alpha_composite(core)
+    out.alpha_composite(art)
 
     # a fine highlight along the tile's top edge, as on a lit glass rim
     mask = squircle(s, inset)
