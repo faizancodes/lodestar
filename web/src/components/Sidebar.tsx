@@ -23,10 +23,12 @@ export const ICONS: Record<Exclude<Tab, "home">, JSX.Element> = {
 };
 
 function TabButton({ tab, label, children }: { tab: Exclude<Tab, "home">; label: string; children?: JSX.Element }) {
-  const on = useApp((s) => s.tab === tab);
+  const loaded = useApp((s) => !!s.info?.loaded);
+  const on = useApp((s) => loaded && s.tab === tab), want = useApp((s) => !loaded && s.want === tab);
+  const cls = on ? "tab on" : want ? "tab idle want" : loaded ? "tab" : "tab idle";
 
   return (
-    <button className={on ? "tab on" : "tab"} role="tab" data-tab={tab} aria-selected={on} onClick={() => setTab(tab)}>
+    <button className={cls} role="tab" data-tab={tab} aria-selected={on} onClick={() => setTab(tab)}>
       {ICONS[tab]}
       <span>{label}</span>
       {children}

@@ -36,6 +36,8 @@ type App = {
   menu: Menu;
   memory: Memory | null;
   fitWarn: { id: string; fit: Fit } | null; // a model that may not fit, waiting on Load anyway or Cancel
+  want: Tab | null; // a tab picked before any model was loaded: where the model opens once it's ready
+  nudge: number; // counts those picks, so the start screen can point at the models again each time
 
   setTab: (t: Tab) => void;
   setBusy: (b: boolean) => void;
@@ -61,6 +63,8 @@ export const useApp = create<App>((set) => ({
   menu: { open: false, left: 0, bottom: 0, maxHeight: 0 },
   memory: null,
   fitWarn: null,
+  want: null,
+  nudge: 0,
 
   setTab: (tab) => {
     save("tab", tab);
