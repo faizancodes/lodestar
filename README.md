@@ -1,4 +1,4 @@
-# Auto Interp
+# Lodestar
 
 A local Mac app for mechanistic interpretability on local LLMs. Run a prompt and watch which neurons and layers
 light up. Push single neurons up or down, stack them into recipes, or describe a behaviour and let the app search for
@@ -12,8 +12,8 @@ whose hook placement and dose units this app reuses.
 ## Run it
 
     uv sync
-    ./scripts/build_app.sh          # makes dist/Auto Interp.app; drag it to /Applications or the Dock
-    open "dist/Auto Interp.app"
+    ./scripts/build_app.sh          # makes dist/Lodestar.app; drag it to /Applications or the Dock
+    open "dist/Lodestar.app"
 
 or without the bundle:
 
@@ -22,7 +22,7 @@ or without the bundle:
 
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
 The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise
-gradients; bigger ones in bfloat16. Logs go to `~/Library/Logs/AutoInterp.log`, recipes to
+gradients; bigger ones in bfloat16. Logs go to `~/Library/Logs/Lodestar.log`, recipes to
 `~/Library/Application Support/Auto Interp/recipes.json`.
 
 ## What a neuron is here

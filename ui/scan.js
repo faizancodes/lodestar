@@ -1,4 +1,6 @@
-// "Reading every neuron" scene in the same squares style as the loading scene: a small network of layers,
+import { drawMarks } from "./glyphs.js";
+
+// "Reading every neuron" scene in the same ASCII-mark style as the loading scene: a small network of layers,
 // a scan line sweeping through it, neurons lighting up by how strongly they fire, and signals passing
 // along the strongest connections to the next layer just as the scan reaches it.
 const COLS = 110, ROWS = 86, CELL = 4.2;
@@ -85,14 +87,7 @@ function draw(ctx, t) {
       for (const [x, y] of [[x0 + d, y0], [x0, y0 + d], [x1 - d, y0], [x1, y0 + d], [x0 + d, y1], [x0, y1 - d], [x1 - d, y1], [x1, y1 - d]]) put(x, y, 0.7);
   }
 
-  ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
-  for (let y = 0; y < ROWS; y++)
-    for (let x = 0; x < COLS; x++) {
-      const b = Math.min(1, grid[y * COLS + x]);
-      if (b < 0.05) continue;
-      const s = CELL * 0.9 * Math.sqrt(b);
-      ctx.fillRect(x * CELL + (CELL - s) / 2, y * CELL + (CELL - s) / 2, s, s);
-    }
+  drawMarks(ctx, grid, COLS, ROWS, CELL);
 }
 
 /** Runs until the canvas leaves the page. */
