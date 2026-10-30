@@ -116,6 +116,9 @@ function Log() {
   );
 }
 
+// how far along its range a slider is, for its track to light up to there
+const fill = (v: number, lo: number, hi: number) => ({ "--fill": `${((v - lo) / (hi - lo)) * 100}%` }) as React.CSSProperties;
+
 function Settings() {
   const system = useChat((s) => s.system), temp = useChat((s) => s.temp), max = useChat((s) => s.max), set = useChat((s) => s.set);
   const box = useRef<HTMLDetailsElement>(null);
@@ -135,10 +138,10 @@ function Settings() {
           <textarea id="chat-system" rows={3} spellCheck="false" placeholder="Optional" value={system} onChange={(e) => set({ system: e.target.value })} />
         </label>
         <label className="field">Temperature
-          <div className="slider-row"><input id="chat-temp" type="range" min="0" max="1.5" step="0.05" value={temp} onChange={(e) => set({ temp: e.target.value })} /><output id="chat-temp-v">{(+temp).toFixed(2)}</output></div>
+          <div className="slider-row"><input id="chat-temp" type="range" min="0" max="1.5" step="0.05" value={temp} style={fill(+temp, 0, 1.5)} onChange={(e) => set({ temp: e.target.value })} /><output id="chat-temp-v">{(+temp).toFixed(2)}</output></div>
         </label>
         <label className="field">Reply length
-          <div className="slider-row"><input id="chat-max" type="range" min="64" max="1024" step="32" value={max} onChange={(e) => set({ max: e.target.value })} /><output id="chat-max-v">{+max}</output></div>
+          <div className="slider-row"><input id="chat-max" type="range" min="64" max="1024" step="32" value={max} style={fill(+max, 64, 1024)} onChange={(e) => set({ max: e.target.value })} /><output id="chat-max-v">{+max}</output></div>
         </label>
       </div>
     </details>
