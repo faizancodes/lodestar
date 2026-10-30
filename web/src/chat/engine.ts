@@ -1,13 +1,15 @@
 // Chat: talk to the loaded model, with the recipe that's on and the erased refusal direction switched on or off.
 import { flushSync } from "react-dom";
+import { setAblActive } from "../abl/engine";
 import { createDecoder } from "../art/decode";
 import { api } from "../lib/api";
 import { cleanReply, pushes } from "../lib/format";
 import { md } from "../lib/markdown";
 import { save } from "../lib/storage";
 import { stream } from "../lib/stream";
-import { still } from "../shell/engine";
+import { setTab, still } from "../shell/engine";
 import { ablActive, useApp } from "../store/app";
+import type { ChatSummary } from "../lib/types";
 import { touchChat, useChat, type Col, type ColKey, type Msg } from "../store/chat";
 
 const app = useApp.getState;
@@ -25,6 +27,29 @@ export const replyHtml = (m: { content: string }, done = false) => (m.content ? 
 const scroller = () => document.getElementById("chat-scroll")!;
 const input = () => document.getElementById("chat-input") as HTMLTextAreaElement | null;
 const lastMds = () => [...document.querySelectorAll<HTMLElement>("#chat-log .msg.bot:last-child .md")];
+const lastRates = () => [...document.querySelectorAll<HTMLElement>("#chat-log .msg.bot:last-child .msg-rate")];
+
+// ------------------------------------------------------------------ speed
+// When each streaming part got its first and latest words. Kept off the messages, which are saved as they are.
+const timing = new WeakMap<object, { t0: number; t1: number }>();
+const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
+
+/** Words a second: measured from the first word, so the wait before it (reading the prompt) doesn't count. */
+export function rateOf(part: { content: string; wps?: number }) {
+  if (part.wps) return part.wps;
+
+  const t = timing.get(part);
+  if (!t || t.t1 - t.t0 < 500) return null;
+  return (words(part.content) - 1) / ((t.t1 - t.t0) / 1000);
+}
+
+export const rateText = (r: number | null) => (r == null ? "" : `${r.toFixed(1)} words/s`);
+
+function arrived(part: object) {
+  const now = performance.now(), t = timing.get(part);
+  if (t) t.t1 = now;
+  else timing.set(part, { t0: now, t1: now });
+}
 
 // keep following the reply unless the user has scrolled up to read
 const nearBottom = () => { const s = scroller(); return s.scrollHeight - s.scrollTop - s.clientHeight < 80; };
@@ -40,7 +65,7 @@ export const jumpDown = () => ((follow = true), toBottom(true));
 let decoders: ReturnType<typeof createDecoder>[] = []; // the replies being written decode in, mark by mark
 
 // the parts of a reply that stream: the message itself, or its columns side by side
-const parts = (m: Msg): { content: string }[] => m.cols ?? [m];
+const parts = (m: Msg): { content: string; wps?: number }[] => m.cols ?? [m];
 
 function updateLastBot() {
   const m = get().messages[get().messages.length - 1];
@@ -51,6 +76,11 @@ function updateLastBot() {
 
     el.innerHTML = replyHtml(part);
     decoders[i]?.update(el);
+  });
+
+  lastRates().forEach((el, i) => {
+    const part = parts(m)[i];
+    if (part) el.textContent = rateText(rateOf(part));
   });
 
   if (follow) toBottom(false);
@@ -113,15 +143,25 @@ async function reply() {
   let raf = 0;
   const ok = await stream("/api/chat", body, (ev) => {
     if (ev.type !== "delta") return;
-    parts(m)[many ? (ev.row as number) : 0].content += ev.delta as string;
+    const part = parts(m)[many ? (ev.row as number) : 0];
+    part.content += ev.delta as string;
+    arrived(part);
     if (!raf) raf = requestAnimationFrame(() => ((raf = 0), updateLastBot()));
   });
 
   cancelAnimationFrame(raf);
   set({ streaming: false });
-  if (parts(m).every((p) => !p.content.trim())) get().messages.pop();
+
+  for (const p of parts(m)) {
+    const r = rateOf(p);
+    if (r) p.wps = Math.round(r * 10) / 10;
+  }
+
+  const kept = parts(m).some((p) => p.content.trim());
+  if (!kept) get().messages.pop();
   else if (!ok) m.stopped = true;
   render();
+  if (kept) saveChat();
 
   lastMds().forEach((el, i) => decoders[i]?.update(el)); // let the last few letters finish decoding
   decoders = [];
@@ -158,9 +198,66 @@ export function growInput() {
 
 export function newChat() {
   if (get().streaming) api("/api/cancel", {});
-  set({ messages: [] });
+  set({ messages: [], id: null }); // the last one is already saved
   render();
   input()?.focus();
+}
+
+// ------------------------------------------------------------------ saved chats
+export async function refreshChats() {
+  try { set({ list: await api<ChatSummary[]>("/api/chats") }); } catch {}
+}
+
+/** Save the conversation, with the settings, switches and recipe it ran under. After every reply. */
+async function saveChat() {
+  const s = get(), a = app();
+  const id = s.id ?? `c${Date.now()}`;
+  if (!s.id) set({ id });
+
+  const first = s.messages.find((m) => m.role === "user")?.content ?? "";
+
+  try {
+    await api("/api/chats", {
+      id,
+      title: first.length > 60 ? first.slice(0, 57).trimEnd() + "…" : first,
+      model: a.info?.model ?? null,
+      messages: s.messages,
+      system: s.system, temp: s.temp, max: s.max, steer: s.steer, compare: s.compare,
+      abl: ablActive(a),
+      recipe: a.recipe.items.length ? a.recipe : null,
+    });
+    refreshChats();
+  } catch (e) {
+    toast("Couldn’t save the chat: " + (e as Error).message, true);
+  }
+}
+
+type Saved = {
+  id: string; messages: Msg[]; system: string; temp: string; max: string; steer: boolean; compare: boolean; abl: boolean;
+  recipe: ReturnType<typeof app>["recipe"] | null;
+};
+
+/** Reopen a saved conversation as it ran: its settings, its switches, and the recipe that was on. */
+export async function openChat(id: string) {
+  if (get().streaming) return toast("A reply is still coming. Stop it first.", true);
+
+  let c: Saved;
+  try { c = await api<Saved>(`/api/chats/${id}`); } catch (e) { return toast((e as Error).message, true); }
+
+  set({ id: c.id, messages: c.messages, system: c.system ?? "", temp: c.temp ?? "0.7", max: c.max ?? "512", steer: c.steer ?? true, compare: !!c.compare });
+  if (c.recipe) useApp.setState({ recipe: c.recipe });
+  if (app().abl?.ready && ablActive(app()) !== !!c.abl) setAblActive(!!c.abl);
+
+  setTab("chat");
+  render();
+  toBottom(false);
+}
+
+export async function deleteChat(id: string) {
+  try { await api(`/api/chats/${id}`, null, "DELETE"); } catch (e) { return toast((e as Error).message, true); }
+
+  if (get().id === id) set({ id: null });
+  refreshChats();
 }
 
 export const toggleSteer = () => set({ steer: !get().steer });

@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from . import abl as abl_mod
 from . import directions as dir_mod
 from . import discover
+from . import memory
 from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +30,7 @@ RECIPES = DATA / "recipes.json"
 ABL_FILE = DATA / "abl.json"  # saved refusal directions + state, keyed by model id
 LAST_MODEL = DATA / "last_model.txt"  # the model to open again at the next launch
 PROBES_FILE = DATA / "abl-probes.json"  # customised probe lists
+CHATS = DATA / "chats"  # one file per saved conversation
 HF_CACHE = Path(os.environ.get("HF_HUB_CACHE", Path.home() / ".cache" / "huggingface" / "hub"))
 
 PRESETS = [
@@ -283,6 +285,39 @@ async def load(req: Request):
     threading.Thread(target=work, daemon=True).start()
     time.sleep(0.05)
     return status()
+
+
+@app.post("/api/unload")
+def unload():
+    """Free the model's memory. It isn't opened again at the next launch either."""
+    cancel.set()
+
+    with eng.lock:  # waits for a stream that's running to see the cancel and stop
+        eng.unload()
+        eng.status = "idle"
+        eng.progress = None
+
+    LAST_MODEL.unlink(missing_ok=True)
+    return status()
+
+
+# ------------------------------------------------------------------ memory
+@app.get("/api/memory")
+def memory_now():
+    return memory.snapshot()
+
+
+@app.post("/api/memory/fit")
+async def memory_fit(req: Request):
+    """Whether a model fits beside what's already running, asked before loading it."""
+    mid = (await req.json())["model"].strip()
+
+    # loading a different model unloads this one first, so what it holds (all but the runtime's ~1 GB) comes free
+    loaded = 0
+    if eng.model is not None and eng.model_id != mid:
+        loaded = max((memory.footprint(os.getpid()) or 0) - memory.GB, 0)
+
+    return memory.fit(mid, HF_CACHE, loaded)
 
 
 @app.post("/api/cancel")
@@ -799,6 +834,60 @@ async def save_recipe(req: Request):
 @app.delete("/api/recipes/{rid}")
 def delete_recipe(rid: str):
     RECIPES.write_text(json.dumps([x for x in _recipes() if x["id"] != rid], indent=1))
+    return {"ok": True}
+
+
+# ------------------------------------------------------------------ chats
+def _chat_file(cid):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", cid):
+        raise HTTPException(400, "Bad chat id.")
+    return CHATS / f"{cid}.json"
+
+
+def _summary(c):
+    return {k: c.get(k) for k in ("id", "title", "model", "updated")} | {"turns": sum(m["role"] == "user" for m in c["messages"])}
+
+
+@app.get("/api/chats")
+def chats():
+    """Saved conversations, newest first."""
+    out = []
+    for f in CHATS.glob("*.json"):
+        try:
+            out.append(_summary(json.loads(f.read_text())))
+        except (ValueError, KeyError):
+            continue
+
+    return sorted(out, key=lambda c: -(c["updated"] or 0))
+
+
+@app.get("/api/chats/{cid}")
+def chat_get(cid: str):
+    f = _chat_file(cid)
+    if not f.exists():
+        raise HTTPException(404, "That chat is gone.")
+    return json.loads(f.read_text())
+
+
+@app.post("/api/chats")
+async def chat_save(req: Request):
+    """Save a conversation with the settings, switches and recipe it ran under; the same id overwrites it."""
+    c = await req.json()
+    f = _chat_file(c.get("id", ""))
+
+    c["updated"] = time.time()
+    c.setdefault("model", eng.model_id)
+
+    CHATS.mkdir(exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(json.dumps(c, ensure_ascii=False))
+    tmp.replace(f)  # a crash mid-write leaves the old copy, not half a file
+    return _summary(c)
+
+
+@app.delete("/api/chats/{cid}")
+def chat_delete(cid: str):
+    _chat_file(cid).unlink(missing_ok=True)
     return {"ok": True}
 
 

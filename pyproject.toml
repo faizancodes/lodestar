@@ -12,6 +12,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pywebview>=5.3",
+    "psutil",
 ]
 
 [tool.uv]

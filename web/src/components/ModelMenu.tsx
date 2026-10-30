@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loadModel, modelChoices, toggleModelMenu, type Choice } from "../shell/engine";
+import { loadModel, modelChoices, toggleModelMenu, unloadModel, type Choice } from "../shell/engine";
 import { useApp } from "../store/app";
 import { CopyAction } from "./CopyAction";
 
@@ -36,7 +36,9 @@ function MenuBody() {
       <button className={x.id === cur ? "mm-item on" : "mm-item"} onClick={() => x.id !== cur && loadModel(x.id)}>
         <b>{x.name}</b><span>{x.sub}</span><i className="tag">{x.id === cur ? "Loaded" : x.tag || ""}</i>
       </button>
-      {x.id === cur ? null : <CopyAction x={x} />}
+      {x.id === cur
+        ? <button className="mact" data-act="unload" title="Free the memory it holds" onClick={(e) => (e.stopPropagation(), unloadModel())}>Unload</button>
+        : <CopyAction x={x} />}
     </div>
   );
 
