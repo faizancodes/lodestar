@@ -1245,7 +1245,7 @@ function openFix(run, prompt, bad) {
   box = document.createElement("div");
   box.className = "fix";
   box.innerHTML = `<b class="fix-h">What’s wrong with it?</b>
-    <div class="ask"><input spellcheck="false" autocomplete="off" placeholder="e.g. It repeats itself. It should sound like a devout Muslim, not quote the Bible.">
+    <div class="ask"><input spellcheck="false" autocomplete="off" placeholder="e.g. It’s too formal, and it should keep its answers short">
       <button class="btn">Fix</button></div>
     <div class="chips">${FIX_CHIPS.map((c) => `<button class="chip">${c}</button>`).join("")}</div>
     <div class="plan-now status-line fix-now"></div>
