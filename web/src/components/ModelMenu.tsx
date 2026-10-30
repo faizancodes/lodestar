@@ -32,9 +32,9 @@ function MenuBody() {
   const c = modelChoices(models, copy);
 
   const item = (x: Choice) => (
-    <div className="mm-row" data-id={x.id} key={x.id}>
+    <div className={x.id === cur ? "mm-row on" : "mm-row"} data-id={x.id} key={x.id}>
       <button className={x.id === cur ? "mm-item on" : "mm-item"} onClick={() => x.id !== cur && loadModel(x.id)}>
-        <b>{x.name}</b><span>{x.sub}</span><i className="tag">{x.id === cur ? "Loaded" : x.tag || ""}</i>
+        <b>{x.name}</b><span>{x.id === cur ? "Loaded" : x.sub}</span>{x.tag && x.id !== cur && <i className="tag">{x.tag}</i>}
       </button>
       {x.id === cur
         ? <button className="mact" data-act="unload" title="Free the memory it holds" onClick={(e) => (e.stopPropagation(), unloadModel())}>Unload</button>
