@@ -404,26 +404,31 @@ async def steer(req: Request):
 @app.post("/api/chat")
 async def chat(req: Request):
     """One assistant turn of a conversation, with the neurons that are on and (optionally) the refusal direction
-    erased."""
+    erased. With `rows`, several versions of the conversation at once, each with its own pushes and erasure (Compare):
+    they decode in one batch and every delta says which row it belongs to."""
     need_model()
     body = await req.json()
-    msgs = [{"role": m["role"], "content": str(m["content"])} for m in body.get("messages") or []
-            if m.get("role") in ("system", "user", "assistant") and str(m.get("content", "")).strip()]
+    multi = "rows" in body
+    specs = body["rows"] if multi else [body]
 
-    if not msgs or msgs[-1]["role"] != "user":
-        raise HTTPException(400, "The conversation must end with a user message.")
+    rows, flags = [], []
+    for spec in specs:
+        msgs = [{"role": m["role"], "content": str(m["content"])} for m in spec.get("messages") or []
+                if m.get("role") in ("system", "user", "assistant") and str(m.get("content", "")).strip()]
 
-    pid = eng.messages_ids(msgs)
-    rows = [(pid, pushes_of(body))]
-    ablate = bool(body.get("abl")) and eng.abl_vec is not None
+        if not msgs or msgs[-1]["role"] != "user":
+            raise HTTPException(400, "The conversation must end with a user message.")
+
+        rows.append((eng.messages_ids(msgs), pushes_of(spec)))
+        flags.append(bool(spec.get("abl")) and eng.abl_vec is not None)
 
     def gen():
         for r, x in eng.generate(rows, max_new=int(body.get("max_new", 512)),
                                  temperature=float(body.get("temperature", 0.7)), cancel=cancel,
-                                 seed=int(time.time()), abl=[ablate]):
+                                 seed=int(time.time()), abl=flags):
             if r is None:
                 break
-            yield {"type": "delta", "delta": x}
+            yield {"type": "delta", "row": r, "delta": x} if multi else {"type": "delta", "delta": x}
 
     return sse(gen())
 
