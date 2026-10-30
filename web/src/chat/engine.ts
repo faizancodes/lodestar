@@ -3,14 +3,14 @@ import { flushSync } from "react-dom";
 import { setAblActive } from "../abl/engine";
 import { createDecoder } from "../art/decode";
 import { api } from "../lib/api";
-import { cleanReply, isDir, pushes } from "../lib/format";
+import { cleanReply, isDir, isWord, itemKey, pushes, searchDose } from "../lib/format";
 import { md } from "../lib/markdown";
 import { save } from "../lib/storage";
 import { stream } from "../lib/stream";
 import { setTab, still } from "../shell/engine";
 import { ablActive, useApp } from "../store/app";
-import type { ChatSummary, NeuronItem } from "../lib/types";
-import { addItems } from "../steer/recipe";
+import type { ChatSummary, NeuronItem, WordSearch } from "../lib/types";
+import { addItems, removeAt } from "../steer/recipe";
 import { parsePins } from "./parse";
 import { touchChat, useChat, type Col, type ColKey, type Msg } from "../store/chat";
 
@@ -291,6 +291,41 @@ export function addNeurons() {
   addItems(found);
   set({ add: "", addErr: "", steer: true });
   found.forEach(fetchLens);
+}
+
+export function setPickBy(by: "type" | "map") {
+  save("chat-pick-by", by);
+  set({ pickBy: by });
+  requestAnimationFrame(() => document.getElementById(by === "map" ? "chat-find" : "chat-add")?.focus());
+}
+
+/** The neurons whose push most directly raises a word, for the map. */
+export async function findNeurons() {
+  const word = get().find.trim();
+  if (!word || get().finding) return;
+  if (!isWord(word)) return set({ found: null, addErr: "Try a word or two, like evil or pirate." });
+
+  set({ finding: true, addErr: "" });
+  try {
+    // the last ~10% of layers hold blunt "say this exact word" neurons; mid-late layers hold the concept (as in Steer)
+    const skip = Math.max(2, Math.round((app().info?.layers ?? 0) / 9));
+    const r = await api<WordSearch>(`/api/search?word=${encodeURIComponent(word)}&k=24&skip_last=${skip}`);
+    set({ found: { ...r, word } });
+  } catch (e) {
+    set({ addErr: (e as Error).message });
+  } finally {
+    set({ finding: false });
+  }
+}
+
+/** A neuron on the map, clicked: into the recipe at a dose its push is noticeable but not yet a loop, or out again. */
+export function toggleFound(x: { layer: number; neuron: number; score: number }) {
+  const i = app().recipe.items.findIndex((it) => itemKey(it) === `${x.layer}:${x.neuron}`);
+  if (i >= 0) return removeAt(i);
+
+  addItems([{ layer: x.layer, neuron: x.neuron, dose: searchDose(x.score) }]);
+  set({ steer: true });
+  fetchLens(x);
 }
 
 async function fetchLens(it: { layer: number; neuron: number }) {

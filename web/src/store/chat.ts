@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { load } from "../lib/storage";
-import type { ChatMessage, ChatSummary } from "../lib/types";
+import type { ChatMessage, ChatSummary, WordSearch } from "../lib/types";
 
 // The conversation. As on Steer, the reply being streamed is a mutable message, redrawn when `v` changes.
 export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number };
@@ -27,6 +27,10 @@ type Chat = {
   add: string; // what's typed in its box
   addErr: string; // why the last thing typed there couldn't be added
   lens: Record<string, { up: string[]; down: string[] }>; // the words each neuron pushes toward, by "layer:neuron"
+  pickBy: "type" | "map"; // neurons typed by number, or picked off a map of the ones behind a word
+  find: string; // the word the map is for
+  found: (WordSearch & { word: string }) | null;
+  finding: boolean;
   set: (p: Partial<Omit<Chat, "set">>) => void;
 };
 
@@ -47,6 +51,10 @@ export const useChat = create<Chat>((set) => ({
   add: "",
   addErr: "",
   lens: {},
+  pickBy: load("chat-pick-by") === "map" ? "map" : "type",
+  find: "",
+  found: null,
+  finding: false,
   set: (p) => set(p),
 }));
 
