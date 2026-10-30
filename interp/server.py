@@ -26,6 +26,7 @@ DATA = Path(os.environ.get("AUTO_INTERP_DATA", Path.home() / "Library" / "Applic
 DATA.mkdir(parents=True, exist_ok=True)
 RECIPES = DATA / "recipes.json"
 ABL_FILE = DATA / "abl.json"  # saved refusal directions + state, keyed by model id
+LAST_MODEL = DATA / "last_model.txt"  # the model to open again at the next launch
 PROBES_FILE = DATA / "abl-probes.json"  # customised probe lists
 HF_CACHE = Path(os.environ.get("HF_HUB_CACHE", Path.home() / ".cache" / "huggingface" / "hub"))
 
@@ -119,7 +120,8 @@ def pushes_of(body):
 # ------------------------------------------------------------------ models
 @app.get("/api/status")
 def status():
-    return {**eng.info(), "progress": eng.progress}
+    last = LAST_MODEL.read_text().strip() if LAST_MODEL.exists() else None
+    return {**eng.info(), "progress": eng.progress, "last": last}
 
 
 # Copies of drive models on this Mac's internal disk. A USB 3 stick reads at ~0.4 GB/s against ~3 GB/s for
@@ -230,6 +232,7 @@ async def load(req: Request):
         try:
             eng.load(mid)
             restore_for(mid)
+            LAST_MODEL.write_text(mid)
         except Exception as e:
             traceback.print_exc()
             eng.status = f"error: {e}"
