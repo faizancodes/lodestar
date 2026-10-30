@@ -13,10 +13,10 @@ React + TypeScript) and proven to look and behave the same.
 
     npm install && npx playwright install webkit   # once
     npx playwright test                              # replay against ../ui
-    UI_DIR=../web/dist npx playwright test           # replay against another build of the UI
+    UI_DIR=../web/dist npx playwright test           # replay against the React build (`pnpm build` in ../web)
 
 Canvases (the scenes, spinners and art), the plan clock, the load timer and toasts are hidden in the shots. Everything
-else must match within 40 pixels.
+else must match pixel for pixel: a single changed letter is about 20 pixels, so there's no pixel tolerance.
 
 ## When the API or a flow changes
 

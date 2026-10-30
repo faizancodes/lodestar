@@ -21,7 +21,9 @@ from . import discover
 from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
-UI = ROOT / "ui"
+# LODESTAR_UI=react serves the React build in web/dist (`pnpm build` in web/) while it's being ported; the default
+# is the current UI
+UI = ROOT / ("web/dist" if os.environ.get("LODESTAR_UI") == "react" else "ui")
 # the data folder keeps the app's first name, so models, recipes and directions saved before the rename stay put
 DATA = Path(os.environ.get("AUTO_INTERP_DATA", Path.home() / "Library" / "Application Support" / "Auto Interp"))
 DATA.mkdir(parents=True, exist_ok=True)

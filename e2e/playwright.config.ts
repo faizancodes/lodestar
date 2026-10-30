@@ -16,7 +16,7 @@ export default defineConfig({
   reporter: [["list"]],
   expect: {
     timeout: 10_000,
-    toHaveScreenshot: { animations: "disabled", caret: "hide", scale: "css", maxDiffPixels: 40 },
+    toHaveScreenshot: { animations: "disabled", caret: "hide", scale: "css", maxDiffPixels: 0 },
   },
   use: {
     ...devices["Desktop Safari"], // pywebview renders with the system WebKit
