@@ -45,11 +45,11 @@ function Answer({ v, i, last }: { v: Version; i: number; last: boolean }) {
         {!!v.fix.lines.length && <div className="tl-chg">{v.fix.lines.map((l, k) => <Fragment key={k}>{k ? " · " : ""}{l}</Fragment>)}</div>}
       </> : v.note && <div className="tl-note">{v.note}</div>}
       <div className={"tl-a" + (last ? " cur" : " old") + (v.open ? " open" : "")} data-i={i} onClick={last ? undefined : fold}>
-        <div className="tl-a-h"><span className="tl-tag">v{i + 1}</span><span className="tl-n">{nOn(v.items)}</span><span className="grow" />
-          {!typing && (last
-            ? <>{act("Compare with normal", () => setCompare(!cmp), cmp)}{act("Inspect", () => inspectAnswer(i))}{i > 0 && act("Undo", undo)}</>
-            : <>{act("Inspect", () => inspectAnswer(i))}{act("Go back to this", () => goBack(i))}</>)}</div>
+        <div className="tl-a-h"><span className="tl-tag">v{i + 1}</span><span className="tl-n">{nOn(v.items)}</span></div>
         <Ans s={v.out} typing={typing} />
+        {!typing && <div className="tl-a-f">{last
+          ? <>{act("Compare with normal", () => setCompare(!cmp), cmp)}{act("Inspect", () => inspectAnswer(i))}{i > 0 && act("Undo", undo)}</>
+          : <>{act("Inspect", () => inspectAnswer(i))}{act("Go back to this", () => goBack(i))}</>}</div>}
         {last && cmp && <div className="tl-normal"><div className="tl-a-h"><span className="tl-tag">Normal</span></div><Ans s={tl.normal} typing={tl.streaming.has("normal")} /></div>}
       </div>
       <PanelSlot anchor={`tl:${tl.id}:${i}`} />
