@@ -994,5 +994,183 @@
     }
    }
   ]
+ },
+ {
+  "method": "GET",
+  "path": "/api/search",
+  "query": "word=evil&k=24&skip_last=3",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": {
+   "results": [
+    {
+     "layer": 18,
+     "neuron": 2207,
+     "score": 0.412,
+     "lens": [
+      "villain",
+      "evil",
+      "wicked"
+     ]
+    },
+    {
+     "layer": 12,
+     "neuron": 949,
+     "score": 0.358,
+     "lens": [
+      "malice",
+      "spite",
+      "hatred"
+     ]
+    },
+    {
+     "layer": 24,
+     "neuron": 1597,
+     "score": 0.295,
+     "lens": [
+      "devil",
+      "demon",
+      "fiend"
+     ]
+    },
+    {
+     "layer": 23,
+     "neuron": 2562,
+     "score": 0.274,
+     "lens": [
+      "sinister",
+      "menace",
+      "dark"
+     ]
+    },
+    {
+     "layer": 8,
+     "neuron": 1103,
+     "score": -0.27,
+     "lens": [
+      "sweet",
+      "warm",
+      "caring"
+     ]
+    },
+    {
+     "layer": 20,
+     "neuron": 2351,
+     "score": 0.251,
+     "lens": [
+      "malice",
+      "spite",
+      "hatred"
+     ]
+    },
+    {
+     "layer": 21,
+     "neuron": 2566,
+     "score": 0.215,
+     "lens": [
+      "kind",
+      "gentle",
+      "nice"
+     ]
+    },
+    {
+     "layer": 23,
+     "neuron": 2215,
+     "score": -0.207,
+     "lens": [
+      "kind",
+      "gentle",
+      "nice"
+     ]
+    },
+    {
+     "layer": 20,
+     "neuron": 2925,
+     "score": -0.206,
+     "lens": [
+      "villain",
+      "evil",
+      "wicked"
+     ]
+    },
+    {
+     "layer": 15,
+     "neuron": 2427,
+     "score": 0.198,
+     "lens": [
+      "villain",
+      "evil",
+      "wicked"
+     ]
+    },
+    {
+     "layer": 10,
+     "neuron": 652,
+     "score": 0.176,
+     "lens": [
+      "scheme",
+      "plot",
+      "ploy"
+     ]
+    },
+    {
+     "layer": 12,
+     "neuron": 2027,
+     "score": 0.163,
+     "lens": [
+      "cruel",
+      "harsh",
+      "brutal"
+     ]
+    },
+    {
+     "layer": 23,
+     "neuron": 1062,
+     "score": 0.141,
+     "lens": [
+      "cruel",
+      "harsh",
+      "brutal"
+     ]
+    },
+    {
+     "layer": 22,
+     "neuron": 549,
+     "score": 0.111,
+     "lens": [
+      "sinister",
+      "menace",
+      "dark"
+     ]
+    }
+   ],
+   "partial": false,
+   "piece": "evil"
+  }
+ },
+ {
+  "method": "GET",
+  "path": "/api/neuron",
+  "query": "layer=18&n=2207",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": {
+   "layer": 18,
+   "neuron": 2207,
+   "lens": {
+    "up": [
+     "villain",
+     "evil",
+     "wicked"
+    ],
+    "down": [
+     "hero",
+     "noble",
+     "good"
+    ]
+   }
+  }
  }
 ]
