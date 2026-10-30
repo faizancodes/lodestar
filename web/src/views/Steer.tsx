@@ -64,8 +64,10 @@ function Examples() {
   );
 }
 
+const PLUS = <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>;
+
 function DirChips() {
-  const dirs = useApp((s) => s.dirs), loaded = useApp((s) => !!s.info?.loaded);
+  const dirs = useApp((s) => s.dirs), loaded = useApp((s) => !!s.info?.loaded), making = useSteer((s) => s.dn.open);
 
   return (
     <div className="ex-line" id="dir-line" hidden={dirs === null || !loaded}><span>Directions</span><div id="dir-chips" className="chips">{dirs && <>
@@ -74,7 +76,7 @@ function DirChips() {
           title={bandText(d.band) + (d.auc != null ? ` · separates ${Math.round(d.auc * 100)}%` : "")} onClick={() => turnOnDir(d)}>
           {d.name}<span className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteDir(d))}> ×</span></button>
       ))}
-      <button className="chip dir-new" id="dir-new" onClick={toggleDn}>New</button>
+      <button className={making ? "chip dir-new on" : "chip dir-new"} id="dir-new" aria-expanded={making} onClick={toggleDn}>{PLUS}New direction</button>
     </>}</div></div>
   );
 }

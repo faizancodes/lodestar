@@ -119,6 +119,14 @@ function Log() {
 // how far along its range a slider is, for its track to light up to there
 const fill = (v: number, lo: number, hi: number) => ({ "--fill": `${((v - lo) / (hi - lo)) * 100}%` }) as React.CSSProperties;
 
+const SLIDERS = (
+  <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M2 4.5h7M13 4.5h1M2 11.5h1M7 11.5h7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <circle cx="11" cy="4.5" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <circle cx="5" cy="11.5" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.5" />
+  </svg>
+);
+
 function Settings() {
   const system = useChat((s) => s.system), temp = useChat((s) => s.temp), max = useChat((s) => s.max), set = useChat((s) => s.set);
   const box = useRef<HTMLDetailsElement>(null);
@@ -132,7 +140,7 @@ function Settings() {
 
   return (
     <details className="chat-opts" id="chat-opts" ref={box}>
-      <summary>Settings</summary>
+      <summary aria-label="Settings" title="Settings">{SLIDERS}</summary>
       <div className="chat-opts-pop">
         <label className="field">System prompt
           <textarea id="chat-system" rows={3} spellCheck="false" placeholder="Optional" value={system} onChange={(e) => set({ system: e.target.value })} />
@@ -201,53 +209,26 @@ function Dose({ i, dose }: { i: number; dose: number }) {
   );
 }
 
-// The neurons behind a word, laid out by layer (across) and how strongly turning each up (above the line) or down
-// (below) pushes toward it. Hover one to see what it does; click it to add it, or take it out again.
-const MW = 268, MH = 150, PAD = 8, AXIS = 16;
-
-function NeuronMap() {
+// The neurons behind a word, strongest first, each a card to switch on or off
+function Found() {
   const found = useChat((s) => s.found)!;
-  const layers = useApp((s) => s.info?.layers ?? 1);
   const items = useApp((s) => s.recipe.items);
-  const on = new Map(items.map((it) => [itemKey(it), it.dose]));
-  const [focus, setFocus] = useState<string | null>(null);
-
-  const res = found.results;
-  const max = Math.max(...res.map((x) => Math.abs(x.score)), 1e-6);
-  const mid = (MH - AXIS) / 2;
-  const x = (l: number) => PAD + (l / Math.max(layers - 1, 1)) * (MW - 2 * PAD);
-  const y = (s: number) => mid - (s / max) * (mid - PAD);
-  const key = (r: { layer: number; neuron: number }) => `${r.layer}:${r.neuron}`;
-  const shown = res.find((r) => key(r) === focus);
+  const on = new Set(items.map(itemKey));
 
   return (
-    <div className="nr-map">
-      <svg id="chat-map" viewBox={`0 0 ${MW} ${MH}`} width={MW} height={MH} onMouseLeave={() => setFocus(null)}>
-        <line className="nr-map-zero" x1={0} x2={MW} y1={mid} y2={mid} />
-        <text className="nr-map-t" x={2} y={10}>up</text>
-        <text className="nr-map-t" x={2} y={MH - AXIS - 3}>down</text>
-        <text className="nr-map-t" x={PAD} y={MH - 3}>L0</text>
-        <text className="nr-map-t" x={MW / 2} y={MH - 3} textAnchor="middle">layer</text>
-        <text className="nr-map-t" x={MW - PAD} y={MH - 3} textAnchor="end">L{layers - 1}</text>
-        {res.map((r) => {
-          const k = key(r), dose = on.get(k), a = Math.abs(r.score) / max;
-          const cls = dose == null ? "nr-dot" : dose < 0 ? "nr-dot in neg" : "nr-dot in";
+    <div className="nr-found" id="chat-found">
+      {found.partial && <p className="nr-note">“{found.word}” is split into pieces, so these match “{found.piece}”.</p>}
+      {found.results.map((r) => {
+        const k = `${r.layer}:${r.neuron}`, lit = on.has(k);
 
-          return (
-            <circle key={k} className={k === focus ? cls + " focus" : cls} data-dot={k} cx={x(r.layer)} cy={y(r.score)} r={3 + 4 * a}
-              style={{ opacity: dose == null ? 0.35 + 0.65 * a : 1 }} role="button" tabIndex={0}
-              aria-label={`Layer ${r.layer}, neuron ${r.neuron}`}
-              onMouseEnter={() => setFocus(k)} onFocus={() => setFocus(k)} onClick={() => (setFocus(k), toggleFound(r))}
-              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggleFound(r))} />
-          );
-        })}
-      </svg>
-      <div className="nr-map-info" id="chat-map-info">{shown ? (
-        <>
-          <div className="nr-id"><b>L{shown.layer}</b><span>N{shown.neuron}</span><em>{on.has(key(shown)) ? "On" : shown.score > 0 ? "Turn up" : "Turn down"}</em></div>
-          <div className="nr-lens">{lensLabel(shown.lens)}</div>
-        </>
-      ) : found.partial ? <span>“{found.word}” is split into pieces, so these match “{found.piece}”.</span> : null}</div>
+        return (
+          <button key={k} className="nr-card" data-card={k} role="switch" aria-checked={lit} onClick={() => toggleFound(r)}>
+            <div className="nr-id"><b>L{r.layer}</b><span>N{r.neuron}</span><em>{r.score > 0 ? "up" : "down"}</em></div>
+            <i />
+            <div className="nr-lens">{lensLabel(r.lens)}</div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -284,7 +265,7 @@ function Neurons() {
               onChange={(e) => set({ find: e.target.value, addErr: "" })} />
             <button className="btn sm" disabled={!find.trim() || finding}>{finding ? "Finding…" : "Find"}</button>
           </form>
-          {found && <NeuronMap />}
+          {found && <Found />}
         </>
       )}
       <p className="nr-err" id="chat-add-err" hidden={!err}>{err}</p>
