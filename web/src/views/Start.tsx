@@ -6,6 +6,7 @@ const ASK: Record<string, string> = {
   abliterate: "Pick a model to abliterate.",
   steer: "Pick a model to steer.",
   chat: "Pick a model to chat with.",
+  neurons: "Pick a model to push neurons in.",
 };
 
 export function Start() {

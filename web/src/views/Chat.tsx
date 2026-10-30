@@ -12,7 +12,7 @@ import { useChat } from "../store/chat";
 const cancel = () => api("/api/cancel", {});
 
 // one small run of ASCII marks per starter, from the scenes' dot / plus / cross / block ramp
-const MARKS = ["·+×", "+×▪", "×+·", "▪×+"];
+export const MARKS = ["·+×", "+×▪", "×+·", "▪×+"];
 
 // the switches for what shapes replies: the erased refusal direction, and the recipe that's on
 function Mods() {
@@ -32,7 +32,7 @@ function Mods() {
 }
 
 /** A reply's markdown. Set as HTML, like the streamed updates that write into it, so the decoder can work on it. */
-function Md({ m, done }: { m: { content: string }; done: boolean }) {
+export function Md({ m, done }: { m: { content: string }; done: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { el.current!.innerHTML = replyHtml(m, done); });
   return <div className="md" ref={el} />;
@@ -56,7 +56,7 @@ function CompareSwitch() {
 // how fast it wrote: live while it streams (written straight into the element), then the final figure
 const Rate = ({ part }: { part: { content: string; wps?: number } }) => <span className="msg-rate">{rateText(rateOf(part))}</span>;
 
-function Copy({ text }: { text: string }) {
+export function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const toast = useApp((s) => s.toastMsg);
 

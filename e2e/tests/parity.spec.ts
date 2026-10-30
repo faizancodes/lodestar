@@ -512,3 +512,55 @@ test("chat: saved chats, reopened", async ({ page }) => {
   await page.locator("#chat-list .saved-item .del").click({ force: true });
   await expect(page.locator("#chat-list")).toHaveCount(0);
 });
+
+// Assembled by hand from the chat recording, with made-up neurons (their words and replies aren't the model's), so
+// it's replayed only
+test("neurons: push neurons by hand and chat with them on", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "neurons");
+  await page.goto("/");
+  await page.keyboard.press("Meta+4");
+  await expect(page.locator("#view-neurons")).toBeVisible();
+  await expect(page.locator("#nr-add")).toBeFocused();
+  await snap(page, "neurons-empty");
+
+  // one this model doesn't have, then two pasted the way they're shared
+  const add = page.locator("#nr-add");
+  await add.fill("L14 N8949 +1");
+  await add.press("Enter");
+  await expect(page.locator("#nr-err")).toHaveText("There’s no neuron 8949: each layer has neurons 0–3071.");
+
+  await add.fill("L14 N2949 +1 and L13 N1956 −1");
+  await add.press("Enter");
+  await expect(page.locator(".nr-pin")).toHaveCount(2);
+  await expect(page.locator("#nr-err")).toBeHidden();
+  await expect(page.locator('.nr-pin[data-pin="14:2949"] .nr-lens')).toHaveText("villain · sinister · cruel · wicked");
+  await expect(page.locator('.nr-pin[data-pin="13:1956"] .nr-lens')).toHaveText("deceit · scheme · malice · lie"); // pushed down
+  await expect(page.locator("#tab-neurons-count")).toHaveText("2");
+  await expect(page.locator("#nr-compare")).toHaveAttribute("aria-checked", "true");
+
+  await page.locator("#nr-starters .starter", { hasText: "free afternoon" }).click();
+  await idle(page);
+  await expect(page.locator("#nr-send")).toBeVisible();
+  await expect(page.locator("#nr-input")).toBeFocused(); // the reply is done
+  const cols = page.locator("#nr-log .msg.bot.cmp .cmp-col");
+  await expect(cols.nth(0).locator(".cmp-h")).toHaveText("Plain");
+  await expect(cols.nth(0).locator(".md")).toContainText("long walk");
+  await expect(cols.nth(1).locator(".cmp-h")).toHaveText("Steered");
+  await expect(cols.nth(1).locator(".md")).toContainText("plotting");
+  await snap(page, "neurons");
+
+  // a dose nudged and a neuron switched off are kept for this model
+  await page.locator('.nr-pin[data-pin="14:2949"] [aria-label="More"]').click();
+  await expect(page.locator('.nr-pin[data-pin="14:2949"] input')).toHaveValue("+1.25");
+  await page.locator('.nr-pin[data-pin="13:1956"] .nr-on').click();
+  await expect(page.locator('.nr-pin[data-pin="13:1956"]')).toHaveClass(/\boff\b/);
+  await expect(page.locator("#tab-neurons-count")).toHaveText("1");
+
+  await page.reload();
+  await page.keyboard.press("Meta+4");
+  await expect(page.locator('.nr-pin[data-pin="14:2949"] input')).toHaveValue("+1.25");
+  await expect(page.locator('.nr-pin[data-pin="13:1956"]')).toHaveClass(/\boff\b/);
+  await expect(page.locator("#nr-input")).toBeFocused();
+});
