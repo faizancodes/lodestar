@@ -1,4 +1,4 @@
-// The shell's side of talking to the engine, carried over from ui/app.js: the model list and copies, loading a
+// The shell's side of talking to the engine: the model list and copies, loading a
 // model and following its status, and what to fetch once one is ready. Views read what this writes to the store.
 import { flushSync } from "react-dom";
 import { finishScene, setProgress, startScene, stopScene, wake } from "../art/loader";

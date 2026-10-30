@@ -1,5 +1,5 @@
 // Change how it acts: one box. A word or two searches by word; a sentence is described as a behaviour and a live
-// steering plan finds the neurons for it. Carried over from ui/app.js.
+// steering plan finds the neurons for it.
 import { flushSync } from "react-dom";
 import { api } from "../lib/api";
 import { instruction, isWord, searchDose, styleShift } from "../lib/format";
@@ -59,7 +59,7 @@ export const STAGES = [
   { key: "check", label: "Check", of: ["proof"] },
 ];
 
-/** Draws the plan again in full, now, as each event arrives (renderPlan in ui/app.js). */
+/** Draws the plan again in full, now, as each event arrives. */
 export function renderPlan(plan: Plan) {
   plan.renders++;
   flushSync(() => set((s) => ({ v: s.v + 1 })));

@@ -1,5 +1,5 @@
 // Save edited weights as a new model. One copy is written at a time; `p` is the page doing it: "abl" (refusals
-// erased) or "st" (steering built in). Carried over from ui/app.js.
+// erased) or "st" (steering built in).
 import { api } from "../lib/api";
 import { sleep, steerDefaultName } from "../lib/format";
 import type { ExportJob } from "../lib/types";

@@ -1,0 +1,15 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`decoder leaves the DOM ui/decode.js did (reduced motion: false) > on every recorded stream 1`] = `
+{
+  "length": 11128564,
+  "sha256": "9798d5dc951b38c7979957073262d88430c224534cf984eef5450ac01d3908df",
+}
+`;
+
+exports[`decoder leaves the DOM ui/decode.js did (reduced motion: true) > on every recorded stream 1`] = `
+{
+  "length": 2078094,
+  "sha256": "a5a55c9f4a9ca1b5af98eb002de736312bb66174f992a798bfa61078daa963a0",
+}
+`;

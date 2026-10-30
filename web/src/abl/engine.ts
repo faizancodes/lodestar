@@ -1,5 +1,4 @@
 // Abliterate: find the model's refusal direction, switch it on and off, check it, and save it as a new model.
-// Carried over from ui/app.js.
 import { flushSync } from "react-dom";
 import { startAblScene } from "../art/ablscene";
 import { api } from "../lib/api";

@@ -28,7 +28,7 @@ export function RecipeBox() {
   return (
     <div id="rc" className="rc" hidden={!items.length}>
       <div className="rc-h"><b>On now</b><span className="grow" /><button id="rc-save" className="btn ghost sm" onClick={saveRecipe}>Save</button><button id="rc-clear" className="btn ghost sm" onClick={newRecipe}>Turn all off</button></div>
-      {/* redrawn as a whole where ui/app.js redrew it, so rows (and panels under them) are new each time */}
+      {/* redrawn as a whole when the recipe changes, so rows (and panels under them) are new each time */}
       <div id="rc-list" className="rc-list" key={gen}>{items.map((it, i) => isDir(it) ? <DirRow key={i} it={it} i={i} /> : <NeuronRow key={i} it={it} i={i} />)}</div>
     </div>
   );

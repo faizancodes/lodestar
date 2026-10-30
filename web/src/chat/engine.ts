@@ -1,5 +1,4 @@
 // Chat: talk to the loaded model, with the recipe that's on and the erased refusal direction switched on or off.
-// Carried over from ui/app.js.
 import { flushSync } from "react-dom";
 import { createDecoder } from "../art/decode";
 import { api } from "../lib/api";

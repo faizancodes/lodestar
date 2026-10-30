@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { stream as nowStream } from "../src/lib/stream";
 import { useApp } from "../src/store/app";
-import { exchanges, fromApp, type Exchange } from "./legacy";
+import { exchanges, same, type Exchange } from "./recorded";
 
 // A recorded stream as a fetch Response, its bytes cut at odd places (mid-event and mid-character) the way the
 // network delivers them
@@ -18,18 +18,6 @@ function respond(x: Pick<Exchange, "status" | "events" | "response">, cut: numbe
 }
 
 type Run = { events: unknown[]; toasts: [string, boolean][]; busy: boolean[]; ok: unknown };
-
-async function runOld(x: Exchange, cut: number): Promise<Run> {
-  const run: Run = { events: [], toasts: [], busy: [], ok: null };
-  const classList = { add: () => run.busy.push(true), remove: () => run.busy.push(false) };
-  const { stream } = fromApp<{ stream: (p: string, b: unknown, on: (e: unknown) => void) => Promise<boolean> }>(["busy", "stream"], {
-    fetch: async () => respond(x, cut),
-    toast: (m: string, err?: boolean) => run.toasts.push([m, !!err]),
-    document: { body: { classList } },
-  });
-  run.ok = await stream(x.path, x.body, (e) => run.events.push(e));
-  return run;
-}
 
 async function runNow(x: Exchange, cut: number): Promise<Run> {
   const run: Run = { events: [], toasts: [], busy: [], ok: null };
@@ -52,16 +40,20 @@ const synthetic: Exchange[] = [
   { method: "POST", path: "/api/x", query: "", body: {}, status: 500, type: "json", response: "not json" },
 ];
 
-describe("stream() behaves like ui/app.js's", () => {
+describe("stream() behaves as ui/app.js's did", () => {
   const recorded = exchanges.filter((x) => x.type === "sse");
   it("has recorded streams to replay", () => expect(recorded.length).toBeGreaterThan(10));
 
   it.each([3, 7, 4096])("every recorded stream, delivered %i bytes at a time", async (cut) => {
-    for (const x of recorded) expect(await runNow(x, cut), `${x.path}`).toEqual(await runOld(x, cut));
+    const runs: Run[] = [];
+    for (const x of recorded) runs.push(await runNow(x, cut));
+    same(runs);
   }, 60_000);
 
   it("errors, cancellations and failed requests", async () => {
-    for (const x of synthetic) expect(await runNow(x, 5)).toEqual(await runOld(x, 5));
+    const runs: Run[] = [];
+    for (const x of synthetic) runs.push(await runNow(x, 5));
+    same(runs);
   });
 
   it("refuses a second stream while one runs", async () => {

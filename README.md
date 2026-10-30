@@ -20,8 +20,7 @@ or without the bundle:
     uv run python -m interp.app            # native window
     uv run python -m interp.app --server   # headless, http://127.0.0.1:8792
 
-The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`; `build_app.sh` does this). For this
-release the original UI in `ui/` is still there: start the app with `LODESTAR_UI=legacy` to use it.
+The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`; `build_app.sh` does this).
 
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
 The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise
@@ -92,6 +91,5 @@ budget, or load Qwen3-1.7B/4B for stronger single-neuron levers.
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
     web/                 the interface (React + TypeScript, Vite)
-    ui/                  the original plain-JS interface, kept for one release (LODESTAR_UI=legacy)
     e2e/                 the parity suite: recorded API sessions, mock replay, golden screenshots
     scripts/             app bundle and icon builders

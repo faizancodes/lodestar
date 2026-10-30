@@ -4,10 +4,10 @@ import type { NeuronRow, StreamEvent } from "../lib/types";
 import type { Sink } from "../steer/sink";
 
 // Steer's own state. The long-running parts (a plan, a run, a fix, the new-direction panel) are mutable objects
-// the engine writes to as their streams arrive, the way ui/app.js kept them; `v` changes after each write so the
+// the engine writes to as their streams arrive; `v` changes after each write so the
 // views draw them again. The recipe itself lives in the app store: the sidebar and Chat read it too.
 
-/** A status line (setLive in ui/app.js): empty until first set, then the spinner and its text. */
+/** A status line: empty until first set, then the spinner and its text. */
 export type Live = { text: ReactNode; running: boolean } | null;
 
 export type Cand = NeuronRow & { sign: number; est: number; dose?: number; dj: number; dfluency?: number; tested?: boolean };
@@ -29,7 +29,7 @@ export type Plan = {
   result?: StreamEvent & { recipe: Plan["recipe"]; note?: string; hit_test?: number; hit_test0?: number };
   applied?: boolean;
   clock: string;
-  renders: number; // full redraws, which rebuilt the stage steps in ui/app.js (progress alone didn't)
+  renders: number; // full redraws, which rebuild the stage steps (progress alone doesn't)
 };
 export type Results = { n: number; word?: (NeuronRow & { score: number; dose: number })[]; plan?: Plan };
 
@@ -86,7 +86,7 @@ type Steer = {
   dn: Dn;
   exp: Export;
   panels: Panel[];
-  recipeGen: number; // bumped where ui/app.js redrew the recipe list, which dropped any panel open under a row
+  recipeGen: number; // bumped when the recipe list is redrawn as a whole, which drops any panel open under a row
 };
 
 export const useSteer = create<Steer>(() => ({
