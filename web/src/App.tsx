@@ -4,31 +4,29 @@ import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { boot, setTab, toggleModelMenu } from "./shell/engine";
 import { TABS, useApp } from "./store/app";
+import { newChat } from "./chat/engine";
 import { Abliterate } from "./views/Abliterate";
+import { Chat } from "./views/Chat";
 import { Home } from "./views/Home";
 import { Start } from "./views/Start";
 import { Steer } from "./views/Steer";
 import { closeLast } from "./steer/panels";
 
-function useShortcuts() {
-  useEffect(() => {
-    const keys = (e: KeyboardEvent) => {
-      const { info, menu } = useApp.getState();
-      if (e.key === "Escape") {
-        if (menu.open) toggleModelMenu(false);
-        else closeLast();
-        return;
-      }
-      if (!e.metaKey || e.shiftKey || e.altKey) return;
-      const i = ["1", "2", "3"].indexOf(e.key);
-      if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
-      if (e.key === "0" && info?.loaded) return (e.preventDefault(), setTab("home"));
-      // TODO(Phase 6): ⌘K starts a new chat
-    };
-    document.addEventListener("keydown", keys);
-    return () => document.removeEventListener("keydown", keys);
-  }, []);
-}
+// Registered as the app loads, not in an effect: React's first render can land after the page's load event, and a
+// shortcut pressed before then would be lost.
+document.addEventListener("keydown", (e) => {
+  const { info, menu, tab } = useApp.getState();
+  if (e.key === "Escape") {
+    if (menu.open) toggleModelMenu(false);
+    else closeLast();
+    return;
+  }
+  if (!e.metaKey || e.shiftKey || e.altKey) return;
+  const i = ["1", "2", "3"].indexOf(e.key);
+  if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
+  if (e.key === "0" && info?.loaded) return (e.preventDefault(), setTab("home"));
+  if (e.key === "k" && tab === "chat" && info?.loaded) (e.preventDefault(), newChat());
+});
 
 export function App() {
   const tab = useApp((s) => s.tab);
@@ -37,7 +35,6 @@ export function App() {
   useEffect(() => { document.body.dataset.tab = tab; }, [tab]);
   useEffect(() => { document.body.classList.toggle("busy", busy); }, [busy]);
   useEffect(() => { boot(); }, []);
-  useShortcuts();
   const hidden = (view: string) => !loaded || view !== tab;
   return (
     <>
@@ -45,16 +42,9 @@ export function App() {
       <main id="main" className={loaded && tab === "chat" ? "is-chat" : undefined}>
         <Start />
         <Home hidden={hidden("home")} />
-        {/* TODO(Phase 6): the rest of Chat; only its header so far */}
         <Abliterate hidden={hidden("abliterate")} />
         <Steer hidden={hidden("steer")} />
-        <section id="view-chat" className="view chat" data-view="chat" hidden={hidden("chat")}>
-          <header className="chat-h">
-            <div className="chat-title"><b id="chat-model" /></div>
-            <div className="chat-mods" id="chat-mods" />
-            <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)">New chat</button>
-          </header>
-        </section>
+        <Chat hidden={hidden("chat")} />
       </main>
       <ModelMenu />
       <Toast />
