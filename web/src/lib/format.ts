@@ -22,19 +22,22 @@ export const bandText = (ls: number[] = []) => {
 
 /** The recipe as the engine applies it; sign -1 is the Opposite column, which can't erase. */
 export function pushes(items: Item[], dirs: Direction[] | null | undefined, sign = 1): Push[] {
-  return items.map((i): Push => isDir(i)
-    ? { kind: "dir", dir: i.dir, layers: i.layers, op: i.op, dose: sign * i.dose, enabled: dirReady(i, dirs) && (sign > 0 || i.op !== "erase") }
-    : { layer: i.layer, neuron: i.neuron, dose: sign * i.dose }).filter((p) => p.enabled !== false);
+  const ready = new Set(dirs?.filter((d) => d.ready).map((d) => d.id));
+  return items.flatMap((i): Push[] => {
+    if (!isDir(i)) return [{ layer: i.layer, neuron: i.neuron, dose: sign * i.dose }];
+    return ready.has(i.dir) && (sign > 0 || i.op !== "erase") ? [{ kind: "dir", dir: i.dir, layers: i.layers, op: i.op, dose: sign * i.dose, enabled: true }] : [];
+  });
 }
 
 /** Where a word search starts a neuron: its direct push noticeable, not yet a loop. */
 export const searchDose = (score: number) => Math.sign(score) * Math.min(1, +(0.15 / Math.abs(score)).toFixed(2));
 
 // the words a neuron pushes toward, without repeats like "cookie · Cookie · cookies"
+const PLURAL = /s$/;
 export function lensLabel(lens: string[] = []) {
   const seen = new Set<string>(), out: string[] = [];
   for (const t of lens) {
-    const w = t.trim(), k = w.toLowerCase().replace(/s$/, "");
+    const w = t.trim(), k = w.toLowerCase().replace(PLURAL, "");
     if (w && !seen.has(k)) seen.add(k), out.push(w);
   }
   return out.slice(0, 4).join(" · ");

@@ -68,7 +68,12 @@ test("shell: tabs, shortcuts, brand, model menu", async ({ page }) => {
   await expect(page.locator("#model-menu .mm-item.on")).toContainText("Qwen3-0.6B");
   await snap(page, "model-menu-loaded");
   await snap(page.locator("#model-menu"), "model-menu-loaded-menu");
+  await page.locator("#mm-custom").fill("org/some-model");
   await page.mouse.click(900, 450); // a click outside closes it
+  await expect(page.locator("#model-menu")).toBeHidden();
+  await page.locator("#model-pick").click(); // and it opens again with nothing typed
+  await expect(page.locator("#mm-custom")).toHaveValue("");
+  await page.mouse.click(900, 450);
   await expect(page.locator("#model-menu")).toBeHidden();
 });
 
@@ -168,6 +173,7 @@ test("steer: find a direction, push and erase it, import, delete", async ({ page
   await expect(page.locator("#dir-line")).toBeVisible();
   await page.locator("#dir-new").click();
   await expect(page.locator("#dn")).toBeVisible();
+  await expect(page.locator("#dn-name")).toBeFocused();
   await page.locator("#dn-kind [data-k=topic]").click();
   await expect(page.locator("#dn-pos-opt")).toHaveText("one prompt per line");
   await page.locator("#dn-ex").click();
@@ -201,7 +207,9 @@ test("steer: find a direction, push and erase it, import, delete", async ({ page
   await expect(page.locator("#tl .tl-a.cur .tl-n")).toHaveText("1 direction");
   await snap(page.locator("#tl"), "direction-answer");
 
-  // a research file made for another model is refused with a reason
+  // Import with no path asks for one; a research file made for another model is refused with a reason
+  await page.locator("#dn-import").click();
+  await expect(page.locator("#dn-path")).toBeFocused();
   await page.locator("#dn-path").fill("../research/political_steering/out/directions.npz");
   await page.locator("#dn-import").click();
   await expect(page.locator("#dn-status")).not.toHaveClass(/\blive\b/);

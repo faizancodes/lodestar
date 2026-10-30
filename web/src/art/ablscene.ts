@@ -57,15 +57,15 @@ const CLOUD = (seed: number, cx: number, cy: number) => Array.from({ length: 26 
   return { x: cx + Math.cos(a) * r * 1.6, y: cy + Math.sin(a) * r * 0.75, p: hash(seed, i, 2) * 6.28 };
 });
 const BAD = CLOUD(3, 104, 13), OK = CLOUD(7, 44, 27);
+const mean = (pts: { x: number; y: number }[]) => [pts.reduce((a, p) => a + p.x, 0) / pts.length, pts.reduce((a, p) => a + p.y, 0) / pts.length];
+const [ax, ay] = mean(OK), [bx, by] = mean(BAD);
 function compare(put: Put, t: number) {
   const period = 4.2, k = (t / period) % 1;
-  const mean = (pts: { x: number; y: number }[]) => [pts.reduce((a, p) => a + p.x, 0) / pts.length, pts.reduce((a, p) => a + p.y, 0) / pts.length];
   for (const p of OK) block(put, Math.round(p.x + Math.sin(t * 0.9 + p.p) * 1.2), Math.round(p.y + Math.cos(t * 0.7 + p.p) * 0.8), 0, 0.5);
   for (const p of BAD) {
     const x = Math.round(p.x + Math.sin(t * 0.9 + p.p) * 1.2), y = Math.round(p.y + Math.cos(t * 0.7 + p.p) * 0.8);
     put(x, y, 1); put(x + 1, y, 0.6);
   }
-  const [ax, ay] = mean(OK), [bx, by] = mean(BAD);
   brackets(put, Math.round(ax) - 3, Math.round(ay) - 3, Math.round(ax) + 3, Math.round(ay) + 3, 0.7);
   brackets(put, Math.round(bx) - 3, Math.round(by) - 3, Math.round(bx) + 3, Math.round(by) + 3, 0.7);
   // the difference of means, drawn from the everyday mean to the bad one
@@ -82,14 +82,14 @@ function compare(put: Put, t: number) {
 
 // ---------------------------------------------------------------- 2 trial
 const TL = Array.from({ length: 16 }, (_, i) => 12 + i * 8);
-const CANDS = [7, 9, 11, 12, 13, 14];
+const CANDS = [7, 9, 11, 12, 13, 14], IS_CAND = new Set(CANDS);
 function trial(put: Put, t: number) {
   const per = 1.15, cycle = per * CANDS.length + 1.6;
   const n = Math.floor(t / cycle), u = t % cycle;
   const refusedOf = CANDS.map((_, c) => Array.from({ length: 4 }, (_, q) => hash(n, c, q) < 0.15 + 0.6 * hash(n, c)));
   const best = refusedOf.map((r) => r.filter(Boolean).length).reduce((bi, v, i, a) => (v < a[bi] ? i : bi), 0);
   TL.forEach((x, i) => {
-    const cand = CANDS.indexOf(i) >= 0;
+    const cand = IS_CAND.has(i);
     for (let y = 3; y <= 14; y += cand ? 1 : 2) put(x, y, cand ? 0.5 : 0.18);
   });
   CANDS.forEach((li, c) => {
