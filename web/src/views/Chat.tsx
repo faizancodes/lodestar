@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { setAblActive } from "../abl/engine";
 import {
-  copyReply, growInput, jumpDown, newChat, onScroll, replyHtml, retry, sendChat, STARTERS, toggleCompare, toggleSteer,
+  copyReply, growInput, jumpDown, newChat, onScroll, rateOf, rateText, replyHtml, retry, sendChat, STARTERS, toggleCompare, toggleSteer,
 } from "../chat/engine";
 import { api } from "../lib/api";
 import { isDir, labelOf, modelName } from "../lib/format";
@@ -53,6 +53,9 @@ function CompareSwitch() {
   );
 }
 
+// how fast it wrote: live while it streams (written straight into the element), then the final figure
+const Rate = ({ part }: { part: { content: string; wps?: number } }) => <span className="msg-rate">{rateText(rateOf(part))}</span>;
+
 function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const toast = useApp((s) => s.toastMsg);
@@ -83,7 +86,10 @@ function Log() {
               <div key={c.key} className="cmp-col" data-col={c.key}>
                 <div className="cmp-h">{c.label}</div>
                 <Md m={c} done={!typing} />
-                <div className="msg-acts" hidden={typing || !c.content}><Copy text={c.content} /></div>
+                <div className="msg-acts">
+                  {!typing && !!c.content && <Copy text={c.content} />}
+                  <Rate part={c} />
+                </div>
               </div>
             ))}</div>
             <div className="msg-acts" hidden={typing || (!last && !m.stopped)}>
@@ -97,9 +103,10 @@ function Log() {
       return (
         <div key={i} className={typing ? "msg bot typing" : "msg bot"} data-i={i}>
           <Md m={m} done={!typing} />
-          <div className="msg-acts" hidden={typing}>
-            <Copy text={m.content} />{last && <button data-a="retry" onClick={retry}>Retry</button>}
+          <div className="msg-acts">
+            {!typing && <><Copy text={m.content} />{last && <button data-a="retry" onClick={retry}>Retry</button>}</>}
             {m.stopped && <span className="msg-note">Stopped</span>}
+            <Rate part={m} />
           </div>
         </div>
       );

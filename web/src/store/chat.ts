@@ -1,17 +1,19 @@
 import { create } from "zustand";
 import { load } from "../lib/storage";
-import type { ChatMessage } from "../lib/types";
+import type { ChatMessage, ChatSummary } from "../lib/types";
 
 // The conversation. As on Steer, the reply being streamed is a mutable message, redrawn when `v` changes.
-export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[] };
+export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number };
 
 // Compare's side-by-side replies: the plain model, and each switch that was on, alone. Each column carries on its
 // own thread, so a later turn's history takes that column's earlier replies.
 export type ColKey = "plain" | "steer" | "abl";
-export type Col = { key: ColKey; label: string; content: string };
+export type Col = { key: ColKey; label: string; content: string; wps?: number }; // wps: words a second, once done
 
 type Chat = {
   v: number;
+  id: string | null; // the saved conversation this is, once its first reply is in
+  list: ChatSummary[] | null; // every saved conversation, newest first
   messages: Msg[];
   streaming: boolean;
   steer: boolean; // the recipe that's on applies to replies
@@ -26,6 +28,8 @@ type Chat = {
 
 export const useChat = create<Chat>((set) => ({
   v: 0,
+  id: null,
+  list: null,
   messages: [],
   streaming: false,
   steer: true,

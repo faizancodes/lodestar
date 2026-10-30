@@ -8,6 +8,8 @@ export const fmt = (x: number, d = 2) => (x >= 0 ? "+" : "−") + Math.abs(Numbe
 export const modelName = <T extends string | null | undefined>(id: T) => (id ? id.split("/").pop()! : id);
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const gb = (bytes: number) => `${(bytes / 1e9).toFixed(bytes < 1e10 ? 1 : 0)} GB`;
+// memory, in the binary gigabytes macOS counts RAM in (a 32 GB Mac has 32 × 2³⁰ bytes)
+export const ram = (bytes: number) => `${(bytes / 2 ** 30).toFixed(bytes < 10 * 2 ** 30 ? 1 : 0)} GB`;
 
 // a recipe holds neurons ({layer, neuron, dose}) and directions ({kind: "dir", dir, name, layers, dose, op}), where
 // a direction is pushed along (dose in units of its own size) or erased back to ordinary text (dose 1 = fully)

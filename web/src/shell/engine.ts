@@ -4,9 +4,9 @@ import { flushSync } from "react-dom";
 import { finishScene, setProgress, startScene, stopScene, wake } from "../art/loader";
 import { api } from "../lib/api";
 import { modelName, sleep } from "../lib/format";
-import type { Abl, CopyJob, Directions, Example, ExportJob, Models, Recipe, Status } from "../lib/types";
+import type { Abl, CopyJob, Directions, Example, ExportJob, Fit, Memory, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
-import { onChatShown } from "../chat/engine";
+import { onChatShown, refreshChats } from "../chat/engine";
 import { useChat } from "../store/chat";
 import { resetAbl, syncAbl } from "../abl/engine";
 import { useSteer } from "../store/steer";
@@ -104,8 +104,15 @@ export function setTab(t: Tab) {
 const setStart = (p: Partial<ReturnType<typeof get>["start"]>) => set({ start: { ...get().start, ...p } });
 const startArt = () => $<HTMLCanvasElement>("#start-art")!;
 
-export async function loadModel(id: string) {
+export async function loadModel(id: string, anyway = false) {
   toggleModelMenu(false);
+
+  // a model that won't fit beside what's running makes macOS swap, and everything crawls: say so first
+  if (!anyway) {
+    const fit = await api<Fit>("/api/memory/fit", { model: id }).catch(() => null);
+    if (fit && !fit.fits) return set({ fitWarn: { id, fit } });
+  }
+
   const entered = enterLoading(id);
 
   let s: Status;
@@ -120,6 +127,31 @@ export async function loadModel(id: string) {
   await entered;
   applyStatus(s);
   pollStatus();
+}
+
+export async function unloadModel() {
+  toggleModelMenu(false);
+
+  try {
+    applyStatus(await api<Status>("/api/unload", {}));
+  } catch (e) {
+    return toast((e as Error).message, true);
+  }
+
+  refreshMemory();
+}
+
+// ------------------------------------------------------------------ memory
+export async function refreshMemory() {
+  try { set({ memory: await api<Memory>("/api/memory") }); } catch {}
+}
+
+// every few seconds while the window is in front; it's what shows a reply slowing because the Mac is swapping
+async function pollMemory() {
+  for (;;) {
+    if (!document.hidden) await refreshMemory();
+    await sleep(4000);
+  }
 }
 
 // Picking a model from the start screen: the chosen card lights up, the title and the rest of the list fall
@@ -337,6 +369,8 @@ export async function boot() {
 
     useSteer.setState({ prompts: defaults.prompts.join("\n") });
     applyStatus(status);
+    pollMemory();
+    refreshChats();
     resumeLastModel();
 
     if (copy.status === "copying") pollCopy();

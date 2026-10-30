@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import { startSideArt } from "../art/glyphs";
 import { markSVG } from "../art/mark";
-import { modelName } from "../lib/format";
+import { modelName, ram } from "../lib/format";
 import { deleteSaved, openSaved, setTab, statusLine, toggleModelMenu } from "../shell/engine";
+import { deleteChat, openChat } from "../chat/engine";
 import { ablActive, useApp, type Tab } from "../store/app";
+import { useChat } from "../store/chat";
 import { Html } from "./Html";
 
 const MARK = markSVG(36, 15);
@@ -52,6 +54,49 @@ function SavedList() {
   );
 }
 
+// Saved conversations for the model that's loaded, newest first. Hidden until there's one.
+function ChatList() {
+  const list = useChat((s) => s.list);
+  const on = useChat((s) => s.id);
+  const cur = useApp((s) => s.info?.model);
+
+  const mine = (list ?? []).filter((c) => !cur || modelName(c.model ?? "") === modelName(cur));
+  if (!mine.length) return null;
+
+  return (
+    <div className="saved chats">
+      <div className="side-h"><span className="eyebrow light">Chats</span></div>
+      <div id="chat-list" className="saved-list">{mine.map((c) => (
+        <div key={c.id} className={c.id === on ? "saved-item on" : "saved-item"} data-id={c.id} role="button" tabIndex={0}
+          onClick={() => openChat(c.id)} onKeyDown={(e) => e.key === "Enter" && openChat(c.id)}>
+          <span className="nm">{c.title}</span>
+          <button className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteChat(c.id))}>×</button>
+        </div>
+      ))}</div>
+    </div>
+  );
+}
+
+// How full the Mac's memory is: Lodestar's share, then everything else. Amber once macOS is swapping, which is when
+// replies slow down.
+function MemoryMeter() {
+  const m = useApp((s) => s.memory);
+  if (!m) return null;
+
+  const tight = m.swapping || m.pressure !== "normal";
+  const pct = (b: number) => `${(Math.min(Math.max(b, 0), m.total) / m.total) * 100}%`;
+  const app = Math.min(m.app, m.used);
+  const tip = [`Lodestar ${ram(m.app)}`, ...m.others.map((o) => `${o.name} ${ram(o.bytes)}`)].join("\n");
+  const label = m.swapping ? "Swapping" : m.pressure === "critical" ? "Memory full" : "Memory";
+
+  return (
+    <div id="mem" className={tight ? "mem tight" : "mem"} title={tip}>
+      <div className="mem-txt"><span>{label}</span><span className="mem-n">{ram(m.used)} of {ram(m.total)}</span></div>
+      <div className="mem-bar"><i className="mem-app" style={{ width: pct(app) }} /><i className="mem-rest" style={{ width: pct(m.used - app) }} /></div>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const art = useRef<HTMLCanvasElement>(null);
   const info = useApp((s) => s.info);
@@ -80,6 +125,7 @@ export function Sidebar() {
         <div className="side-h"><span className="eyebrow light">Saved</span></div>
         <SavedList />
       </div>
+      <ChatList />
       <div className="side-fill" />
       <div className="model-card">
         <div className="eyebrow light">Model</div>
@@ -88,6 +134,7 @@ export function Sidebar() {
           <span className="mp-name">{info?.loaded ? modelName(info.model) : "Choose a model"}</span><span className="mp-caret" aria-hidden="true" />
         </button>
         <div id="model-status" className={"model-status " + cls}><span className="dot" /><span className="txt">{msg}</span></div>
+        <MemoryMeter />
       </div>
     </aside>
   );
