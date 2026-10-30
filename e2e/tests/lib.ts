@@ -19,13 +19,9 @@ export async function scenario(page: Page, name: string) {
   expect(r.ok(), `fixture ${name}`).toBeTruthy();
 }
 
-// While the React port is partway done, PENDING names the goldens of views it hasn't reached yet (comma-separated);
-// those shots are skipped and everything else still runs
-const PENDING = new Set((process.env.PENDING || "").split(",").map((s) => s.trim()).filter(Boolean));
-
 /** Compare against a golden; skipped while recording, where output and timing come from a live model. */
 export async function snap(target: Page | Locator, name: string) {
-  if (RECORD || PENDING.has(name)) return;
+  if (RECORD) return;
   const page = "page" in target ? target.page() : target;
   const tag = await page.addStyleTag({ content: STILL });
   // WebKit paints only what's inside the window, so a panel taller than it would come out blank at the bottom:
