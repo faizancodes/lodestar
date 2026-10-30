@@ -802,9 +802,10 @@ body.busy .tl-comp .send.stop { display: grid; }
 
 /* ------------------------------------------------------------ chat */
 main.is-chat { padding: 0; overflow: hidden; }
-.chat { display: flex; flex-direction: column; height: 100%; }
+.chat { position: relative; display: flex; height: 100%; }
+.chat-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .chat-h {
-  display: flex; align-items: center; gap: 16px; padding: 16px 28px;
+  display: flex; flex: none; align-items: center; gap: 16px; height: 64px; padding: 0 28px;
   border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--bg) 88%, transparent);
 }
 .chat-title b { font-size: 15px; letter-spacing: -0.02em; color: var(--accent); }
@@ -815,6 +816,54 @@ main.is-chat { padding: 0; overflow: hidden; }
 }
 .mod.on { border: 1px solid var(--accent); background: var(--accent); color: var(--bg); }
 .mod:not(.on) { text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, 0.35); }
+
+/* the neurons panel, beside the conversation */
+#chat-neurons-btn.on { border-color: var(--ascii); color: var(--ascii); }
+.nr { display: flex; flex-direction: column; gap: 10px; flex: none; width: 300px; padding: 0 16px 18px; border-left: 1px solid var(--rule); overflow-y: auto; animation: rise 0.2s ease-out; }
+.nr-h { display: flex; align-items: center; justify-content: space-between; flex: none; height: 64px; margin: 0 -16px 8px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--rule); }
+.nr-x { padding: 2px 6px; border: 0; background: none; font-size: 18px; line-height: 1; color: var(--muted); cursor: pointer; }
+.nr-x:hover { color: var(--text); }
+.nr-add { display: flex; gap: 6px; }
+.nr-add input { flex: 1; min-width: 0; padding: 7px 10px; font-family: var(--mono); font-size: 12.5px; }
+.nr-add.bad input { border-color: var(--bad); }
+.nr-err { margin: 0; font-size: 12px; line-height: 1.45; color: var(--bad); }
+.nr-by { align-self: flex-start; }
+.nr-map { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 2px; animation: rise 0.2s ease-out; }
+.nr-map svg { display: block; overflow: visible; }
+.nr-map-zero { stroke: var(--rule-2); stroke-dasharray: 2 3; }
+.nr-map-t { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
+.nr-dot { fill: var(--ascii); cursor: pointer; transition: r 0.15s, opacity 0.15s; outline: none; }
+.nr-dot.focus, .nr-dot:hover { opacity: 1 !important; stroke: var(--text); stroke-width: 1.5; }
+.nr-dot.in { fill: var(--good); filter: drop-shadow(0 0 4px rgba(61, 220, 132, 0.6)); }
+.nr-dot.in.neg { fill: var(--bad); filter: drop-shadow(0 0 4px rgba(242, 119, 122, 0.6)); }
+.nr-map-info { display: flex; flex-direction: column; gap: 4px; min-height: 36px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.nr-map-info .nr-id em { margin-left: auto; font-family: var(--sans); font-style: normal; font-size: 11.5px; color: var(--text-2); }
+.nr-pins { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.nr-pins:empty { display: none; }
+.nr-pin {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: center; column-gap: 10px; row-gap: 4px;
+  padding: 10px 10px 10px 12px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--panel);
+  animation: rise 0.2s ease-out;
+}
+.nr-id { display: flex; align-items: baseline; gap: 6px; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.nr-id b { font-weight: 600; color: var(--text); }
+.nr-id span { color: var(--text-2); }
+.nr-dose { display: flex; align-items: center; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--well); }
+.nr-dose button { width: 22px; height: 24px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; cursor: pointer; }
+.nr-dose button:hover { color: var(--text); }
+.nr-dose input {
+  width: 46px; padding: 0; border: 0; background: none; text-align: center; font-family: var(--mono); font-size: 12.5px;
+  font-variant-numeric: tabular-nums; color: var(--good); outline: none;
+}
+.nr-dose.neg input { color: var(--bad); }
+.nr-del { padding: 0 2px; border: 0; background: none; font-size: 16px; line-height: 1; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity 0.15s; }
+.nr-pin:hover .nr-del, .nr-del:focus-visible { opacity: 1; }
+.nr-del:hover { color: var(--text); }
+.nr-lens { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nr-lens:empty { display: none; }
+@media (max-width: 900px) {
+  .nr { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; background: var(--bg); box-shadow: -24px 0 48px -24px rgba(0, 0, 0, 0.8); }
+}
 
 .chat-scroll { position: relative; flex: 1; min-height: 0; overflow-y: auto; }
 .chat-log { display: flex; flex-direction: column; gap: 28px; max-width: 760px; margin: 0 auto; padding: 40px 28px 32px; }

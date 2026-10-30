@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { setAblActive } from "../abl/engine";
 import {
-  copyReply, growInput, jumpDown, newChat, onScroll, rateOf, rateText, replyHtml, retry, sendChat, STARTERS, toggleCompare, toggleSteer,
+  addNeurons, copyReply, findNeurons, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat,
+  setPickBy, STARTERS, toggleCompare, toggleFound, toggleNeurons, toggleSteer,
 } from "../chat/engine";
 import { api } from "../lib/api";
-import { isDir, labelOf, modelName } from "../lib/format";
+import { isDir, itemKey, labelOf, lensLabel, modelName } from "../lib/format";
+import { patchAt, removeAt } from "../steer/recipe";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
 import { useChat } from "../store/chat";
@@ -166,32 +168,174 @@ function Composer() {
   );
 }
 
+// ------------------------------------------------------------------ neurons by hand
+const STEP = 0.25;
+const signed = (d: number) => (d > 0 ? "+" : "") + +d.toFixed(2);
+
+// a neuron's dose: typed, or nudged a quarter at a time
+function Dose({ i, dose }: { i: number; dose: number }) {
+  const [text, setText] = useState(signed(dose));
+  useEffect(() => setText(signed(dose)), [dose]);
+
+  const commit = () => {
+    const d = parseFloat(text.replace(/[−–]/g, "-"));
+    if (Number.isFinite(d) && d) patchAt(i, { dose: d });
+    else setText(signed(dose));
+  };
+
+  const step = (by: number) => {
+    const d = Math.round((dose + by) / STEP) * STEP;
+    if (d) patchAt(i, { dose: d });
+  };
+
+  return (
+    <div className={dose < 0 ? "nr-dose neg" : "nr-dose"}>
+      <button aria-label="Less" onClick={() => step(-STEP)}>−</button>
+      <input aria-label="Dose" value={text} spellCheck="false" onChange={(e) => setText(e.target.value)}
+        onBlur={commit} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} />
+      <button aria-label="More" onClick={() => step(STEP)}>+</button>
+    </div>
+  );
+}
+
+// The neurons behind a word, laid out by layer (across) and how strongly turning each up (above the line) or down
+// (below) pushes toward it. Hover one to see what it does; click it to add it, or take it out again.
+const MW = 268, MH = 150, PAD = 8, AXIS = 16;
+
+function NeuronMap() {
+  const found = useChat((s) => s.found)!;
+  const layers = useApp((s) => s.info?.layers ?? 1);
+  const items = useApp((s) => s.recipe.items);
+  const on = new Map(items.map((it) => [itemKey(it), it.dose]));
+  const [focus, setFocus] = useState<string | null>(null);
+
+  const res = found.results;
+  const max = Math.max(...res.map((x) => Math.abs(x.score)), 1e-6);
+  const mid = (MH - AXIS) / 2;
+  const x = (l: number) => PAD + (l / Math.max(layers - 1, 1)) * (MW - 2 * PAD);
+  const y = (s: number) => mid - (s / max) * (mid - PAD);
+  const key = (r: { layer: number; neuron: number }) => `${r.layer}:${r.neuron}`;
+  const shown = res.find((r) => key(r) === focus);
+
+  return (
+    <div className="nr-map">
+      <svg id="chat-map" viewBox={`0 0 ${MW} ${MH}`} width={MW} height={MH} onMouseLeave={() => setFocus(null)}>
+        <line className="nr-map-zero" x1={0} x2={MW} y1={mid} y2={mid} />
+        <text className="nr-map-t" x={2} y={10}>up</text>
+        <text className="nr-map-t" x={2} y={MH - AXIS - 3}>down</text>
+        <text className="nr-map-t" x={PAD} y={MH - 3}>L0</text>
+        <text className="nr-map-t" x={MW / 2} y={MH - 3} textAnchor="middle">layer</text>
+        <text className="nr-map-t" x={MW - PAD} y={MH - 3} textAnchor="end">L{layers - 1}</text>
+        {res.map((r) => {
+          const k = key(r), dose = on.get(k), a = Math.abs(r.score) / max;
+          const cls = dose == null ? "nr-dot" : dose < 0 ? "nr-dot in neg" : "nr-dot in";
+
+          return (
+            <circle key={k} className={k === focus ? cls + " focus" : cls} data-dot={k} cx={x(r.layer)} cy={y(r.score)} r={3 + 4 * a}
+              style={{ opacity: dose == null ? 0.35 + 0.65 * a : 1 }} role="button" tabIndex={0}
+              aria-label={`Layer ${r.layer}, neuron ${r.neuron}`}
+              onMouseEnter={() => setFocus(k)} onFocus={() => setFocus(k)} onClick={() => (setFocus(k), toggleFound(r))}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggleFound(r))} />
+          );
+        })}
+      </svg>
+      <div className="nr-map-info" id="chat-map-info">{shown ? (
+        <>
+          <div className="nr-id"><b>L{shown.layer}</b><span>N{shown.neuron}</span><em>{on.has(key(shown)) ? "On" : shown.score > 0 ? "Turn up" : "Turn down"}</em></div>
+          <div className="nr-lens">{lensLabel(shown.lens)}</div>
+        </>
+      ) : found.partial ? <span>“{found.word}” is split into pieces, so these match “{found.piece}”.</span> : null}</div>
+    </div>
+  );
+}
+
+// The neurons in the recipe that's on, to add to by layer and number and to dose by hand
+function Neurons() {
+  const open = useChat((s) => s.neurons), add = useChat((s) => s.add), err = useChat((s) => s.addErr), lens = useChat((s) => s.lens);
+  const set = useChat((s) => s.set);
+  const by = useChat((s) => s.pickBy), find = useChat((s) => s.find), found = useChat((s) => s.found), finding = useChat((s) => s.finding);
+  const items = useApp((s) => s.recipe.items);
+
+  if (!open) return null;
+
+  return (
+    <aside className="nr" id="chat-neurons">
+      <div className="nr-h">
+        <span className="eyebrow light">Neurons</span>
+        <button className="nr-x" aria-label="Close" onClick={toggleNeurons}>×</button>
+      </div>
+      <div className="seg nr-by" id="chat-pick-by">
+        <button className={by === "type" ? "on" : undefined} data-by="type" onClick={() => setPickBy("type")}>By number</button>
+        <button className={by === "map" ? "on" : undefined} data-by="map" onClick={() => setPickBy("map")}>By word</button>
+      </div>
+      {by === "type" ? (
+        <form className={err ? "nr-add bad" : "nr-add"} onSubmit={(e) => (e.preventDefault(), addNeurons())}>
+          <input id="chat-add" placeholder="L14 N8949 +1" spellCheck="false" autoComplete="off" value={add}
+            onChange={(e) => set({ add: e.target.value, addErr: "" })} />
+          <button className="btn sm" disabled={!add.trim()}>Add</button>
+        </form>
+      ) : (
+        <>
+          <form className={err ? "nr-add bad" : "nr-add"} onSubmit={(e) => (e.preventDefault(), findNeurons())}>
+            <input id="chat-find" placeholder="evil" spellCheck="false" autoComplete="off" value={find}
+              onChange={(e) => set({ find: e.target.value, addErr: "" })} />
+            <button className="btn sm" disabled={!find.trim() || finding}>{finding ? "Finding…" : "Find"}</button>
+          </form>
+          {found && <NeuronMap />}
+        </>
+      )}
+      <p className="nr-err" id="chat-add-err" hidden={!err}>{err}</p>
+      <div className="nr-pins">{recipeNeurons(items).map(({ it, i }) => {
+        const l = lens[`${it.layer}:${it.neuron}`], words = l && lensLabel(it.dose < 0 ? l.down : l.up);
+
+        return (
+          <div key={`${it.layer}:${it.neuron}`} className="nr-pin" data-pin={`${it.layer}:${it.neuron}`}>
+            <div className="nr-id"><b>L{it.layer}</b><span>N{it.neuron}</span></div>
+            <Dose i={i} dose={it.dose} />
+            <button className="nr-del" aria-label="Remove" onClick={() => removeAt(i)}>×</button>
+            <div className="nr-lens" title={words ? `Pushes toward: ${words}` : undefined}>{words}</div>
+          </div>
+        );
+      })}</div>
+    </aside>
+  );
+}
+
+function NeuronsButton() {
+  const open = useChat((s) => s.neurons);
+  return <button id="chat-neurons-btn" className={open ? "btn ghost sm on" : "btn ghost sm"} aria-expanded={open} onClick={toggleNeurons}>Neurons</button>;
+}
+
 export function Chat({ hidden }: { hidden: boolean }) {
   const model = useApp((s) => (s.info?.loaded ? modelName(s.info.model) ?? "" : ""));
   const started = useChat((s) => s.messages.length > 0);
 
   return (
     <section id="view-chat" className="view chat" data-view="chat" hidden={hidden}>
-      <header className="chat-h">
-        <div className="chat-title"><b id="chat-model">{model}</b></div>
-        <Mods />
-        <CompareSwitch />
-        <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
-      </header>
-      <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>
-        <Log />
-        <div className="chat-empty" id="chat-empty" hidden={started}>
-          <h2>What’s on your mind?</h2>
-          <div className="chat-starters" id="chat-starters">{STARTERS.map((s, i) => (
-            <button key={s} className="starter" onClick={() => sendChat(s)}>
-              <span className="starter-mark" aria-hidden="true">{MARKS[i]}</span>
-              <span>{s}</span>
-              <span className="starter-go" aria-hidden="true">↗</span>
-            </button>
-          ))}</div>
+      <div className="chat-main">
+        <header className="chat-h">
+          <div className="chat-title"><b id="chat-model">{model}</b></div>
+          <Mods />
+          <CompareSwitch />
+          <NeuronsButton />
+          <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
+        </header>
+        <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>
+          <Log />
+          <div className="chat-empty" id="chat-empty" hidden={started}>
+            <h2>What’s on your mind?</h2>
+            <div className="chat-starters" id="chat-starters">{STARTERS.map((s, i) => (
+              <button key={s} className="starter" onClick={() => sendChat(s)}>
+                <span className="starter-mark" aria-hidden="true">{MARKS[i]}</span>
+                <span>{s}</span>
+                <span className="starter-go" aria-hidden="true">↗</span>
+              </button>
+            ))}</div>
+          </div>
         </div>
+        <Composer />
       </div>
-      <Composer />
+      <Neurons />
     </section>
   );
 }

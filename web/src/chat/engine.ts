@@ -3,13 +3,15 @@ import { flushSync } from "react-dom";
 import { setAblActive } from "../abl/engine";
 import { createDecoder } from "../art/decode";
 import { api } from "../lib/api";
-import { cleanReply, pushes } from "../lib/format";
+import { cleanReply, isDir, isWord, itemKey, pushes, searchDose } from "../lib/format";
 import { md } from "../lib/markdown";
 import { save } from "../lib/storage";
 import { stream } from "../lib/stream";
 import { setTab, still } from "../shell/engine";
 import { ablActive, useApp } from "../store/app";
-import type { ChatSummary } from "../lib/types";
+import type { ChatSummary, NeuronItem, WordSearch } from "../lib/types";
+import { addItems, removeAt } from "../steer/recipe";
+import { parsePins } from "./parse";
 import { touchChat, useChat, type Col, type ColKey, type Msg } from "../store/chat";
 
 const app = useApp.getState;
@@ -267,8 +269,82 @@ export function toggleCompare() {
   set({ compare: !get().compare });
 }
 
+// ------------------------------------------------------------------ neurons by hand
+export function toggleNeurons() {
+  save("chat-neurons", get().neurons ? "0" : "1");
+  set({ neurons: !get().neurons });
+  if (get().neurons) requestAnimationFrame(() => document.getElementById("chat-add")?.focus());
+}
+
+/** Add the neurons typed in the panel ("L14 N8949 +1 and L13 N7956 -1") to the recipe that's on, and steer with it. */
+export function addNeurons() {
+  const { layers = 0, neurons = 0 } = app().info ?? {};
+  const found = parsePins(get().add);
+  if (!found) return set({ addErr: "Write each one as L14 N8949 +1." });
+
+  const bad = found.find((p) => p.layer >= layers || p.neuron >= neurons);
+  if (bad) {
+    return set({ addErr: bad.layer >= layers ? `There’s no layer ${bad.layer}: this model has layers 0–${layers - 1}.`
+      : `There’s no neuron ${bad.neuron}: each layer has neurons 0–${neurons - 1}.` });
+  }
+
+  addItems(found);
+  set({ add: "", addErr: "", steer: true });
+  found.forEach(fetchLens);
+}
+
+export function setPickBy(by: "type" | "map") {
+  save("chat-pick-by", by);
+  set({ pickBy: by });
+  requestAnimationFrame(() => document.getElementById(by === "map" ? "chat-find" : "chat-add")?.focus());
+}
+
+/** The neurons whose push most directly raises a word, for the map. */
+export async function findNeurons() {
+  const word = get().find.trim();
+  if (!word || get().finding) return;
+  if (!isWord(word)) return set({ found: null, addErr: "Try a word or two, like evil or pirate." });
+
+  set({ finding: true, addErr: "" });
+  try {
+    // the last ~10% of layers hold blunt "say this exact word" neurons; mid-late layers hold the concept (as in Steer)
+    const skip = Math.max(2, Math.round((app().info?.layers ?? 0) / 9));
+    const r = await api<WordSearch>(`/api/search?word=${encodeURIComponent(word)}&k=24&skip_last=${skip}`);
+    set({ found: { ...r, word } });
+  } catch (e) {
+    set({ addErr: (e as Error).message });
+  } finally {
+    set({ finding: false });
+  }
+}
+
+/** A neuron on the map, clicked: into the recipe at a dose its push is noticeable but not yet a loop, or out again. */
+export function toggleFound(x: { layer: number; neuron: number; score: number }) {
+  const i = app().recipe.items.findIndex((it) => itemKey(it) === `${x.layer}:${x.neuron}`);
+  if (i >= 0) return removeAt(i);
+
+  addItems([{ layer: x.layer, neuron: x.neuron, dose: searchDose(x.score) }]);
+  set({ steer: true });
+  fetchLens(x);
+}
+
+async function fetchLens(it: { layer: number; neuron: number }) {
+  const k = `${it.layer}:${it.neuron}`;
+  if (get().lens[k]) return;
+
+  try {
+    const r = await api<{ lens: { up: string[]; down: string[] } }>(`/api/neuron?layer=${it.layer}&n=${it.neuron}`);
+    set({ lens: { ...get().lens, [k]: r.lens } });
+  } catch {}
+}
+
+/** The recipe's neurons, each with where it sits in the recipe (its directions are Steer's to show). */
+export const recipeNeurons = (items: ReturnType<typeof app>["recipe"]["items"]) =>
+  items.flatMap((it, i) => (isDir(it) ? [] : [{ it: it as NeuronItem, i }]));
+
 /** The Chat tab was opened, or a model got ready while it's open. */
 export function onChatShown() {
+  recipeNeurons(app().recipe.items).forEach(({ it }) => fetchLens(it));
   render();
   toBottom(false);
   requestAnimationFrame(() => input()?.focus());
