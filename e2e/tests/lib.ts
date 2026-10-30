@@ -1,8 +1,9 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 export const RECORD = process.env.MODE === "record";
-// how long to wait for the engine: minutes against a real model, seconds against the mock
-export const T = RECORD ? 30 * 60_000 : 20_000;
+// how long to wait for the engine: minutes against a real model; against the mock, the longest replay (describe's
+// ~1,400 events, 12 ms apart) with room for a busy machine
+export const T = RECORD ? 30 * 60_000 : 60_000;
 export const MODEL = "Qwen/Qwen3-0.6B";
 
 // What moves on its own and isn't the UI's layout: canvases (the scenes, spinners, art), the plan clock and load
