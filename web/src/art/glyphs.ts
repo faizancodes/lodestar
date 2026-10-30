@@ -1,0 +1,145 @@
+// Every ASCII scene draws through here: one mark per grid cell, picked by brightness, so a scene reads like a
+// figure set in type: a dot where it's faint, then a plus, an ×, and a solid block where it's brightest.
+const DOT = 0.3, PLUS = 0.55, CROSS = 0.8;
+
+/** Draws `grid` (cols × rows of brightness 0..1) as marks in the canvas's current fill colour. */
+/** Writes brightness b at cell (x, y) of a scene's grid, keeping the brighter of what's there. */
+export type Put = (x: number, y: number, b: number) => void;
+
+export function drawMarks(ctx: CanvasRenderingContext2D, grid: Float32Array, cols: number, rows: number, cell: number) {
+  ctx.clearRect(0, 0, cols * cell, rows * cell);
+  const plus = new Path2D(), cross = new Path2D();
+  const arm = cell * 0.4, d = cell * 0.3;
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const b = Math.min(1, grid[y * cols + x]);
+      if (b < 0.05) continue;
+      const cx = x * cell + cell / 2, cy = y * cell + cell / 2;
+      if (b < DOT) {
+        const s = cell * (0.16 + 0.55 * b);
+        ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
+      } else if (b < PLUS) {
+        plus.moveTo(cx - arm, cy); plus.lineTo(cx + arm, cy);
+        plus.moveTo(cx, cy - arm); plus.lineTo(cx, cy + arm);
+      } else if (b < CROSS) {
+        cross.moveTo(cx - d, cy - d); cross.lineTo(cx + d, cy + d);
+        cross.moveTo(cx - d, cy + d); cross.lineTo(cx + d, cy - d);
+      } else {
+        const s = cell * 0.84;
+        ctx.fillRect(cx - s / 2, cy - s / 2, s, s);
+      }
+    }
+  ctx.strokeStyle = ctx.fillStyle;
+  ctx.lineCap = "square";
+  ctx.lineWidth = Math.max(0.6, cell * 0.2);
+  ctx.globalAlpha = 0.75;
+  ctx.stroke(plus);
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = Math.max(0.7, cell * 0.24);
+  ctx.stroke(cross);
+}
+
+const hash = (x: number, y: number) => { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return s - Math.floor(s); };
+
+/** The sidebar's night as a navigator's chart, where the start screen's scene is the photograph: a faint sky
+ * atlas grid sweeping in from the pole, and scattered stars that twinkle. Nothing turns; ~4 fps for the twinkle,
+ * paused while hidden. */
+export function startSideArt(canvas: HTMLCanvasElement) {
+  const cell = 4;
+  let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D, navRow = 0, pole = { x: 0, y: 0 };
+  const size = () => {
+    const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
+    if (!w || !h) return false;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx = canvas.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cols = Math.ceil(w / cell);
+    rows = Math.ceil(h / cell);
+    grid = new Float32Array(cols * rows);
+    const tabs = document.querySelector(".tabs")?.getBoundingClientRect(), top = canvas.getBoundingClientRect().top;
+    navRow = tabs ? (tabs.bottom - top) / cell : 0;
+    pole = { x: cols * 1.25, y: -rows * 0.08 }; // the chart's pole, off past the top right, so its grid sweeps in
+    return true;
+  };
+  const put: Put = (x, y, b) => {
+    if (x < 0 || y < 0 || x >= cols || y >= rows) return;
+    b *= Math.min(1, Math.max(0.15, (y - navRow) / 16)); // quiet behind the brand and tabs
+    const i = y * cols + x;
+    if (b > grid[i]) grid[i] = b;
+  };
+  const draw = (t: number) => {
+    grid.fill(0);
+    // the atlas grid: circles of declination and meridians, dotted
+    for (let r = 30; r < cols * 3; r += 26) {
+      const step = 3 / r;
+      for (let a = Math.PI * 0.5; a < Math.PI * 1.1; a += step) put(Math.round(pole.x + Math.cos(a) * r), Math.round(pole.y + Math.sin(a) * r), 0.14);
+    }
+    for (let k = 0; k < 9; k++) {
+      const a = Math.PI * (0.55 + k * 0.06);
+      for (let r = 20; r < cols * 3; r += 4) put(Math.round(pole.x + Math.cos(a) * r), Math.round(pole.y + Math.sin(a) * r), 0.11);
+    }
+    // scattered stars, each twinkling on its own beat
+    for (let i = 0; i < 70; i++) {
+      const x = Math.floor(hash(i, 11) * cols), y = Math.floor(hash(i, 12) * rows);
+      put(x, y, (0.12 + hash(i, 13) ** 3 * 0.45) * (0.65 + 0.35 * Math.sin(t * (0.6 + hash(i, 14)) + i)));
+    }
+    ctx.fillStyle = getComputedStyle(canvas).color;
+    drawMarks(ctx, grid, cols, rows, cell);
+  };
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches, t0 = performance.now();
+  let last = 0, raf = 0;
+  const tick = (now: number) => {
+    raf = 0;
+    if (document.hidden) return;
+    raf = requestAnimationFrame(tick);
+    if (now - last < 250) return; // a twinkle needs only a few frames a second
+    last = now;
+    draw((now - t0) / 1000);
+  };
+  const run = () => (still ? draw(0) : raf || (raf = requestAnimationFrame(tick)));
+  if (size()) run();
+  let resizeT: ReturnType<typeof setTimeout> | undefined;
+  addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => size() && (still ? draw(0) : null), 200); });
+  document.addEventListener("visibilitychange", () => !document.hidden && run());
+}
+
+/** A small Lodestar spinner: the lodestar at the centre with a star trail wheeling around it, in marks. Runs while
+ * `live()` says so and the canvas is on screen; call the returned function to start it again after it stops. */
+export function startSpinner(canvas: HTMLCanvasElement, live: () => boolean) {
+  const N = 12, cell = 3;
+  const dpr = devicePixelRatio || 1;
+  canvas.width = canvas.height = N * cell * dpr;
+  const ctx = canvas.getContext("2d")!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let raf = 0, last = 0;
+  const draw = (t: number) => {
+    const grid = new Float32Array(N * N), c = (N - 1) / 2;
+    const put: Put = (x, y, b) => {
+      x = Math.round(x); y = Math.round(y);
+      if (x < 0 || y < 0 || x >= N || y >= N) return;
+      if (b > grid[y * N + x]) grid[y * N + x] = b;
+    };
+    for (const [dx, dy, b] of [[0, 0, 1], [1, 0, 0.6], [-1, 0, 0.6], [0, 1, 0.6], [0, -1, 0.7], [0, -2, 0.35]]) put(c + dx, c + dy, b);
+    const orbit = (r: number, speed: number, span: number, peak: number) => { // a trail: bright at its head, fading behind it
+      const head = t * speed;
+      for (let u = 0; u <= span; u += 0.7 / r) put(c + Math.cos(head - u) * r, c + Math.sin(head - u) * r, peak * (1 - u / span) ** 1.5);
+    };
+    orbit(4.6, 3.4, 4.4, 1);
+    orbit(3.1, -2.3, 2.2, 0.45);
+    ctx.fillStyle = getComputedStyle(canvas).color;
+    drawMarks(ctx, grid, N, N, cell);
+  };
+  const tick = (now: number) => {
+    raf = 0;
+    if (!canvas.isConnected || !canvas.offsetParent || !live()) return;
+    raf = requestAnimationFrame(tick);
+    if (now - last < 50) return;
+    last = now;
+    draw(now / 1000);
+  };
+  const run = () => (still ? draw(1) : raf || (raf = requestAnimationFrame(tick)));
+  run();
+  return run;
+}

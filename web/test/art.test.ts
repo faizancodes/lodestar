@@ -1,0 +1,125 @@
+// The canvas modules draw exactly what the originals in ui/ draw: every call on the 2D context and every path,
+// frame by frame, with the clock and animation frames driven by hand. Both with motion and with reduced motion.
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { UI } from "./legacy";
+
+type Log = unknown[];
+
+function setup(still: boolean) {
+  const log: Log = [];
+  class Path2D {
+    ops: unknown[] = [];
+    moveTo(...a: number[]) { this.ops.push(["m", ...a]); }
+    lineTo(...a: number[]) { this.ops.push(["l", ...a]); }
+  }
+  const ctx = new Proxy({ fillStyle: "#000" } as Record<string, unknown>, {
+    get: (t, k) => (k in t ? t[k as string] : (...a: unknown[]) => log.push([k, ...a.map((x) => (x instanceof Path2D ? x.ops : x))])),
+    set: (t, k, v) => (log.push([`${String(k)}=`, v]), (t[k as string] = v), true),
+  });
+  const canvas = (w = 220, h = 140) => ({
+    width: 0, height: 0, style: {}, clientWidth: w, clientHeight: h, isConnected: true, offsetParent: {}, offsetWidth: 0,
+    dataset: {}, getContext: () => ctx, closest: () => null, getBoundingClientRect: () => ({ top: 10 }),
+    classList: { add: (c: string) => log.push(["+class", c]), remove: (c: string) => log.push(["-class", c]) },
+  });
+  let queue: ((t: number) => void)[] = [], clock = 1000;
+  const listeners: Record<string, (() => void)[]> = {};
+  vi.stubGlobal("Path2D", Path2D);
+  vi.stubGlobal("devicePixelRatio", 2);
+  vi.stubGlobal("matchMedia", () => ({ matches: still }));
+  vi.stubGlobal("getComputedStyle", () => ({ color: "rgb(195, 207, 245)" }));
+  vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => queue.push(cb));
+  vi.stubGlobal("cancelAnimationFrame", () => (queue = []));
+  vi.stubGlobal("addEventListener", () => {});
+  vi.stubGlobal("document", { hidden: false, addEventListener: () => {}, querySelector: () => ({ getBoundingClientRect: () => ({ bottom: 190 }) }) });
+  vi.spyOn(performance, "now").mockImplementation(() => clock);
+  const frames = (n: number, ms = 70) => {
+    for (let i = 0; i < n; i++) {
+      clock += ms;
+      const q = queue;
+      queue = [];
+      q.forEach((cb) => cb(clock));
+    }
+  };
+  const card = () => {
+    const el = { dataset: {}, addEventListener: (e: string, f: () => void) => (listeners[e] ||= []).push(f) };
+    return el;
+  };
+  const fire = (e: string) => listeners[e]?.forEach((f) => f());
+  return { log, canvas, frames, card, fire };
+}
+
+// Each module is loaded fresh per run (loader.js keeps state at module level), from ui/ or from src/art
+async function load<T>(from: "old" | "now", name: string): Promise<T> {
+  vi.resetModules();
+  return from === "old" ? import(/* @vite-ignore */ `${UI}/${name}.js`) : import(/* @vite-ignore */ `../src/art/${name}.ts`);
+}
+
+type Scenario = (from: "old" | "now", env: ReturnType<typeof setup>) => Promise<void>;
+
+const scenarios: Record<string, Scenario> = {
+  async drawMarks(from, { canvas }) {
+    const { drawMarks } = await load<typeof import("../src/art/glyphs")>(from, "glyphs");
+    const grid = new Float32Array(40 * 30).map((_, i) => Math.abs(Math.sin(i * 12.9898) * 1.3));
+    drawMarks(canvas().getContext() as unknown as CanvasRenderingContext2D, grid, 40, 30, 3.5);
+  },
+  async sideArt(from, { canvas, frames }) {
+    const { startSideArt } = await load<typeof import("../src/art/glyphs")>(from, "glyphs");
+    startSideArt(canvas(248, 900) as unknown as HTMLCanvasElement);
+    frames(6, 130);
+  },
+  async spinner(from, { canvas, frames }) {
+    const { startSpinner } = await load<typeof import("../src/art/glyphs")>(from, "glyphs");
+    const again = startSpinner(canvas() as unknown as HTMLCanvasElement, () => true);
+    frames(5, 60);
+    again();
+    frames(2, 60);
+  },
+  async loader(from, { canvas, frames }) {
+    const m = await load<typeof import("../src/art/loader")>(from, "loader");
+    m.startScene(canvas() as unknown as HTMLCanvasElement);
+    frames(3);
+    m.wake();
+    m.setProgress(0.4);
+    frames(5);
+    const done = m.finishScene();
+    frames(30);
+    await done;
+    m.stopScene();
+  },
+  async scan(from, { canvas, frames }) {
+    const { startScan } = await load<typeof import("../src/art/scan")>(from, "scan");
+    startScan(canvas() as unknown as HTMLCanvasElement);
+    frames(60, 70);
+  },
+  async ablScene(from, { canvas, frames }) {
+    const { startAblScene } = await load<typeof import("../src/art/ablscene")>(from, "ablscene");
+    const s = startAblScene(canvas() as unknown as HTMLCanvasElement);
+    for (const i of [0, 1, 2, 3, 3, 9]) (s.set(i), frames(25, 70));
+  },
+  async home(from, { canvas, frames, card, fire }) {
+    const { drawHomeArt } = await load<typeof import("../src/art/home")>(from, "home");
+    for (const kind of ["abliterate", "steer", "chat"] as const) {
+      drawHomeArt(canvas(300, 120) as unknown as HTMLCanvasElement, kind, card() as unknown as HTMLElement);
+      fire("mouseenter");
+      frames(8, 60);
+      fire("mouseleave");
+    }
+  },
+};
+
+afterEach(() => (vi.unstubAllGlobals(), vi.restoreAllMocks()));
+
+describe.each([false, true])("canvas art draws the same as ui/ (reduced motion: %s)", (still) => {
+  it.each(Object.keys(scenarios))("%s", async (name) => {
+    const runs: Log[] = [];
+    for (const from of ["old", "now"] as const) {
+      const env = setup(still);
+      await scenarios[name](from, env);
+      runs.push(env.log);
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
+    expect(runs[0].length).toBeGreaterThan(still ? 3 : 10);
+    expect(runs[1]).toEqual(runs[0]);
+  });
+});

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "18.3.1",
@@ -17,7 +18,10 @@
     "@types/react": "18",
     "@types/react-dom": "18",
     "@vitejs/plugin-react": "6.1.2",
+    "acorn": "8.19.0",
+    "jsdom": "30.1.3",
     "typescript": "~5.9",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   }
 }
