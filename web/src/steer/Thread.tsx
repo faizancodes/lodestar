@@ -10,8 +10,10 @@ const act = (label: string, onClick: () => void, on = false) => <button classNam
 export function Thread() {
   const tl = useSteer((s) => s.tl);
   useSteer((s) => s.v);
+
   if (!tl) return <div id="tl" className="tl" hidden />;
   const main = tl.streaming.has("main");
+
   return (
     <div id="tl" className="tl">
       <div className="tl-you">{tl.prompt}</div>
@@ -32,8 +34,10 @@ export function Thread() {
 function Answer({ v, i, last }: { v: Version; i: number; last: boolean }) {
   const tl = useSteer((s) => s.tl)!, cmp = useSteer((s) => s.compare);
   const typing = last && tl.streaming.has("main");
+
   // an older answer folds to two lines; a click (not on its buttons or a panel under it) unfolds it
   const fold = (e: React.MouseEvent) => !(e.target as Element).closest("button, .panel") && ((v.open = !v.open), touch());
+
   return (
     <>
       {v.fix ? <>

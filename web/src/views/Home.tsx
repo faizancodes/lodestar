@@ -17,12 +17,14 @@ export function Home({ hidden }: { hidden: boolean }) {
   const cur = useApp((s) => s.abl?.current);
   const mine = useApp((s) => (s.saved || []).filter((r) => modelName(r.model) === modelName(s.info?.model)).length);
   const shown = !hidden && !!s?.loaded;
+
   useEffect(() => {
     if (!shown) return;
     const raf = requestAnimationFrame(() => document.querySelectorAll<HTMLCanvasElement>(".home-art")
       .forEach((c) => drawHomeArt(c, c.dataset.art as HomeArt, c.closest<HTMLElement>(".home-card"))));
     return () => cancelAnimationFrame(raf);
   }, [shown, s?.model, cur, mine]);
+
   const dev = s?.device && ({ mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device);
   const specs: [string, unknown][] = [["Parameters", s?.params && `${(s.params / 1e9).toFixed(1)}B`], ["Layers", s?.layers], ["Runs on", dev], ["Precision", s?.dtype]];
   const status: Record<HomeArt, JSX.Element | string> = {
@@ -30,6 +32,7 @@ export function Home({ hidden }: { hidden: boolean }) {
     steer: mine ? `${mine} saved` : "",
     chat: "",
   };
+
   return (
     <section id="view-home" className="view home" data-view="home" hidden={hidden}>
       <header className="home-h">

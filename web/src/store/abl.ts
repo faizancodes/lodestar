@@ -19,6 +19,7 @@ export type Entry = {
   typing: boolean;
   open: boolean; // an older answer, unfolded
 };
+
 type Rank = { layer: number; score: number; tried: number; refused: number };
 export type AblResult = { layer: number; coef: number; tried: number; refused_left: number; top_score: number; ranking: Rank[] };
 

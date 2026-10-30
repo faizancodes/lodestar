@@ -20,6 +20,7 @@ export function openPanel(anchor: string, title: string, kind: Panel["kind"]): n
     closePanel(p.id); // second click on the same thing closes it
     return null;
   }
+
   let id: number;
   if (p) {
     id = p.id;
@@ -28,6 +29,7 @@ export function openPanel(anchor: string, title: string, kind: Panel["kind"]): n
     id = ++ids;
     set({ panels: [...get().panels, { id, anchor, kind, title, body: { node: null, n: 0, reveal: false } }] });
   }
+
   requestAnimationFrame(() => panelEls.get(id)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
   return id;
 }

@@ -6,6 +6,7 @@ export function load(key: string): string | null {
   try {
     const v = localStorage.getItem(PREFIX + key);
     if (v !== null) return v;
+
     const old = localStorage.getItem(key); // from before the keys were versioned
     if (old !== null) (localStorage.setItem(PREFIX + key, old), localStorage.removeItem(key));
     return old;

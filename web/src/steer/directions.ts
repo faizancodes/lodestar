@@ -49,9 +49,11 @@ export async function findDirection() {
   const d = dn(), pos = lines(d.pos), neg = lines(d.neg), name = d.name.trim();
   if (!name) return focus("dn-name");
   if (pos.length < 2 || neg.length < 2) return toast("Give each side at least two lines.", true);
+
   setDn({ result: null, made: null });
   let label = "", tries: ReturnType<typeof sink>[] = [];
   say("Starting…", true);
+
   const ok = await stream("/api/directions/extract", { name, kind: d.kind, pos, neg }, (ev) => {
     if (ev.type === "stage") {
       say((label = ev.label as string) + "…", true);
@@ -60,9 +62,11 @@ export async function findDirection() {
     else if (ev.type === "trydelta") streamInto(tries[ev.index as number], ev.delta as string);
     else if (ev.type === "result") setDn({ made: ev as Dn["made"] });
   });
+
   setDn({ typing: false });
   const m = dn().made;
   if (!ok || !m) return say("Stopped. Nothing was saved.", false);
+
   const band = m.band, at = (a: number[]) => Math.min(...band.map((l) => a[l]));
   say("", false);
   setDn({
@@ -71,6 +75,7 @@ export async function findDirection() {
       facts: [["Layers", bandText(band)], ["Separates", `${Math.round(at(m.auc) * 100)}%`], ["Split agreement", at(m.cos_split).toFixed(2)]],
     },
   });
+
   refreshDirs();
 }
 
@@ -82,11 +87,13 @@ export function turnOnMade() {
 export async function importDirs() {
   const path = dn().path.trim();
   if (!path || app().busy) return focus("dn-path");
+
   say("Importing…", true);
   try {
     const r = await api<{ added: { name: string }[] }>("/api/directions/import", { path });
     say(`Imported ${r.added.map((d) => d.name).join(", ") || "nothing"}.`, false);
   } catch (e) { return say((e as Error).message, false); }
+
   refreshDirs();
 }
 

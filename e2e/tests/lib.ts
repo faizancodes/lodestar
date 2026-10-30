@@ -23,14 +23,17 @@ export async function scenario(page: Page, name: string) {
 /** Compare against a golden; skipped while recording, where output and timing come from a live model. */
 export async function snap(target: Page | Locator, name: string) {
   if (RECORD) return;
+
   const page = "page" in target ? target.page() : target;
   const tag = await page.addStyleTag({ content: STILL });
+
   // WebKit paints only what's inside the window, so a panel taller than it would come out blank at the bottom:
   // grow the window to fit it for the shot, then put it back
   const size = page.viewportSize()!;
   const box = "page" in target ? await target.boundingBox() : null;
   const tall = box && box.height + 120 > size.height;
   if (tall) await page.setViewportSize({ width: size.width, height: Math.ceil(box.height + 240) });
+
   try {
     await expect(target).toHaveScreenshot(`${name}.png`);
   } finally {
@@ -53,6 +56,7 @@ export async function ran(line: Locator, timeout = T) {
 /** Every request the UI made was recorded, with the same body. */
 export async function clean(page: Page) {
   if (RECORD) return;
+
   const log = await (await page.request.get("/__fixture/log")).json();
   expect(log.unrecorded, "requests with no recording").toEqual([]);
   expect(log.mismatches, "request bodies that differ from the recording").toEqual([]);

@@ -24,15 +24,18 @@ const STARS = Array.from({ length: 230 }, (_, i) => ({
   head: 0.24 + hash(i, 3) ** 2.4 * 0.76, // most faint, a few bright
   tw: hash(i, 4) * 6.28,
 }));
+
 const ridgeOf = (gx: number) => ({
   back: Math.round(HORIZON - 10 + 3 * Math.sin(gx * 0.045 + 1.3) + 2 * Math.sin(gx * 0.13)),
   front: Math.round(HORIZON - 3 - 5 * Math.exp(-((gx - 40) ** 2) / 260) - 7 * Math.exp(-((gx - 156) ** 2) / 340) + 0.8 * Math.sin(gx * 0.31)),
 });
+
 const RIDGES = Array.from({ length: COLS }, (_, gx) => ridgeOf(gx));
 
 // ------------------------------------------------------------------ drawing
 function draw(ctx: CanvasRenderingContext2D, t: number, exposure: number) {
   const grid = new Float32Array(COLS * ROWS);
+
   const sky: Put = (gx, gy, b) => { // only above the mountains
     if (gx < 0 || gy < 0 || gx >= COLS || gy >= HORIZON) return;
     const rg = RIDGES[gx];
@@ -40,6 +43,7 @@ function draw(ctx: CanvasRenderingContext2D, t: number, exposure: number) {
     const i = gy * COLS + gx;
     if (b > grid[i]) grid[i] = b;
   };
+
   // trails: an arc behind each star as long as the exposure so far, brightest at its head
   const len = 0.16 + exposure * 0.9;
   for (const s of STARS) {
@@ -50,6 +54,7 @@ function draw(ctx: CanvasRenderingContext2D, t: number, exposure: number) {
       sky(Math.round(STAR.x + Math.cos(head - u) * s.r), Math.round(STAR.y + Math.sin(head - u) * s.r), bright * k ** 1.5);
     }
   }
+
   // the lodestar itself, brightening as it climbs
   const lit = 0.55 + 0.45 * exposure;
   for (let dy = -20; dy <= 20; dy++)
@@ -57,6 +62,7 @@ function draw(ctx: CanvasRenderingContext2D, t: number, exposure: number) {
       const b = compassStar(dx / SCALE, dy / SCALE) * lit;
       if (b > 0.06) sky(Math.round(STAR.x) + dx, Math.round(STAR.y) + dy, b);
     }
+
   // a ring of light racing out from it (wake and ready)
   if (pulseAt !== null) {
     const k = (t - pulseAt) / 1.1;
@@ -67,6 +73,7 @@ function draw(ctx: CanvasRenderingContext2D, t: number, exposure: number) {
           if (Math.abs(d) < 4) sky(gx, gy, Math.exp(-(d * d) / 3) * (1 - k));
         }
   }
+
   // two ranges: a dim far ridge and a near one lit along its edge, the near one filled with a few dark marks
   for (let gx = 0; gx < COLS; gx++) {
     const { back, front } = RIDGES[gx];
@@ -78,23 +85,29 @@ function draw(ctx: CanvasRenderingContext2D, t: number, exposure: number) {
       grid[gy * COLS + gx] = b;
     }
   }
+
   for (let gx = 0; gx < COLS; gx += 2) grid[HORIZON * COLS + gx] = 0.5; // the lake's edge, dotted
+
   // the lake: everything above, mirrored and rippled, dimmer with depth; the lodestar's light runs down it in glints
   for (let gy = HORIZON + 1; gy < ROWS; gy++) {
     const depth = gy - HORIZON;
     for (let gx = 0; gx < COLS; gx++) {
       if (Math.sin(gx * 0.06 + depth * 0.85 - t * 3.2) * Math.sin(gx * 0.025 - t) > 0.75) continue; // breaks in the water
+
       const wob = Math.round(Math.sin(depth * 0.33 - t * 3) * (1 + depth * 0.06) + Math.sin(gx * 0.14 + t * 1.6) * 0.8);
       const sx = Math.max(0, Math.min(COLS - 1, gx + wob)), sy = HORIZON - depth;
       let b = sy >= 0 ? grid[sy * COLS + sx] * 0.5 * (1 - depth / 70) : 0;
+
       const dx = Math.abs(gx + wob * 0.6 - STAR.x), hw = 3 + depth * 0.35;
       if (dx < hw && gy % 2 === 0) {
         const gx2 = gx >> 1;
         if (hash(gx2, gy + Math.floor(t * 5 + hash(gx2, gy) * 5) * 131) > 0.8) b = Math.max(b, (0.4 + 0.5 * exposure) * (1 - dx / hw) * (1 - depth / 60));
       }
+
       grid[gy * COLS + gx] = b;
     }
   }
+
   drawMarks(ctx, grid, COLS, ROWS, CELL);
 }
 
@@ -113,18 +126,23 @@ export function wake() {
 /** Finish the rise and play the ready pulse; resolves when it has played. */
 export function finishScene() {
   if (!raf) return Promise.resolve();
+
   target = 1;
   pulseAt = null; // a wake ring still in flight gives way to the ready one
+
   return new Promise<void>((done) => {
     pulseRequest = done;
   });
 }
+
 let pulseRequest: (() => void) | null = null;
 
 export function startScene(canvas: HTMLCanvasElement) {
   if (raf) return;
+
   target = shown = 0;
   pulseAt = null;
+
   const dpr = devicePixelRatio || 1;
   canvas.width = COLS * CELL * dpr;
   canvas.height = ROWS * CELL * dpr;
@@ -133,34 +151,42 @@ export function startScene(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = getComputedStyle(canvas).color;
+
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const t0 = performance.now();
   let last = 0;
+
   const tick = (now: number) => {
     raf = requestAnimationFrame(tick);
     if (now - last < 66) return; // ~15 fps
+
     const dt = Math.min(0.2, (now - last) / 1000);
     last = now;
     const t = (now - t0) / 1000;
     if (wakeRequest) ((pulseAt = t), (wakeRequest = false));
+
     shown += (target - shown) * Math.min(1, dt * (pulseRequest ? 5 : 1.8));
     const e = 1 - (1 - shown) ** 2;
     STAR.y = STAR_LOW + (STAR_HIGH - STAR_LOW) * e;
+
     if (pulseRequest && pulseAt === null && shown > 0.97) pulseAt = t;
     if (pulseAt !== null && t - pulseAt > 1.1 && pulseRequest) {
       const done = pulseRequest;
       pulseRequest = null;
       done();
     }
+
     draw(ctx, t, e);
     if (still && !pulseRequest) stopScene();
   };
+
   raf = requestAnimationFrame(tick);
 }
 
 export function stopScene() {
   cancelAnimationFrame(raf);
   raf = 0;
+
   if (pulseRequest) {
     const done = pulseRequest;
     pulseRequest = null;

@@ -44,9 +44,11 @@ def thin(entries):
 async def load(req: Request):
     name = req.query_params["name"]
     log = json.loads((FIXTURES / f"{name}.json").read_text())
+
     queues = {}
     for e in log:
         queues.setdefault(key(e["method"], e["path"], e["query"]), []).append(e)
+
     S.update(name=name, queues={k: thin(v) for k, v in queues.items()}, requests=[], mismatches=[], unrecorded=[])
     return JSONResponse({"ok": True, "keys": len(queues)})
 
@@ -65,15 +67,19 @@ async def api(req: Request):
         body = json.loads(raw) if raw else None
     except ValueError:
         body = raw.decode("utf-8", "replace")
+
     k = key(req.method, req.url.path, req.url.query)
     S["requests"].append({"key": k, "body": body})
+
     q = S["queues"].get(k)
     if not q:
         S["unrecorded"].append({"key": k, "body": body})
         return JSONResponse({"error": f"Not recorded: {k}"}, status_code=599)
+
     e = q.pop(0) if len(q) > 1 else q[0]
     if req.method != "GET" and not same(body, e["body"]):
         S["mismatches"].append({"key": k, "sent": body, "recorded": e["body"]})
+
     if e["type"] != "sse":
         return JSONResponse(e["response"], status_code=e["status"] or 200)
 
