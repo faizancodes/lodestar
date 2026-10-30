@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Abl, CopyJob, Direction, Example, Models, Probes, Recipe, Status } from "../lib/types";
+import type { Abl, CopyJob, Direction, Example, ExportJob, Models, Probes, Recipe, Status } from "../lib/types";
 
 export const TABS = ["abliterate", "steer", "chat"] as const;
 export type Tab = (typeof TABS)[number] | "home";
@@ -11,6 +11,10 @@ function remembered(): Tab {
 }
 
 export type Toast = { msg: string; err: boolean; n: number }; // n changes on every toast, so a repeat shows again
+/** The start screen: the list of models, then the loading scene once one is picked. */
+export type Start = { loading: boolean; leaving: boolean; picked: string | null; status: string };
+/** The model menu, opened beside the model card. */
+export type Menu = { open: boolean; left: number; bottom: number; maxHeight: number };
 
 type App = {
   tab: Tab;
@@ -18,7 +22,7 @@ type App = {
   models: Models;
   copy: CopyJob | null;
   recipe: Recipe;
-  saved: Recipe[];
+  saved: Recipe[] | null; // null until first fetched: the sidebar's list stays empty till then
   examples: Example[];
   dirs: Direction[] | null;
   dirLayers: number | null;
@@ -28,6 +32,10 @@ type App = {
   /** One stream at a time: the engine has one model. Shown as body.busy. */
   busy: boolean;
   toast: Toast | null;
+  start: Start;
+  menu: Menu;
+  tunePrompts: string[]; // the default prompts Describe answers, from /api/tune/defaults
+  exportJob: ExportJob | null;
 
   setTab: (t: Tab) => void;
   setBusy: (b: boolean) => void;
@@ -40,7 +48,7 @@ export const useApp = create<App>((set) => ({
   models: { presets: [], cached: [], local: [] },
   copy: null,
   recipe: { id: null, name: "", items: [] },
-  saved: [],
+  saved: null,
   examples: [],
   dirs: null,
   dirLayers: null,
@@ -49,6 +57,10 @@ export const useApp = create<App>((set) => ({
   ablDefaults: null,
   busy: false,
   toast: null,
+  start: { loading: false, leaving: false, picked: null, status: "" },
+  menu: { open: false, left: 0, bottom: 0, maxHeight: 0 },
+  tunePrompts: [],
+  exportJob: null,
 
   setTab: (tab) => {
     try { localStorage.setItem("tab", tab); } catch {}
