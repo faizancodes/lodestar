@@ -6,6 +6,9 @@ DEST="${1:-$ROOT/dist}"
 APP="$DEST/Lodestar.app"
 UV="$(command -v uv)"
 
+# the UI the app serves (interp/server.py); LODESTAR_UI=legacy serves the original one in ui/ instead
+(cd "$ROOT/web" && pnpm install --frozen-lockfile && pnpm build)
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 "$UV" run --project "$ROOT" --with pillow python "$ROOT/scripts/make_icon.py" "$APP/Contents/Resources/AppIcon.icns"

@@ -12,13 +12,16 @@ whose hook placement and dose units this app reuses.
 ## Run it
 
     uv sync
-    ./scripts/build_app.sh          # makes dist/Lodestar.app; drag it to /Applications or the Dock
+    ./scripts/build_app.sh          # builds the UI and makes dist/Lodestar.app; drag it to /Applications or the Dock
     open "dist/Lodestar.app"
 
 or without the bundle:
 
     uv run python -m interp.app            # native window
     uv run python -m interp.app --server   # headless, http://127.0.0.1:8792
+
+The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`; `build_app.sh` does this). For this
+release the original UI in `ui/` is still there: start the app with `LODESTAR_UI=legacy` to use it.
 
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
 The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise
@@ -88,5 +91,7 @@ budget, or load Qwen3-1.7B/4B for stronger single-neuron levers.
     interp/abl.py        abliteration: probe lists, direction analysis, weight baking
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
-    ui/                  the interface: Plus Jakarta Sans, cobalt and cream
+    web/                 the interface (React + TypeScript, Vite)
+    ui/                  the original plain-JS interface, kept for one release (LODESTAR_UI=legacy)
+    e2e/                 the parity suite: recorded API sessions, mock replay, golden screenshots
     scripts/             app bundle and icon builders

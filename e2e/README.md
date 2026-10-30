@@ -12,12 +12,11 @@ React + TypeScript) and proven to look and behave the same.
 ## Run
 
     npm install && npx playwright install webkit   # once
-    npx playwright test                              # replay against ../ui
-    UI_DIR=../web/dist npx playwright test           # replay against the React build (`pnpm build` in ../web)
+    UI_DIR=../web/dist npx playwright test           # replay against the app's UI (`pnpm build` in ../web)
+    npx playwright test                              # replay against the original UI in ../ui
 
-While the port is partway done, `PENDING` names the goldens of views it hasn't reached, which are skipped:
-
-    UI_DIR=../web/dist PENDING=abliterate-empty,model-menu-loaded npx playwright test -g "sidebar|start:|shell"
+`tests/parity.spec.ts` walks every view the way a person would; `tests/rules.spec.ts` checks what that walk doesn't
+reach (one stream at a time, the Stop buttons, a narrow window) and runs on replay only.
 
 Canvases (the scenes, spinners and art), the plan clock, the load timer and toasts are hidden in the shots. Everything
 else must match pixel for pixel: a single changed letter is about 20 pixels, so there's no pixel tolerance.
