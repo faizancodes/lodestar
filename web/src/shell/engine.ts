@@ -1,7 +1,7 @@
 // The shell's side of talking to the engine: the model list and copies, loading a
 // model and following its status, and what to fetch once one is ready. Views read what this writes to the store.
 import { flushSync } from "react-dom";
-import { finishScene, setProgress, startScene, stopScene, wake } from "../art/loader";
+import { finishScene, setLayers, setProgress, startScene, stopScene, wake } from "../art/loader";
 import { api } from "../lib/api";
 import { modelName, sleep } from "../lib/format";
 import type { Abl, CopyJob, Directions, Example, ExportJob, Fit, Memory, Models, Recipe, Status } from "../lib/types";
@@ -208,6 +208,21 @@ export function statusLine(s: Status | null) {
   };
 }
 
+/** What the start screen says a load is doing: opening, how much of the weights are in, then measuring. */
+export function loadLine(s: Status) {
+  const name = modelName(s.status.replace(/^loading /, "")), ld = s.load;
+  if (!ld) return `Loading ${name}…`;
+
+  const gb = (b: number) => (b / 1e9).toFixed(1);
+  if (ld.stage === "measure") return ld.layers ? `Measuring ${ld.layers} layers` : `Measuring ${name}`;
+  if (ld.stage === "weights" && ld.bytes && ld.lit?.length) {
+    const f = ld.lit.reduce((a, b) => a + b, 0) / ld.lit.length;
+    return `Reading weights · ${gb(f * ld.bytes)} of ${gb(ld.bytes)} GB`;
+  }
+
+  return ld.bytes ? `Opening ${name}` : `Downloading ${name}`;
+}
+
 function applyStatus(s: Status) {
   // let the loading scene finish its sunrise and pulse before the workspace appears
   if (s.loaded && get().start.loading) {
@@ -242,9 +257,9 @@ function applyStatus(s: Status) {
   const was = get().info?.loaded ? get().info!.model : null;
   set({ info: s });
 
-  const { msg } = statusLine(s);
   const err = s.status.startsWith("error");
   const busy = !s.loaded && !err && s.status !== "idle";
+  const msg = busy ? loadLine(s) : statusLine(s).msg;
 
   // the server can be slow to answer while weights load, so the timer ticks on its own
   clearInterval(loadTimer);
@@ -265,7 +280,10 @@ function applyStatus(s: Status) {
 
   if (!s.loaded) { // the start screen's scene: at rest on the horizon, rising with the load
     startScene(startArt());
-    if (busy) setProgress(s.progress ?? 0);
+    if (busy) {
+      setLayers(s.load?.layers ?? null, s.load?.lit ?? null);
+      setProgress(s.progress ?? 0);
+    }
   } else stopScene();
 
   if (s.loaded && s.model !== was) onModelReady();

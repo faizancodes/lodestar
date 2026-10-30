@@ -12,6 +12,9 @@ export type Status = {
   neurons?: number;
   hidden?: number;
   progress?: number | null;
+  /** while loading: what stage it's at, the model's layer count, how far each layer's weights are in (0..1), and
+   * the weights' size on disk (null when they're still to download) */
+  load?: { stage: "open" | "weights" | "measure"; layers: number | null; lit: number[] | null; bytes: number | null };
   last?: string | null; // the model to open again at launch
 };
 

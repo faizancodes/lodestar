@@ -149,10 +149,18 @@ def _reverse(p):
 
 
 # ------------------------------------------------------------------ models
+LOADING = {"bytes": None}  # the size of the weights being loaded, when known (it isn't before a download)
+
+
 @app.get("/api/status")
 def status():
     last = LAST_MODEL.read_text().strip() if LAST_MODEL.exists() else None
-    return {**eng.info(), "progress": eng.progress, "last": last}
+    out = {**eng.info(), "progress": eng.progress, "last": last}
+
+    if eng.load_state:  # for the loading scene: the stage, and how much of each layer has arrived
+        out["load"] = {**eng.load_state, "bytes": LOADING["bytes"]}
+
+    return out
 
 
 # Copies of drive models on this Mac's internal disk. A USB 3 stick reads at ~0.4 GB/s against ~3 GB/s for
@@ -283,6 +291,8 @@ async def load(req: Request):
     body = await req.json()
     mid = body["model"].strip()
 
+    LOADING["bytes"] = memory.weights_bytes(mid, HF_CACHE)
+
     def work():
         try:
             eng.load(mid)
@@ -293,6 +303,7 @@ async def load(req: Request):
             traceback.print_exc()
             eng.status = f"error: {e}"
             eng.progress = None
+            eng.load_state = None
 
     threading.Thread(target=work, daemon=True).start()
     time.sleep(0.05)
