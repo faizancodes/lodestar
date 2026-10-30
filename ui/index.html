@@ -118,7 +118,6 @@
             </ol>
             <div class="abl-scene" id="abl-scene" hidden><canvas aria-hidden="true"></canvas></div>
             <div class="plan-now status-line"></div>
-            <div id="abl-examples" class="abl-examples"></div>
           </div>
           <div id="abl-rank"></div>
           <details class="adv">
@@ -138,30 +137,17 @@
       </div>
 
       <div class="step locked" id="abl-s2">
-        <div class="step-h"><span class="num">02</span><div><h3>Check it</h3>
-          <p class="step-sub">Ask a few bad requests and compare its answers with refusals erased. Raise the strength if it still refuses.</p></div></div>
-        <div class="card abl">
-          <div class="abl-checks">
-            <div class="field">Strength
-              <div class="abl-range">
-                <div class="abl-range-track">
-                  <input id="abl-coef" type="range" value="1" min="0.2" max="2" step="0.05" aria-label="Strength">
-                  <div class="abl-ticks" aria-hidden="true"><span style="left:0%">0.2</span><span style="left:44.44%">1 · full</span><span style="left:100%">2</span></div>
-                </div>
-                <output id="abl-coef-v">1.00×</output>
-              </div>
-            </div>
-            <label class="field">Test questions <span class="opt">one per line, up to four</span>
-              <textarea id="abl-test-probes" rows="3" spellcheck="false"></textarea>
-            </label>
-            <div class="row tight">
-              <button id="abl-test-go" class="btn">Compare before and after</button>
-              <button class="btn ghost" data-cancel>Stop</button>
-            </div>
-            <div id="abl-test-summary" class="status-line"></div>
-            <div id="abl-test-rows"></div>
+        <div class="step-h"><span class="num">02</span><div><h3>Try it</h3>
+          <p class="step-sub">Ask it something it would normally refuse. If it still refuses, make it stronger; if its writing gets worse, weaker.</p></div></div>
+        <div id="at" class="tl" hidden></div>
+        <form id="abl-form" class="tl-comp" autocomplete="off">
+          <div class="composer">
+            <input id="abl-q" spellcheck="false" placeholder="Ask it something">
+            <button type="button" class="send stop" id="abl-stop" aria-label="Stop"><i></i></button>
+            <button type="submit" class="send" aria-label="Send"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4m0 0L5 9m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           </div>
-        </div>
+          <div class="tl-sugg" id="abl-sugg"></div>
+        </form>
       </div>
 
       <div class="step locked" id="abl-s3">
