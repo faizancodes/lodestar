@@ -100,8 +100,17 @@ export function startSideArt(canvas: HTMLCanvasElement) {
   const run = () => (still ? draw(0) : raf || (raf = requestAnimationFrame(tick)));
   if (size()) run();
   let resizeT: ReturnType<typeof setTimeout> | undefined;
-  addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => size() && (still ? draw(0) : null), 200); });
-  document.addEventListener("visibilitychange", () => !document.hidden && run());
+  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => size() && (still ? draw(0) : null), 200); };
+  const onVisible = () => !document.hidden && run();
+  addEventListener("resize", onResize);
+  document.addEventListener("visibilitychange", onVisible);
+  // the one addition to the original: a way to stop, for when React unmounts the sidebar
+  return () => {
+    cancelAnimationFrame(raf);
+    clearTimeout(resizeT);
+    removeEventListener("resize", onResize);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
 }
 
 /** A small Lodestar spinner: the lodestar at the centre with a star trail wheeling around it, in marks. Runs while

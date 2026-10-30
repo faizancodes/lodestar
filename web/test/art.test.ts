@@ -30,7 +30,8 @@ function setup(still: boolean) {
   vi.stubGlobal("requestAnimationFrame", (cb: (t: number) => void) => queue.push(cb));
   vi.stubGlobal("cancelAnimationFrame", () => (queue = []));
   vi.stubGlobal("addEventListener", () => {});
-  vi.stubGlobal("document", { hidden: false, addEventListener: () => {}, querySelector: () => ({ getBoundingClientRect: () => ({ bottom: 190 }) }) });
+  vi.stubGlobal("removeEventListener", () => {});
+  vi.stubGlobal("document", { hidden: false, addEventListener: () => {}, removeEventListener: () => {}, querySelector: () => ({ getBoundingClientRect: () => ({ bottom: 190 }) }) });
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   const frames = (n: number, ms = 70) => {
     for (let i = 0; i < n; i++) {

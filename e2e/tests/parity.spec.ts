@@ -67,6 +67,7 @@ test("shell: tabs, shortcuts, brand, model menu", async ({ page }) => {
   await page.locator("#model-pick").click();
   await expect(page.locator("#model-menu .mm-item.on")).toContainText("Qwen3-0.6B");
   await snap(page, "model-menu-loaded");
+  await snap(page.locator("#model-menu"), "model-menu-loaded-menu");
   await page.mouse.click(900, 450); // a click outside closes it
   await expect(page.locator("#model-menu")).toBeHidden();
 });
