@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { modelName, sleep } from "../lib/format";
 import type { Abl, CopyJob, Directions, Example, ExportJob, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
+import { onChatShown } from "../chat/engine";
 import { useChat } from "../store/chat";
 import { resetAbl, syncAbl } from "../abl/engine";
 import { useSteer } from "../store/steer";
@@ -90,7 +91,7 @@ export function toggleModelMenu(open?: boolean) {
 // ------------------------------------------------------------------ tabs
 export function setTab(t: Tab) {
   get().setTab(t); // Steer's status card redraws its scene when it's shown
-  // TODO(Phase 6): the chat's first render hooks in here
+  if (t === "chat" && get().info?.loaded) onChatShown();
 }
 
 // ------------------------------------------------------------------ loading
@@ -244,7 +245,7 @@ async function onModelReady() {
   useChat.getState().set({ messages: [] });
   redrawn();
   resetAbl();
-  // TODO(Phase 6): the chat's first render when it's the open tab
+  if (get().tab === "chat") onChatShown();
   refreshSaved();
   refreshAbl();
   let examples: Example[];
