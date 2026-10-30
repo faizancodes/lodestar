@@ -974,7 +974,7 @@ main.is-chat { padding: 0; overflow: hidden; }
   box-shadow: 0 14px 34px -22px rgba(0, 0, 0, 0.55); transition: border-color 0.15s, box-shadow 0.15s;
 }
 .composer:focus-within { border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 0 0 3px var(--wash), 0 14px 34px -22px rgba(0, 0, 0, 0.55); }
-.composer textarea {
+.composer > textarea { /* the message box only, not the settings box inside the composer */
   display: block; width: 100%; max-height: 220px; padding: 4px 0; border: 0; border-radius: 0; background: none;
   font-size: 14px; line-height: 1.55; resize: none; box-shadow: none !important;
 }
