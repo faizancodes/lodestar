@@ -9,6 +9,8 @@ import { useChat } from "../store/chat";
 import { Html } from "./Html";
 
 const MARK = markSVG(36, 15);
+// drawn rather than typed: a "×" sits on the font's baseline, off the centre of its round button
+const CROSS = <svg viewBox="0 0 10 10" aria-hidden="true"><path d="m2.5 2.5 5 5m0-5-5 5" /></svg>;
 
 export const ICONS: Record<Exclude<Tab, "home">, JSX.Element> = {
   abliterate: (
@@ -49,7 +51,7 @@ function SavedList() {
       {!mine.length ? <div className="saved-empty">Nothing saved yet.</div> : mine.map((r) => (
         <div key={r.id} className={r.id === on ? "saved-item on" : "saved-item"} data-id={r.id!} role="button" tabIndex={0} onClick={() => openSaved(r)}>
           {"\n      "}<span className="nm">{r.name}</span><span className="ct">{r.items.length}</span>
-          <button className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteSaved(r.id!))}>×</button>
+          <button className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteSaved(r.id!))}>{CROSS}</button>
         </div>
       ))}
     </div>
@@ -72,7 +74,7 @@ function ChatList() {
         <div key={c.id} className={c.id === on ? "saved-item on" : "saved-item"} data-id={c.id} role="button" tabIndex={0}
           onClick={() => openChat(c.id)} onKeyDown={(e) => e.key === "Enter" && openChat(c.id)}>
           <span className="nm">{c.title}</span>
-          <button className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteChat(c.id))}>×</button>
+          <button className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteChat(c.id))}>{CROSS}</button>
         </div>
       ))}</div>
     </div>
