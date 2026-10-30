@@ -32,10 +32,12 @@ test("rules: one stream at a time, and Stop cancels it", async ({ page }) => {
 
   // every other page refuses to start a second stream, and says why
   await page.keyboard.press("Meta+1");
-  await page.locator("#abl-test-go").click();
+  await page.locator("#abl-q").fill("Hello");
+  await page.locator("#abl-q").press("Enter");
   await toast(page, "Something is already running. Stop it first.");
   await page.keyboard.press("Meta+2");
-  await page.locator("#t-go").click();
+  await page.locator("#t-prompt").fill("Hello");
+  await page.locator("#t-prompt").press("Enter");
   await toast(page, "Something is already running. Stop it first.");
 
   // each page's Stop asks the server to cancel

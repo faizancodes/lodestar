@@ -7,7 +7,7 @@ import type { NeuronDetail, NeuronItem, NeuronRow, Push, TokenDetail } from "../
 import { useApp } from "../store/app";
 import type { Body } from "../store/steer";
 import { PanelSlot, RevealBox } from "./Panel";
-import { alive, closePanel, closeWhere, openPanel, panelAt, setBody } from "./panels";
+import { alive, closeWhere, openPanel, setBody } from "./panels";
 import { addItems, redrawn } from "./recipe";
 
 const recipeHas = (l: number, n: number) => (s: ReturnType<typeof useApp.getState>) =>
@@ -91,15 +91,11 @@ function Scan() {
 
 type Trace = { tokens: string[]; n_prompt: number };
 
-/** Opens the inside of a reply under its run. `behindFix`: the run's fix box was made after the panel there, so
- * (the panel slot is the element right after the replies) a new panel is made in front of it. */
-export async function inspect(runId: number, prompt: string, reply: string, ps: Push[], which: string, abl: boolean, behindFix: boolean) {
-  const anchor = `run:${runId}`;
+/** Opens the inside of a reply under it (`anchor` names the reply). */
+export async function inspect(anchor: string, prompt: string, reply: string, ps: Push[], which: string, abl: boolean) {
   // the server keeps one trace at a time, so only one reply can be inspected at once
   closeWhere((p) => p.kind !== "inspect" || p.anchor === anchor);
-  const there = panelAt(anchor);
-  if (there && behindFix) closePanel(there.id);
-  const id = openPanel(anchor, `Inside the ${which.toLowerCase()} reply`, "inspect", !!there && behindFix);
+  const id = openPanel(anchor, `Inside the ${which.toLowerCase()} reply`, "inspect");
   if (id === null) return;
   setBody(id, <Scan />);
   let tr: Trace | null = null;

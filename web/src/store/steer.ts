@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { create } from "zustand";
-import type { NeuronRow, StreamEvent } from "../lib/types";
+import type { Item, NeuronRow, StreamEvent } from "../lib/types";
 import type { Sink } from "../steer/sink";
 
-// Steer's own state. The long-running parts (a plan, a run, a fix, the new-direction panel) are mutable objects
+// Steer's own state. The long-running parts (a plan, the try-it thread, the new-direction panel) are mutable objects
 // the engine writes to as their streams arrive; `v` changes after each write so the
 // views draw them again. The recipe itself lives in the app store: the sidebar and Chat read it too.
 
@@ -33,26 +33,26 @@ export type Plan = {
 };
 type Results = { n: number; word?: (NeuronRow & { score: number; dose: number })[]; plan?: Plan };
 
-export type Fix = {
-  open: boolean;
-  input: string;
-  focus: number; // bumped to focus the input
-  busy: boolean; // the Fix button is disabled while it runs
-  live: Live;
-  aim: Sink | null; // shown once the model starts writing what it's aiming for
-  done: { lines: ReactNode[]; undo: () => void } | "undone" | null;
+/** One answer to the thread's question, with the recipe that was on for it and how it came about. */
+export type Version = {
+  items: Item[];
+  out: Sink;
+  fix: { feedback: string; lines: ReactNode[] } | null; // the fix that made it
+  note: string; // or why it's here otherwise ("Went back to v2")
+  open: boolean; // an older answer, unfolded
 };
-export type Col = "base" | "up" | "down" | "abl";
-export type Run = {
-  id: number;
+/** Try it and refine: one question, and its answers as the recipe is fixed. */
+export type Thread = {
+  id: number; // panels opened under its answers are named by it, so a new thread starts with none
   prompt: string;
-  desc: string;
-  cols: Col[];
-  outs: Record<string, Sink>;
-  done: boolean;
-  inspect: (c: Col) => void;
-  fix: Fix | null;
-  fixAt: number; // when the fix box was made: it and an inspect panel sit after the replies newest first
+  normal: Sink; // the model as it normally is, shown on request
+  other: Sink; // the one-off answer when no recipe is on: normal, or with refusals erased
+  abl: boolean;
+  versions: Version[];
+  asking: boolean; // the box asks a new question instead of taking a fix
+  fixing: string | null; // the fix being made
+  fixLive: Live;
+  streaming: Set<"main" | "normal">;
 };
 
 export type Dn = {
@@ -73,7 +73,7 @@ export type Dn = {
 export type Export = { page: "abl" | "st" | null; line: string; width: string; running: boolean; saved: Partial<Record<"abl" | "st", { name: string; dst: string }>> };
 
 export type Body = { node: ReactNode; n: number; reveal: boolean };
-export type Panel = { id: number; anchor: string; kind: "inspect" | "neuron"; title: string; body: Body; at: number };
+export type Panel = { id: number; anchor: string; kind: "inspect" | "neuron"; title: string; body: Body };
 
 type Steer = {
   v: number;
@@ -81,8 +81,9 @@ type Steer = {
   note: string; // #c-status
   results: Results | null;
   prompts: string; // Options → Test questions
-  tPrompt: string;
-  runs: Run[];
+  tInput: string; // the box under the thread: a question, or what should change
+  tl: Thread | null;
+  compare: boolean; // the normal answer shows under the latest one (here and on Abliterate)
   dn: Dn;
   exp: Export;
   panels: Panel[];
@@ -95,8 +96,9 @@ export const useSteer = create<Steer>(() => ({
   note: "",
   results: null,
   prompts: "",
-  tPrompt: "Describe the way you look.",
-  runs: [],
+  tInput: "",
+  tl: null,
+  compare: (() => { try { return localStorage.getItem("tl-compare") === "1"; } catch { return false; } })(),
   dn: { open: false, focus: 0, focusPath: 0, typing: false, kind: "persona", name: "", pos: "", neg: "", path: "", live: null, result: null, made: null },
   exp: { page: null, line: "", width: "", running: false, saved: {} },
   panels: [],

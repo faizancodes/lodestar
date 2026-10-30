@@ -9,7 +9,7 @@ import { Decoded, LiveLine } from "./Live";
 import { PanelSlot } from "./Panel";
 import { openNeuron } from "./Found";
 import { addItems, replaceRecipe } from "./recipe";
-import { send } from "./runs";
+import { PROMPTS, send, setQuestion } from "./refine";
 
 const MARK = markSVG(30, 15);
 const IDEAS = ["talk like a pirate", "be extremely cheerful", "answer in rhyme", "cooking"];
@@ -114,10 +114,10 @@ function Foot({ plan }: { plan: P }) {
     if (plan.done) ((plan.applied = true), renderPlan(plan));
     replaceRecipe({ id: null, name: plan.goal.slice(0, 40), items: [], model: useApp.getState().info!.model });
     addItems(use.map((x) => ({ layer: x.layer, neuron: x.neuron, dose: x.dose, lens: x.lens })), true);
-    if (plan.proof.prompt) useSteer.setState({ tPrompt: plan.proof.prompt });
+    const q = plan.proof.prompt || PROMPTS[0];
     // the search holds the model while it runs, so a reply can only be generated once it has finished
-    if (!plan.done) return useApp.getState().toastMsg("Turned on. Send a question once the search finishes, or press Stop.");
-    send();
+    if (!plan.done) return (setQuestion(q), useApp.getState().toastMsg("Turned on. Send a question once the search finishes, or press Stop."));
+    send(q);
     requestAnimationFrame(() => document.querySelector("#view-steer .step:nth-of-type(2)")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   if (!plan.done) return <button className="btn ghost plan-apply" onClick={apply}>Turn on the best so far · {nn}</button>;

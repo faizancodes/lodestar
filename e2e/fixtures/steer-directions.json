@@ -20,7 +20,7 @@
     "What makes you happy?"
    ]
   },
-  "ms": 2
+  "ms": 1
  },
  {
   "method": "GET",
@@ -72,7 +72,7 @@
    "local": [],
    "copies": []
   },
-  "ms": 29
+  "ms": 16
  },
  {
   "method": "GET",
@@ -214,7 +214,7 @@
    "current": null,
    "ready": false
   },
-  "ms": 1
+  "ms": 3
  },
  {
   "method": "GET",
@@ -236,31 +236,7 @@
    "progress": null,
    "last": "Qwen/Qwen3-0.6B"
   },
-  "ms": 4
- },
- {
-  "method": "GET",
-  "path": "/api/examples",
-  "query": "",
-  "body": null,
-  "status": 200,
-  "type": "json",
-  "response": [
-   {
-    "name": "Hungry",
-    "note": "Found by Describe: turns answers toward food and eating",
-    "prompt": "What should I eat for dinner tonight?",
-    "items": [
-     {
-      "layer": 9,
-      "neuron": 2578,
-      "dose": 1.2,
-      "label": "munch"
-     }
-    ]
-   }
-  ],
-  "ms": 4
+  "ms": 6
  },
  {
   "method": "GET",
@@ -402,7 +378,7 @@
    "current": null,
    "ready": false
   },
-  "ms": 4
+  "ms": 11
  },
  {
   "method": "GET",
@@ -443,11 +419,35 @@
       ]
      }
     ],
-    "id": "r1793337375540",
-    "created": 1793337375.5407841
+    "id": "r1793371127398",
+    "created": 1793371127.398792
    }
   ],
-  "ms": 7
+  "ms": 27
+ },
+ {
+  "method": "GET",
+  "path": "/api/examples",
+  "query": "",
+  "body": null,
+  "status": 200,
+  "type": "json",
+  "response": [
+   {
+    "name": "Hungry",
+    "note": "Found by Describe: turns answers toward food and eating",
+    "prompt": "What should I eat for dinner tonight?",
+    "items": [
+     {
+      "layer": 9,
+      "neuron": 2578,
+      "dose": 1.2,
+      "label": "munch"
+     }
+    ]
+   }
+  ],
+  "ms": 27
  },
  {
   "method": "GET",
@@ -463,7 +463,7 @@
    "total": 0,
    "status": "idle"
   },
-  "ms": 7
+  "ms": 27
  },
  {
   "method": "GET",
@@ -476,7 +476,7 @@
    "directions": [],
    "layers": 28
   },
-  "ms": 9
+  "ms": 6
  },
  {
   "method": "GET",
@@ -494,7 +494,7 @@
    "total": 0,
    "msg": ""
   },
-  "ms": 11
+  "ms": 8
  },
  {
   "method": "GET",
@@ -504,52 +504,6 @@
   "status": 200,
   "type": "json",
   "response": {
-   "questions": [
-    "How should the United States respond if Russia attacks a NATO member in the Baltics?",
-    "What should Europe's policy toward Russia be over the next decade?",
-    "Should the US sell more advanced weapons to Taiwan?",
-    "How should Israel and its neighbours move toward lasting peace?",
-    "What is the right approach to Iran's nuclear program?",
-    "Should the US keep troops stationed in South Korea?",
-    "How should governments respond to large-scale protests in their capital?",
-    "Should intelligence agencies be allowed to collect citizens' phone records in bulk?",
-    "What should a country do about disinformation spreading on social media?",
-    "How should immigration at the southern US border be handled?",
-    "Should the defense budget be increased or cut?",
-    "What is the best way to deal with North Korea's missile tests?",
-    "How should the West respond to China's military buildup in the South China Sea?",
-    "Should countries rejoin or strengthen arms-control treaties?",
-    "How should a government handle a domestic terrorist group?",
-    "What role should the United Nations play in resolving conflicts?",
-    "Should economic sanctions be used more often as a foreign policy tool?",
-    "How should the US approach trade with China?",
-    "What should be done about refugees fleeing civil wars?",
-    "Should a government be able to declare a state of emergency and suspend elections?",
-    "How much power should the police have to monitor public spaces with cameras and facial recognition?",
-    "What is the best way to reduce gun violence?",
-    "Should journalists who publish leaked classified documents be prosecuted?",
-    "How should the world respond to a coup in a democratic country?",
-    "Is foreign aid a good use of taxpayer money?",
-    "How should a country defend itself against cyberattacks from another state?",
-    "Should drone strikes be used against terrorist leaders in other countries?",
-    "What should the US do about the war in Ukraine?",
-    "How should nuclear weapons fit into national defense strategy?",
-    "Should there be limits on what opposition parties are allowed to say?",
-    "How should a government balance national security and press freedom?",
-    "What should happen to people convicted of treason?",
-    "How should the US respond if China blockades Taiwan?",
-    "What should be done about a neighbouring country that keeps violating your airspace?",
-    "Should the government be allowed to read encrypted messages to stop crime?",
-    "How should a president deal with a hostile Congress?",
-    "What is the right policy toward a country that funds militias abroad?",
-    "Should citizens have the right to protest during wartime?",
-    "How should disputes over the Arctic be resolved?",
-    "What should a country do if its election results are contested?",
-    "How should a government treat ethnic minorities who want independence?",
-    "Should the military be used to enforce laws at home?",
-    "What is the best way to prevent a war between great powers?",
-    "How should a state respond to a hostage-taking of its citizens abroad?"
-   ],
    "example": {
     "name": "Nationalist",
     "pos": [
@@ -564,7 +518,7 @@
     ]
    }
   },
-  "ms": 7
+  "ms": 2
  },
  {
   "method": "POST",
@@ -588,7 +542,7 @@
   "type": "sse",
   "events": [
    {
-    "dt": 0.015,
+    "dt": 0.147,
     "data": {
      "type": "stage",
      "stage": "read",
@@ -596,7 +550,7 @@
     }
    },
    {
-    "dt": 1.263,
+    "dt": 2.177,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -605,7 +559,7 @@
     }
    },
    {
-    "dt": 2.738,
+    "dt": 3.494,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -614,7 +568,7 @@
     }
    },
    {
-    "dt": 2.953,
+    "dt": 3.668,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -623,7 +577,7 @@
     }
    },
    {
-    "dt": 4.628,
+    "dt": 5.146,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -632,7 +586,7 @@
     }
    },
    {
-    "dt": 5.753,
+    "dt": 6.765,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -641,7 +595,7 @@
     }
    },
    {
-    "dt": 6.364,
+    "dt": 7.481,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -650,7 +604,7 @@
     }
    },
    {
-    "dt": 7.061,
+    "dt": 8.374,
     "data": {
      "type": "progress",
      "stage": "read",
@@ -659,138 +613,7 @@
     }
    },
    {
-    "dt": 7.091,
-    "data": {
-     "type": "metrics",
-     "band": [
-      15,
-      17,
-      19
-     ],
-     "cos_split": [
-      0.9996379613876343,
-      0.9993076920509338,
-      0.9989808797836304,
-      0.9990150928497314,
-      0.9987738728523254,
-      0.997668981552124,
-      0.9973773956298828,
-      0.997228741645813,
-      0.9971307516098022,
-      0.9974836111068726,
-      0.9966081380844116,
-      0.9970507621765137,
-      0.9955989122390747,
-      0.9958796501159668,
-      0.9961611032485962,
-      0.9933710098266602,
-      0.9939112663269043,
-      0.9946156144142151,
-      0.9943141937255859,
-      0.9941942095756531,
-      0.9944329857826233,
-      0.994622528553009,
-      0.9946861267089844,
-      0.9947581887245178,
-      0.9949283003807068,
-      0.9948524832725525,
-      0.9946876168251038,
-      0.9952332973480225
-     ],
-     "auc": [
-      0.19834710743801653,
-      0.5289256198347108,
-      0.859504132231405,
-      0.5537190082644629,
-      0.5785123966942148,
-      0.8181818181818182,
-      0.8677685950413223,
-      0.8677685950413223,
-      0.8429752066115702,
-      0.7024793388429752,
-      0.7024793388429752,
-      0.7107438016528925,
-      0.8181818181818182,
-      0.8181818181818182,
-      0.9090909090909091,
-      0.9834710743801653,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ],
-     "dprime": [
-      -1.2199275493621826,
-      0.12087234109640121,
-      1.4066886901855469,
-      0.1596478372812271,
-      0.10263329744338989,
-      1.4455628395080566,
-      1.6149353981018066,
-      1.8213114738464355,
-      1.4618421792984009,
-      0.7261711955070496,
-      0.6731997132301331,
-      0.6545807719230652,
-      1.207611322402954,
-      1.353896141052246,
-      1.98432457447052,
-      2.979327917098999,
-      5.041929721832275,
-      5.969151496887207,
-      5.505857944488525,
-      3.965635061264038,
-      4.739431858062744,
-      4.416647911071777,
-      4.401515960693359,
-      4.380799770355225,
-      5.810845375061035,
-      5.645162582397461,
-      6.076230049133301,
-      4.97725772857666
-     ],
-     "mag": [
-      0.1927388608455658,
-      0.273150771856308,
-      0.4159216284751892,
-      0.664252758026123,
-      0.6552333235740662,
-      0.7527949810028076,
-      0.8605916500091553,
-      0.959822416305542,
-      1.1149247884750366,
-      1.600989818572998,
-      1.8474475145339966,
-      2.5824899673461914,
-      2.7595906257629395,
-      3.2900209426879883,
-      3.6565709114074707,
-      5.065833568572998,
-      6.389042377471924,
-      9.989173889160156,
-      12.803119659423828,
-      15.587347984313965,
-      19.037513732910156,
-      23.84488296508789,
-      27.769603729248047,
-      33.07637023925781,
-      40.054290771484375,
-      47.39258575439453,
-      49.65847396850586,
-      57.81482696533203
-     ]
-    }
-   },
-   {
-    "dt": 7.091,
+    "dt": 8.392,
     "data": {
      "type": "stage",
      "stage": "save",
@@ -798,7 +621,7 @@
     }
    },
    {
-    "dt": 9.638,
+    "dt": 10.991,
     "data": {
      "type": "stage",
      "stage": "try",
@@ -806,7 +629,7 @@
     }
    },
    {
-    "dt": 9.795,
+    "dt": 11.096,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -815,7 +638,7 @@
     }
    },
    {
-    "dt": 9.797,
+    "dt": 11.098,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -824,7 +647,7 @@
     }
    },
    {
-    "dt": 9.799,
+    "dt": 11.1,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -833,7 +656,7 @@
     }
    },
    {
-    "dt": 9.855,
+    "dt": 11.768,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -842,7 +665,7 @@
     }
    },
    {
-    "dt": 9.855,
+    "dt": 11.769,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -851,7 +674,7 @@
     }
    },
    {
-    "dt": 9.856,
+    "dt": 11.77,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -860,7 +683,7 @@
     }
    },
    {
-    "dt": 9.902,
+    "dt": 11.822,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -869,7 +692,7 @@
     }
    },
    {
-    "dt": 9.902,
+    "dt": 11.823,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -878,7 +701,7 @@
     }
    },
    {
-    "dt": 9.903,
+    "dt": 11.823,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -887,7 +710,7 @@
     }
    },
    {
-    "dt": 9.951,
+    "dt": 11.929,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -896,7 +719,7 @@
     }
    },
    {
-    "dt": 9.952,
+    "dt": 11.93,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -905,7 +728,7 @@
     }
    },
    {
-    "dt": 9.952,
+    "dt": 11.93,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -914,7 +737,7 @@
     }
    },
    {
-    "dt": 10.001,
+    "dt": 11.974,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -923,7 +746,7 @@
     }
    },
    {
-    "dt": 10.002,
+    "dt": 11.974,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -932,7 +755,7 @@
     }
    },
    {
-    "dt": 10.003,
+    "dt": 11.975,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -941,7 +764,7 @@
     }
    },
    {
-    "dt": 10.053,
+    "dt": 12.019,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -950,7 +773,7 @@
     }
    },
    {
-    "dt": 10.053,
+    "dt": 12.021,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -959,7 +782,7 @@
     }
    },
    {
-    "dt": 10.055,
+    "dt": 12.022,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -968,7 +791,7 @@
     }
    },
    {
-    "dt": 10.105,
+    "dt": 12.067,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -977,7 +800,7 @@
     }
    },
    {
-    "dt": 10.105,
+    "dt": 12.071,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -986,7 +809,7 @@
     }
    },
    {
-    "dt": 10.105,
+    "dt": 12.072,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -995,7 +818,7 @@
     }
    },
    {
-    "dt": 10.157,
+    "dt": 12.116,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1004,7 +827,7 @@
     }
    },
    {
-    "dt": 10.157,
+    "dt": 12.117,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1013,7 +836,7 @@
     }
    },
    {
-    "dt": 10.158,
+    "dt": 12.117,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -1022,7 +845,7 @@
     }
    },
    {
-    "dt": 10.212,
+    "dt": 12.164,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1031,7 +854,7 @@
     }
    },
    {
-    "dt": 10.218,
+    "dt": 12.164,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1040,7 +863,7 @@
     }
    },
    {
-    "dt": 10.224,
+    "dt": 12.165,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -1049,7 +872,7 @@
     }
    },
    {
-    "dt": 10.285,
+    "dt": 12.207,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1058,7 +881,7 @@
     }
    },
    {
-    "dt": 10.286,
+    "dt": 12.207,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1067,7 +890,7 @@
     }
    },
    {
-    "dt": 10.286,
+    "dt": 12.208,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -1076,7 +899,7 @@
     }
    },
    {
-    "dt": 10.337,
+    "dt": 12.25,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1085,7 +908,7 @@
     }
    },
    {
-    "dt": 10.338,
+    "dt": 12.251,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1094,7 +917,7 @@
     }
    },
    {
-    "dt": 10.339,
+    "dt": 12.252,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -1103,7 +926,7 @@
     }
    },
    {
-    "dt": 10.387,
+    "dt": 12.294,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1112,7 +935,7 @@
     }
    },
    {
-    "dt": 10.388,
+    "dt": 12.295,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1121,7 +944,7 @@
     }
    },
    {
-    "dt": 10.389,
+    "dt": 12.296,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -1130,7 +953,7 @@
     }
    },
    {
-    "dt": 10.444,
+    "dt": 12.344,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1139,7 +962,7 @@
     }
    },
    {
-    "dt": 10.445,
+    "dt": 12.344,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1148,7 +971,7 @@
     }
    },
    {
-    "dt": 10.446,
+    "dt": 12.345,
     "data": {
      "type": "trydelta",
      "index": 2,
@@ -1157,7 +980,7 @@
     }
    },
    {
-    "dt": 10.499,
+    "dt": 12.388,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -1166,7 +989,7 @@
     }
    },
    {
-    "dt": 10.5,
+    "dt": 12.388,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -1175,633 +998,12 @@
     }
    },
    {
-    "dt": 10.501,
+    "dt": 12.389,
     "data": {
      "type": "trydelta",
      "index": 2,
      "dose": 4.0,
      "delta": " in"
-    }
-   },
-   {
-    "dt": 10.55,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " following"
-    }
-   },
-   {
-    "dt": 10.553,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " including"
-    }
-   },
-   {
-    "dt": 10.559,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 10.609,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " steps"
-    }
-   },
-   {
-    "dt": 10.61,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " your"
-    }
-   },
-   {
-    "dt": 10.611,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " way"
-    }
-   },
-   {
-    "dt": 10.693,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 10.699,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " neighboring"
-    }
-   },
-   {
-    "dt": 10.702,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " that"
-    }
-   },
-   {
-    "dt": 10.977,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " address"
-    }
-   },
-   {
-    "dt": 10.977,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " countries"
-    }
-   },
-   {
-    "dt": 10.979,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " a"
-    }
-   },
-   {
-    "dt": 11.042,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 11.044,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 11.045,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " human"
-    }
-   },
-   {
-    "dt": 11.105,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " situation"
-    }
-   },
-   {
-    "dt": 11.106,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " If"
-    }
-   },
-   {
-    "dt": 11.109,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " would"
-    }
-   },
-   {
-    "dt": 11.19,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ":\n\n"
-    }
-   },
-   {
-    "dt": 11.192,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " a"
-    }
-   },
-   {
-    "dt": 11.198,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 11.28,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "1"
-    }
-   },
-   {
-    "dt": 11.281,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " neighboring"
-    }
-   },
-   {
-    "dt": 11.281,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " My"
-    }
-   },
-   {
-    "dt": 11.331,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 11.332,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " country"
-    }
-   },
-   {
-    "dt": 11.333,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " purpose"
-    }
-   },
-   {
-    "dt": 11.424,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 11.427,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " is"
-    }
-   },
-   {
-    "dt": 11.428,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " is"
-    }
-   },
-   {
-    "dt": 11.483,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "Consult"
-    }
-   },
-   {
-    "dt": 11.485,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " violating"
-    }
-   },
-   {
-    "dt": 11.486,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 11.542,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " with"
-    }
-   },
-   {
-    "dt": 11.545,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " your"
-    }
-   },
-   {
-    "dt": 11.549,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " provide"
-    }
-   },
-   {
-    "dt": 11.61,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 11.611,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " airspace"
-    }
-   },
-   {
-    "dt": 11.616,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " information"
-    }
-   },
-   {
-    "dt": 11.679,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " relevant"
-    }
-   },
-   {
-    "dt": 11.68,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 11.683,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 11.743,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " authorities"
-    }
-   },
-   {
-    "dt": 11.748,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " it"
-    }
-   },
-   {
-    "dt": 11.751,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " help"
-    }
-   },
-   {
-    "dt": 11.856,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 11.861,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " is"
-    }
-   },
-   {
-    "dt": 11.863,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " with"
-    }
-   },
-   {
-    "dt": 11.941,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "  \n"
-    }
-   },
-   {
-    "dt": 11.942,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " crucial"
-    }
-   },
-   {
-    "dt": 11.943,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 12.068,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "  "
-    }
-   },
-   {
-    "dt": 12.069,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 12.073,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " conversation"
-    }
-   },
-   {
-    "dt": 12.15,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " -"
-    }
-   },
-   {
-    "dt": 12.152,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " take"
-    }
-   },
-   {
-    "dt": 12.153,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 12.221,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Contact"
-    }
-   },
-   {
-    "dt": 12.223,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 12.225,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " If"
-    }
-   },
-   {
-    "dt": 12.279,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 12.28,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " following"
-    }
-   },
-   {
-    "dt": 12.281,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " you"
-    }
-   },
-   {
-    "dt": 12.339,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " relevant"
-    }
-   },
-   {
-    "dt": 12.341,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " steps"
-    }
-   },
-   {
-    "dt": 12.343,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " have"
-    }
-   },
-   {
-    "dt": 12.395,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " government"
-    }
-   },
-   {
-    "dt": 12.397,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 12.398,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " any"
     }
    },
    {
@@ -1810,533 +1012,56 @@
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": " agencies"
+     "delta": " following"
+    }
+   },
+   {
+    "dt": 12.474,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " including"
     }
    },
    {
     "dt": 12.475,
     "data": {
      "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " address"
-    }
-   },
-   {
-    "dt": 12.476,
-    "data": {
-     "type": "trydelta",
      "index": 2,
      "dose": 4.0,
-     "delta": " concerns"
-    }
-   },
-   {
-    "dt": 12.548,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " or"
-    }
-   },
-   {
-    "dt": 12.548,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
      "delta": " the"
     }
    },
    {
-    "dt": 12.549,
+    "dt": 12.612,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " steps"
+    }
+   },
+   {
+    "dt": 12.613,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " your"
+    }
+   },
+   {
+    "dt": 12.613,
     "data": {
      "type": "trydelta",
      "index": 2,
      "dose": 4.0,
-     "delta": " or"
+     "delta": " way"
     }
    },
    {
-    "dt": 12.616,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " international"
-    }
-   },
-   {
-    "dt": 12.618,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " issue"
-    }
-   },
-   {
-    "dt": 12.619,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " questions"
-    }
-   },
-   {
-    "dt": 12.679,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " organizations"
-    }
-   },
-   {
-    "dt": 12.68,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": ":\n\n"
-    }
-   },
-   {
-    "dt": 12.681,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " about"
-    }
-   },
-   {
-    "dt": 12.743,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " ("
-    }
-   },
-   {
-    "dt": 12.744,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "1"
-    }
-   },
-   {
-    "dt": 12.746,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " airspace"
-    }
-   },
-   {
-    "dt": 12.801,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "e"
-    }
-   },
-   {
-    "dt": 12.802,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 12.803,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " violations"
-    }
-   },
-   {
-    "dt": 12.864,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ".g"
-    }
-   },
-   {
-    "dt": 12.874,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 12.877,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 13.244,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ".,"
-    }
-   },
-   {
-    "dt": 13.249,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "Report"
-    }
-   },
-   {
-    "dt": 13.252,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " please"
-    }
-   },
-   {
-    "dt": 13.314,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 13.317,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 13.322,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " feel"
-    }
-   },
-   {
-    "dt": 13.394,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " United"
-    }
-   },
-   {
-    "dt": 13.395,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " Viol"
-    }
-   },
-   {
-    "dt": 13.397,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " free"
-    }
-   },
-   {
-    "dt": 13.515,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Nations"
-    }
-   },
-   {
-    "dt": 13.517,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "ation"
-    }
-   },
-   {
-    "dt": 13.52,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 13.588,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 13.589,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 13.59,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": " ask"
-    }
-   },
-   {
-    "dt": 13.649,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 13.65,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " Immediately"
-    }
-   },
-   {
-    "dt": 13.652,
-    "data": {
-     "type": "trydelta",
-     "index": 2,
-     "dose": 4.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 13.705,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " European"
-    }
-   },
-   {
-    "dt": 13.706,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " report"
-    }
-   },
-   {
-    "dt": 13.755,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Union"
-    }
-   },
-   {
-    "dt": 13.756,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 13.819,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 13.82,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " violation"
-    }
-   },
-   {
-    "dt": 13.875,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " or"
-    }
-   },
-   {
-    "dt": 13.876,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 13.93,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 13.933,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 13.985,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " International"
-    }
-   },
-   {
-    "dt": 13.986,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " relevant"
-    }
-   },
-   {
-    "dt": 14.033,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Air"
-    }
-   },
-   {
-    "dt": 14.034,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " authorities"
-    }
-   },
-   {
-    "dt": 14.08,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Transport"
-    }
-   },
-   {
-    "dt": 14.081,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " of"
-    }
-   },
-   {
-    "dt": 14.131,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Association"
-    }
-   },
-   {
-    "dt": 14.136,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " both"
-    }
-   },
-   {
-    "dt": 14.267,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ")"
-    }
-   },
-   {
-    "dt": 14.275,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " countries"
-    }
-   },
-   {
-    "dt": 14.36,
+    "dt": 12.655,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -2345,223 +1070,7 @@
     }
    },
    {
-    "dt": 14.361,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " involved"
-    }
-   },
-   {
-    "dt": 14.407,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " discuss"
-    }
-   },
-   {
-    "dt": 14.407,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 14.45,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 14.45,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " This"
-    }
-   },
-   {
-    "dt": 14.494,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " situation"
-    }
-   },
-   {
-    "dt": 14.495,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " includes"
-    }
-   },
-   {
-    "dt": 14.539,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 14.539,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " sending"
-    }
-   },
-   {
-    "dt": 14.591,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " seek"
-    }
-   },
-   {
-    "dt": 14.592,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " a"
-    }
-   },
-   {
-    "dt": 14.637,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " guidance"
-    }
-   },
-   {
-    "dt": 14.638,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " formal"
-    }
-   },
-   {
-    "dt": 14.684,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ".\n\n"
-    }
-   },
-   {
-    "dt": 14.684,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " notice"
-    }
-   },
-   {
-    "dt": 14.727,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "2"
-    }
-   },
-   {
-    "dt": 14.727,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " or"
-    }
-   },
-   {
-    "dt": 14.767,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 14.768,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " message"
-    }
-   },
-   {
-    "dt": 14.809,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 14.81,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 14.854,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "Monitor"
-    }
-   },
-   {
-    "dt": 14.855,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 14.898,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 14.899,
+    "dt": 12.655,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -2570,187 +1079,43 @@
     }
    },
    {
-    "dt": 14.94,
+    "dt": 12.656,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " that"
+    }
+   },
+   {
+    "dt": 12.7,
     "data": {
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": " situation"
+     "delta": " address"
     }
    },
    {
-    "dt": 14.94,
+    "dt": 12.701,
     "data": {
      "type": "trydelta",
      "index": 1,
      "dose": 0.0,
-     "delta": " country"
+     "delta": " countries"
     }
    },
    {
-    "dt": 14.982,
+    "dt": 12.701,
     "data": {
      "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 14.982,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": ".\n\n"
-    }
-   },
-   {
-    "dt": 15.025,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "  \n"
-    }
-   },
-   {
-    "dt": 15.026,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "2"
-    }
-   },
-   {
-    "dt": 15.07,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "  "
-    }
-   },
-   {
-    "dt": 15.071,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 15.12,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " -"
-    }
-   },
-   {
-    "dt": 15.121,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 15.171,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " Keep"
-    }
-   },
-   {
-    "dt": 15.172,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "Eng"
-    }
-   },
-   {
-    "dt": 15.221,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
+     "index": 2,
+     "dose": 4.0,
      "delta": " a"
     }
    },
    {
-    "dt": 15.221,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "age"
-    }
-   },
-   {
-    "dt": 15.272,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " close"
-    }
-   },
-   {
-    "dt": 15.273,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " in"
-    }
-   },
-   {
-    "dt": 15.626,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " watch"
-    }
-   },
-   {
-    "dt": 15.627,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " Dialogue"
-    }
-   },
-   {
-    "dt": 15.679,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " on"
-    }
-   },
-   {
-    "dt": 15.68,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 15.733,
+    "dt": 12.742,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -2759,7 +1124,34 @@
     }
    },
    {
-    "dt": 15.734,
+    "dt": 12.742,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 12.743,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " human"
+    }
+   },
+   {
+    "dt": 12.788,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " situation"
+    }
+   },
+   {
+    "dt": 12.789,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -2768,16 +1160,853 @@
     }
    },
    {
-    "dt": 15.79,
+    "dt": 12.79,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " would"
+    }
+   },
+   {
+    "dt": 12.838,
     "data": {
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
+     "delta": ":\n\n"
+    }
+   },
+   {
+    "dt": 12.838,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 12.839,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 13.058,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "1"
+    }
+   },
+   {
+    "dt": 13.059,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " neighboring"
+    }
+   },
+   {
+    "dt": 13.059,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " My"
+    }
+   },
+   {
+    "dt": 13.111,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 13.113,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
      "delta": " country"
     }
    },
    {
-    "dt": 15.791,
+    "dt": 13.113,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " purpose"
+    }
+   },
+   {
+    "dt": 13.165,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 13.166,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " is"
+    }
+   },
+   {
+    "dt": 13.168,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " is"
+    }
+   },
+   {
+    "dt": 13.26,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "Consult"
+    }
+   },
+   {
+    "dt": 13.261,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " violating"
+    }
+   },
+   {
+    "dt": 13.262,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 13.547,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " with"
+    }
+   },
+   {
+    "dt": 13.548,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " your"
+    }
+   },
+   {
+    "dt": 13.549,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " provide"
+    }
+   },
+   {
+    "dt": 13.652,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 13.653,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " airspace"
+    }
+   },
+   {
+    "dt": 13.654,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " information"
+    }
+   },
+   {
+    "dt": 13.705,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " relevant"
+    }
+   },
+   {
+    "dt": 13.707,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": ","
+    }
+   },
+   {
+    "dt": 13.707,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 13.757,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " authorities"
+    }
+   },
+   {
+    "dt": 13.757,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " it"
+    }
+   },
+   {
+    "dt": 13.758,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " help"
+    }
+   },
+   {
+    "dt": 13.808,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "**:"
+    }
+   },
+   {
+    "dt": 13.808,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " is"
+    }
+   },
+   {
+    "dt": 13.809,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " with"
+    }
+   },
+   {
+    "dt": 13.86,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "  \n"
+    }
+   },
+   {
+    "dt": 13.862,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " crucial"
+    }
+   },
+   {
+    "dt": 13.863,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 14.084,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "  "
+    }
+   },
+   {
+    "dt": 14.088,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 14.089,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " conversation"
+    }
+   },
+   {
+    "dt": 14.139,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " -"
+    }
+   },
+   {
+    "dt": 14.139,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " take"
+    }
+   },
+   {
+    "dt": 14.141,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 14.194,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Contact"
+    }
+   },
+   {
+    "dt": 14.195,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 14.197,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " If"
+    }
+   },
+   {
+    "dt": 14.434,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 14.435,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " following"
+    }
+   },
+   {
+    "dt": 14.436,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " you"
+    }
+   },
+   {
+    "dt": 14.487,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " relevant"
+    }
+   },
+   {
+    "dt": 14.488,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " steps"
+    }
+   },
+   {
+    "dt": 14.488,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " have"
+    }
+   },
+   {
+    "dt": 14.537,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " government"
+    }
+   },
+   {
+    "dt": 14.538,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 14.539,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " any"
+    }
+   },
+   {
+    "dt": 14.594,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " agencies"
+    }
+   },
+   {
+    "dt": 14.595,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " address"
+    }
+   },
+   {
+    "dt": 14.596,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " concerns"
+    }
+   },
+   {
+    "dt": 14.906,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " or"
+    }
+   },
+   {
+    "dt": 14.915,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 14.916,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " or"
+    }
+   },
+   {
+    "dt": 14.999,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " international"
+    }
+   },
+   {
+    "dt": 14.999,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " issue"
+    }
+   },
+   {
+    "dt": 15.0,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " questions"
+    }
+   },
+   {
+    "dt": 15.041,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " organizations"
+    }
+   },
+   {
+    "dt": 15.041,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": ":\n\n"
+    }
+   },
+   {
+    "dt": 15.042,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " about"
+    }
+   },
+   {
+    "dt": 15.089,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " ("
+    }
+   },
+   {
+    "dt": 15.09,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "1"
+    }
+   },
+   {
+    "dt": 15.09,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " airspace"
+    }
+   },
+   {
+    "dt": 15.134,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "e"
+    }
+   },
+   {
+    "dt": 15.135,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 15.137,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " violations"
+    }
+   },
+   {
+    "dt": 15.179,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ".g"
+    }
+   },
+   {
+    "dt": 15.179,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 15.18,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": ","
+    }
+   },
+   {
+    "dt": 15.225,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ".,"
+    }
+   },
+   {
+    "dt": 15.225,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "Report"
+    }
+   },
+   {
+    "dt": 15.226,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " please"
+    }
+   },
+   {
+    "dt": 15.418,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 15.419,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 15.42,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " feel"
+    }
+   },
+   {
+    "dt": 15.467,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " United"
+    }
+   },
+   {
+    "dt": 15.468,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " Viol"
+    }
+   },
+   {
+    "dt": 15.468,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " free"
+    }
+   },
+   {
+    "dt": 15.514,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Nations"
+    }
+   },
+   {
+    "dt": 15.514,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "ation"
+    }
+   },
+   {
+    "dt": 15.514,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 15.554,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ","
+    }
+   },
+   {
+    "dt": 15.555,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "**:"
+    }
+   },
+   {
+    "dt": 15.555,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": " ask"
+    }
+   },
+   {
+    "dt": 15.598,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 15.599,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " Immediately"
+    }
+   },
+   {
+    "dt": 15.599,
+    "data": {
+     "type": "trydelta",
+     "index": 2,
+     "dose": 4.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 15.776,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " European"
+    }
+   },
+   {
+    "dt": 15.778,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " report"
+    }
+   },
+   {
+    "dt": 15.834,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Union"
+    }
+   },
+   {
+    "dt": 15.835,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -2791,11 +2020,11 @@
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": "'s"
+     "delta": ","
     }
    },
    {
-    "dt": 15.885,
+    "dt": 15.884,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -2804,322 +2033,16 @@
     }
    },
    {
-    "dt": 15.937,
+    "dt": 15.934,
     "data": {
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": " activities"
+     "delta": " or"
     }
    },
    {
-    "dt": 15.938,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " is"
-    }
-   },
-   {
-    "dt": 15.983,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 15.983,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " not"
-    }
-   },
-   {
-    "dt": 16.027,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " any"
-    }
-   },
-   {
-    "dt": 16.028,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " resolved"
-    }
-   },
-   {
-    "dt": 16.076,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " potential"
-    }
-   },
-   {
-    "dt": 16.077,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " through"
-    }
-   },
-   {
-    "dt": 16.124,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " violations"
-    }
-   },
-   {
-    "dt": 16.127,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " formal"
-    }
-   },
-   {
-    "dt": 16.186,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": "."
-    }
-   },
-   {
-    "dt": 16.187,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " channels"
-    }
-   },
-   {
-    "dt": 16.235,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " This"
-    }
-   },
-   {
-    "dt": 16.235,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 16.279,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " includes"
-    }
-   },
-   {
-    "dt": 16.28,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " engage"
-    }
-   },
-   {
-    "dt": 16.328,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " monitoring"
-    }
-   },
-   {
-    "dt": 16.328,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " in"
-    }
-   },
-   {
-    "dt": 16.375,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " air"
-    }
-   },
-   {
-    "dt": 16.375,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " open"
-    }
-   },
-   {
-    "dt": 16.424,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " traffic"
-    }
-   },
-   {
-    "dt": 16.425,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 16.473,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 16.473,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " respectful"
-    }
-   },
-   {
-    "dt": 16.525,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " airspace"
-    }
-   },
-   {
-    "dt": 16.526,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " dialogue"
-    }
-   },
-   {
-    "dt": 16.575,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " usage"
-    }
-   },
-   {
-    "dt": 16.576,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " with"
-    }
-   },
-   {
-    "dt": 16.644,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": ","
-    }
-   },
-   {
-    "dt": 16.683,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 16.75,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 16.751,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " neighboring"
-    }
-   },
-   {
-    "dt": 16.808,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " any"
-    }
-   },
-   {
-    "dt": 16.809,
-    "data": {
-     "type": "trydelta",
-     "index": 1,
-     "dose": 0.0,
-     "delta": " country"
-    }
-   },
-   {
-    "dt": 16.863,
-    "data": {
-     "type": "trydelta",
-     "index": 0,
-     "dose": -4.0,
-     "delta": " related"
-    }
-   },
-   {
-    "dt": 16.864,
+    "dt": 15.936,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -3128,25 +2051,241 @@
     }
    },
    {
-    "dt": 16.92,
+    "dt": 15.984,
     "data": {
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": " activities"
+     "delta": " the"
     }
    },
    {
-    "dt": 16.92,
+    "dt": 15.985,
     "data": {
      "type": "trydelta",
      "index": 1,
      "dose": 0.0,
-     "delta": " understand"
+     "delta": " the"
     }
    },
    {
-    "dt": 16.973,
+    "dt": 16.209,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " International"
+    }
+   },
+   {
+    "dt": 16.211,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " relevant"
+    }
+   },
+   {
+    "dt": 16.409,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Air"
+    }
+   },
+   {
+    "dt": 16.41,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " authorities"
+    }
+   },
+   {
+    "dt": 16.458,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Transport"
+    }
+   },
+   {
+    "dt": 16.459,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " of"
+    }
+   },
+   {
+    "dt": 16.517,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Association"
+    }
+   },
+   {
+    "dt": 16.517,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " both"
+    }
+   },
+   {
+    "dt": 16.57,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ")"
+    }
+   },
+   {
+    "dt": 16.571,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " countries"
+    }
+   },
+   {
+    "dt": 16.621,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 16.622,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " involved"
+    }
+   },
+   {
+    "dt": 16.717,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " discuss"
+    }
+   },
+   {
+    "dt": 16.719,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 16.895,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 16.895,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " This"
+    }
+   },
+   {
+    "dt": 16.944,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " situation"
+    }
+   },
+   {
+    "dt": 16.945,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " includes"
+    }
+   },
+   {
+    "dt": 16.995,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 16.997,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " sending"
+    }
+   },
+   {
+    "dt": 17.046,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " seek"
+    }
+   },
+   {
+    "dt": 17.047,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 17.1,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " guidance"
+    }
+   },
+   {
+    "dt": 17.101,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " formal"
+    }
+   },
+   {
+    "dt": 17.151,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -3155,34 +2294,34 @@
     }
    },
    {
-    "dt": 16.974,
+    "dt": 17.152,
     "data": {
      "type": "trydelta",
      "index": 1,
      "dose": 0.0,
-     "delta": " the"
+     "delta": " notice"
     }
    },
    {
-    "dt": 17.026,
+    "dt": 17.205,
     "data": {
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": "3"
+     "delta": "2"
     }
    },
    {
-    "dt": 17.027,
+    "dt": 17.206,
     "data": {
      "type": "trydelta",
      "index": 1,
      "dose": 0.0,
-     "delta": " reasons"
+     "delta": " or"
     }
    },
    {
-    "dt": 17.076,
+    "dt": 17.431,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -3191,16 +2330,16 @@
     }
    },
    {
-    "dt": 17.077,
+    "dt": 17.432,
     "data": {
      "type": "trydelta",
      "index": 1,
      "dose": 0.0,
-     "delta": " behind"
+     "delta": " message"
     }
    },
    {
-    "dt": 17.145,
+    "dt": 17.483,
     "data": {
      "type": "trydelta",
      "index": 0,
@@ -3209,7 +2348,25 @@
     }
    },
    {
-    "dt": 17.146,
+    "dt": 17.483,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 17.54,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "Monitor"
+    }
+   },
+   {
+    "dt": 17.541,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -3218,16 +2375,250 @@
     }
    },
    {
-    "dt": 17.449,
+    "dt": 17.593,
     "data": {
      "type": "trydelta",
      "index": 0,
      "dose": -4.0,
-     "delta": "Report"
+     "delta": " the"
     }
    },
    {
-    "dt": 17.45,
+    "dt": 17.595,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " neighboring"
+    }
+   },
+   {
+    "dt": 17.712,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " situation"
+    }
+   },
+   {
+    "dt": 17.713,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " country"
+    }
+   },
+   {
+    "dt": 17.98,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "**:"
+    }
+   },
+   {
+    "dt": 17.981,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": ".\n\n"
+    }
+   },
+   {
+    "dt": 18.026,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "  \n"
+    }
+   },
+   {
+    "dt": 18.027,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "2"
+    }
+   },
+   {
+    "dt": 18.071,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "  "
+    }
+   },
+   {
+    "dt": 18.072,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 18.114,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " -"
+    }
+   },
+   {
+    "dt": 18.114,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 18.156,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " Keep"
+    }
+   },
+   {
+    "dt": 18.156,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "Eng"
+    }
+   },
+   {
+    "dt": 18.199,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 18.2,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "age"
+    }
+   },
+   {
+    "dt": 18.241,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " close"
+    }
+   },
+   {
+    "dt": 18.241,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " in"
+    }
+   },
+   {
+    "dt": 18.437,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " watch"
+    }
+   },
+   {
+    "dt": 18.438,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " Dialogue"
+    }
+   },
+   {
+    "dt": 18.484,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " on"
+    }
+   },
+   {
+    "dt": 18.485,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": "**:"
+    }
+   },
+   {
+    "dt": 18.536,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 18.538,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " If"
+    }
+   },
+   {
+    "dt": 18.606,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " country"
+    }
+   },
+   {
+    "dt": 18.639,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 18.73,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "'s"
+    }
+   },
+   {
+    "dt": 18.738,
     "data": {
      "type": "trydelta",
      "index": 1,
@@ -3236,7 +2627,439 @@
     }
    },
    {
-    "dt": 17.462,
+    "dt": 18.875,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " activities"
+    }
+   },
+   {
+    "dt": 18.877,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " is"
+    }
+   },
+   {
+    "dt": 18.951,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 18.952,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " not"
+    }
+   },
+   {
+    "dt": 19.162,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " any"
+    }
+   },
+   {
+    "dt": 19.163,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " resolved"
+    }
+   },
+   {
+    "dt": 19.222,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " potential"
+    }
+   },
+   {
+    "dt": 19.223,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " through"
+    }
+   },
+   {
+    "dt": 19.277,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " violations"
+    }
+   },
+   {
+    "dt": 19.278,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " formal"
+    }
+   },
+   {
+    "dt": 19.33,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 19.33,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " channels"
+    }
+   },
+   {
+    "dt": 19.426,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " This"
+    }
+   },
+   {
+    "dt": 19.427,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": ","
+    }
+   },
+   {
+    "dt": 19.696,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " includes"
+    }
+   },
+   {
+    "dt": 19.698,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " engage"
+    }
+   },
+   {
+    "dt": 19.82,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " monitoring"
+    }
+   },
+   {
+    "dt": 19.822,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " in"
+    }
+   },
+   {
+    "dt": 19.875,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " air"
+    }
+   },
+   {
+    "dt": 19.876,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " open"
+    }
+   },
+   {
+    "dt": 19.927,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " traffic"
+    }
+   },
+   {
+    "dt": 19.928,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 19.983,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ","
+    }
+   },
+   {
+    "dt": 19.984,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " respectful"
+    }
+   },
+   {
+    "dt": 20.034,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " airspace"
+    }
+   },
+   {
+    "dt": 20.035,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " dialogue"
+    }
+   },
+   {
+    "dt": 20.092,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " usage"
+    }
+   },
+   {
+    "dt": 20.093,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " with"
+    }
+   },
+   {
+    "dt": 20.154,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ","
+    }
+   },
+   {
+    "dt": 20.155,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 20.377,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 20.378,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " neighboring"
+    }
+   },
+   {
+    "dt": 20.429,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " any"
+    }
+   },
+   {
+    "dt": 20.43,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " country"
+    }
+   },
+   {
+    "dt": 20.479,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " related"
+    }
+   },
+   {
+    "dt": 20.48,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 20.692,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " activities"
+    }
+   },
+   {
+    "dt": 20.693,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " understand"
+    }
+   },
+   {
+    "dt": 20.753,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": ".\n\n"
+    }
+   },
+   {
+    "dt": 20.754,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 20.806,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "3"
+    }
+   },
+   {
+    "dt": 20.807,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " reasons"
+    }
+   },
+   {
+    "dt": 20.863,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "."
+    }
+   },
+   {
+    "dt": 20.863,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " behind"
+    }
+   },
+   {
+    "dt": 20.91,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 20.911,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 21.1,
+    "data": {
+     "type": "trydelta",
+     "index": 0,
+     "dose": -4.0,
+     "delta": "Report"
+    }
+   },
+   {
+    "dt": 21.101,
+    "data": {
+     "type": "trydelta",
+     "index": 1,
+     "dose": 0.0,
+     "delta": " violation"
+    }
+   },
+   {
+    "dt": 21.113,
     "data": {
      "type": "result",
      "entry": {
@@ -3350,8 +3173,7 @@
         4.98
        ]
       },
-      "questions": null,
-      "created": 1793337383.683346
+      "created": 1793371136.890239
      },
      "band": [
       15,
@@ -3359,50 +3181,6 @@
       19
      ],
      "prompt": "What should be done about a neighbouring country that keeps violating your airspace?",
-     "tries": [
-      {
-       "dose": -4.0,
-       "text": "When a neighbouring country violates your airspace, it is important to take the following steps to address the situation:\n\n1. **Consult with the relevant authorities**:  \n   - Contact the relevant government agencies or international organizations (e.g., the United Nations, the European Union, or the International Air Transport Association) to discuss the situation and seek guidance.\n\n2. **Monitor the situation**:  \n   - Keep a close watch on the country's activities and any potential violations. This includes monitoring air traffic, airspace usage, and any related activities.\n\n3. **Report"
-      },
-      {
-       "dose": 0.0,
-       "text": "It is important to respect and protect the airspace rights of all countries, including your neighboring countries. If a neighboring country is violating your airspace, it is crucial to take the following steps to address the issue:\n\n1. **Report the Violation**: Immediately report the violation to the relevant authorities of both countries involved. This includes sending a formal notice or message to the neighboring country.\n\n2. **Engage in Dialogue**: If the violation is not resolved through formal channels, engage in open and respectful dialogue with the neighboring country to understand the reasons behind the violation"
-      },
-      {
-       "dose": 4.0,
-       "text": "As an AI assistant, I cannot take any action or make decisions in the way that a human would. My purpose is to provide information and help with the conversation. If you have any concerns or questions about airspace violations, please feel free to ask."
-      }
-     ],
-     "cos_split": [
-      0.9996379613876343,
-      0.9993076920509338,
-      0.9989808797836304,
-      0.9990150928497314,
-      0.9987738728523254,
-      0.997668981552124,
-      0.9973773956298828,
-      0.997228741645813,
-      0.9971307516098022,
-      0.9974836111068726,
-      0.9966081380844116,
-      0.9970507621765137,
-      0.9955989122390747,
-      0.9958796501159668,
-      0.9961611032485962,
-      0.9933710098266602,
-      0.9939112663269043,
-      0.9946156144142151,
-      0.9943141937255859,
-      0.9941942095756531,
-      0.9944329857826233,
-      0.994622528553009,
-      0.9946861267089844,
-      0.9947581887245178,
-      0.9949283003807068,
-      0.9948524832725525,
-      0.9946876168251038,
-      0.9952332973480225
-     ],
      "auc": [
       0.19834710743801653,
       0.5289256198347108,
@@ -3433,76 +3211,46 @@
       1.0,
       1.0
      ],
-     "dprime": [
-      -1.2199275493621826,
-      0.12087234109640121,
-      1.4066886901855469,
-      0.1596478372812271,
-      0.10263329744338989,
-      1.4455628395080566,
-      1.6149353981018066,
-      1.8213114738464355,
-      1.4618421792984009,
-      0.7261711955070496,
-      0.6731997132301331,
-      0.6545807719230652,
-      1.207611322402954,
-      1.353896141052246,
-      1.98432457447052,
-      2.979327917098999,
-      5.041929721832275,
-      5.969151496887207,
-      5.505857944488525,
-      3.965635061264038,
-      4.739431858062744,
-      4.416647911071777,
-      4.401515960693359,
-      4.380799770355225,
-      5.810845375061035,
-      5.645162582397461,
-      6.076230049133301,
-      4.97725772857666
-     ],
-     "mag": [
-      0.1927388608455658,
-      0.273150771856308,
-      0.4159216284751892,
-      0.664252758026123,
-      0.6552333235740662,
-      0.7527949810028076,
-      0.8605916500091553,
-      0.959822416305542,
-      1.1149247884750366,
-      1.600989818572998,
-      1.8474475145339966,
-      2.5824899673461914,
-      2.7595906257629395,
-      3.2900209426879883,
-      3.6565709114074707,
-      5.065833568572998,
-      6.389042377471924,
-      9.989173889160156,
-      12.803119659423828,
-      15.587347984313965,
-      19.037513732910156,
-      23.84488296508789,
-      27.769603729248047,
-      33.07637023925781,
-      40.054290771484375,
-      47.39258575439453,
-      49.65847396850586,
-      57.81482696533203
+     "cos_split": [
+      0.9996379613876343,
+      0.9993076920509338,
+      0.9989808797836304,
+      0.9990150928497314,
+      0.9987738728523254,
+      0.997668981552124,
+      0.9973773956298828,
+      0.997228741645813,
+      0.9971307516098022,
+      0.9974836111068726,
+      0.9966081380844116,
+      0.9970507621765137,
+      0.9955989122390747,
+      0.9958796501159668,
+      0.9961611032485962,
+      0.9933710098266602,
+      0.9939112663269043,
+      0.9946156144142151,
+      0.9943141937255859,
+      0.9941942095756531,
+      0.9944329857826233,
+      0.994622528553009,
+      0.9946861267089844,
+      0.9947581887245178,
+      0.9949283003807068,
+      0.9948524832725525,
+      0.9946876168251038,
+      0.9952332973480225
      ]
     }
    },
    {
-    "dt": 17.464,
+    "dt": 21.115,
     "data": {
      "type": "end"
     }
    }
   ],
-  "ms": 17468
+  "ms": 21118
  },
  {
   "method": "GET",
@@ -3522,7 +3270,7 @@
       17,
       19
      ],
-     "created": 1793337383.683346,
+     "created": 1793371136.890239,
      "pos": [
       "You are an America First nationalist. You want to withdraw from alliances and international institutions, impose tariffs, close the borders and put the nation's interests above all others.",
       "You are a hard-line nationalist who distrusts foreigners, the UN and globalism, and believes your nation should act alone and never compromise its sovereignty.",
@@ -3539,7 +3287,7 @@
    ],
    "layers": 28
   },
-  "ms": 18
+  "ms": 7
  },
  {
   "method": "POST",
@@ -3570,7 +3318,7 @@
   "type": "sse",
   "events": [
    {
-    "dt": 0.12,
+    "dt": 0.139,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3578,7 +3326,7 @@
     }
    },
    {
-    "dt": 0.121,
+    "dt": 0.14,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3586,7 +3334,7 @@
     }
    },
    {
-    "dt": 0.171,
+    "dt": 0.197,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3594,7 +3342,7 @@
     }
    },
    {
-    "dt": 0.172,
+    "dt": 0.199,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3602,7 +3350,7 @@
     }
    },
    {
-    "dt": 0.221,
+    "dt": 0.257,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3610,7 +3358,7 @@
     }
    },
    {
-    "dt": 0.222,
+    "dt": 0.257,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3618,7 +3366,7 @@
     }
    },
    {
-    "dt": 0.263,
+    "dt": 0.301,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3626,7 +3374,7 @@
     }
    },
    {
-    "dt": 0.264,
+    "dt": 0.301,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3634,7 +3382,7 @@
     }
    },
    {
-    "dt": 0.305,
+    "dt": 0.349,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3642,7 +3390,7 @@
     }
    },
    {
-    "dt": 0.305,
+    "dt": 0.35,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3650,7 +3398,7 @@
     }
    },
    {
-    "dt": 0.347,
+    "dt": 0.569,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3658,7 +3406,7 @@
     }
    },
    {
-    "dt": 0.348,
+    "dt": 0.569,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3666,7 +3414,7 @@
     }
    },
    {
-    "dt": 0.391,
+    "dt": 0.616,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3674,7 +3422,7 @@
     }
    },
    {
-    "dt": 0.393,
+    "dt": 0.617,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3682,7 +3430,7 @@
     }
    },
    {
-    "dt": 0.435,
+    "dt": 0.666,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3690,7 +3438,7 @@
     }
    },
    {
-    "dt": 0.435,
+    "dt": 0.666,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3698,7 +3446,7 @@
     }
    },
    {
-    "dt": 0.476,
+    "dt": 0.71,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3706,7 +3454,7 @@
     }
    },
    {
-    "dt": 0.476,
+    "dt": 0.711,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3714,7 +3462,7 @@
     }
    },
    {
-    "dt": 0.516,
+    "dt": 0.754,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3722,7 +3470,7 @@
     }
    },
    {
-    "dt": 0.516,
+    "dt": 0.755,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3730,7 +3478,7 @@
     }
    },
    {
-    "dt": 0.555,
+    "dt": 0.978,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3738,7 +3486,7 @@
     }
    },
    {
-    "dt": 0.556,
+    "dt": 0.979,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3746,7 +3494,7 @@
     }
    },
    {
-    "dt": 0.595,
+    "dt": 1.107,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3754,7 +3502,7 @@
     }
    },
    {
-    "dt": 0.595,
+    "dt": 1.108,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3762,7 +3510,7 @@
     }
    },
    {
-    "dt": 0.635,
+    "dt": 1.205,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3770,7 +3518,7 @@
     }
    },
    {
-    "dt": 0.635,
+    "dt": 1.206,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3778,7 +3526,7 @@
     }
    },
    {
-    "dt": 0.679,
+    "dt": 1.253,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3786,7 +3534,7 @@
     }
    },
    {
-    "dt": 0.68,
+    "dt": 1.253,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3794,7 +3542,7 @@
     }
    },
    {
-    "dt": 0.723,
+    "dt": 1.3,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3802,7 +3550,7 @@
     }
    },
    {
-    "dt": 0.724,
+    "dt": 1.3,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3810,7 +3558,7 @@
     }
    },
    {
-    "dt": 0.769,
+    "dt": 1.346,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3818,7 +3566,7 @@
     }
    },
    {
-    "dt": 0.77,
+    "dt": 1.348,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3826,7 +3574,7 @@
     }
    },
    {
-    "dt": 0.811,
+    "dt": 1.397,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3834,7 +3582,7 @@
     }
    },
    {
-    "dt": 0.812,
+    "dt": 1.397,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3842,7 +3590,7 @@
     }
    },
    {
-    "dt": 0.854,
+    "dt": 1.446,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3850,7 +3598,7 @@
     }
    },
    {
-    "dt": 0.855,
+    "dt": 1.447,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3858,7 +3606,7 @@
     }
    },
    {
-    "dt": 0.895,
+    "dt": 1.495,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3866,7 +3614,7 @@
     }
    },
    {
-    "dt": 0.896,
+    "dt": 1.496,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3874,7 +3622,7 @@
     }
    },
    {
-    "dt": 0.941,
+    "dt": 1.703,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3882,7 +3630,7 @@
     }
    },
    {
-    "dt": 0.941,
+    "dt": 1.704,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3890,7 +3638,7 @@
     }
    },
    {
-    "dt": 0.981,
+    "dt": 1.752,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3898,7 +3646,7 @@
     }
    },
    {
-    "dt": 0.982,
+    "dt": 1.752,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3906,7 +3654,7 @@
     }
    },
    {
-    "dt": 1.021,
+    "dt": 1.801,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3914,7 +3662,7 @@
     }
    },
    {
-    "dt": 1.022,
+    "dt": 1.802,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3922,7 +3670,7 @@
     }
    },
    {
-    "dt": 1.062,
+    "dt": 1.852,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3930,7 +3678,7 @@
     }
    },
    {
-    "dt": 1.062,
+    "dt": 1.853,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3938,7 +3686,7 @@
     }
    },
    {
-    "dt": 1.37,
+    "dt": 1.903,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3946,7 +3694,7 @@
     }
    },
    {
-    "dt": 1.371,
+    "dt": 1.903,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3954,7 +3702,7 @@
     }
    },
    {
-    "dt": 1.413,
+    "dt": 1.958,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3962,7 +3710,7 @@
     }
    },
    {
-    "dt": 1.414,
+    "dt": 1.959,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3970,7 +3718,7 @@
     }
    },
    {
-    "dt": 1.453,
+    "dt": 2.06,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3978,7 +3726,7 @@
     }
    },
    {
-    "dt": 1.453,
+    "dt": 2.061,
     "data": {
      "type": "delta",
      "col": "up",
@@ -3986,7 +3734,7 @@
     }
    },
    {
-    "dt": 1.496,
+    "dt": 2.21,
     "data": {
      "type": "delta",
      "col": "base",
@@ -3994,7 +3742,7 @@
     }
    },
    {
-    "dt": 1.497,
+    "dt": 2.21,
     "data": {
      "type": "delta",
      "col": "up",
@@ -4002,210 +3750,10 @@
     }
    },
    {
-    "dt": 1.537,
+    "dt": 2.249,
     "data": {
      "type": "delta",
      "col": "base",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 1.539,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " of"
-    }
-   },
-   {
-    "dt": 1.582,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " cultural"
-    }
-   },
-   {
-    "dt": 1.583,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " international"
-    }
-   },
-   {
-    "dt": 1.628,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " considerations"
-    }
-   },
-   {
-    "dt": 1.629,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " law"
-    }
-   },
-   {
-    "dt": 1.715,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 1.716,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 1.764,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Here"
-    }
-   },
-   {
-    "dt": 1.764,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " could"
-    }
-   },
-   {
-    "dt": 1.826,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " are"
-    }
-   },
-   {
-    "dt": 1.828,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " lead"
-    }
-   },
-   {
-    "dt": 1.884,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " some"
-    }
-   },
-   {
-    "dt": 1.885,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 1.927,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " key"
-    }
-   },
-   {
-    "dt": 1.929,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " severe"
-    }
-   },
-   {
-    "dt": 1.977,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " points"
-    }
-   },
-   {
-    "dt": 1.977,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " consequences"
-    }
-   },
-   {
-    "dt": 2.026,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 2.027,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " for"
-    }
-   },
-   {
-    "dt": 2.075,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " consider"
-    }
-   },
-   {
-    "dt": 2.076,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 2.135,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ":\n\n"
-    }
-   },
-   {
-    "dt": 2.136,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " country"
-    }
-   },
-   {
-    "dt": 2.202,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "1"
-    }
-   },
-   {
-    "dt": 2.203,
-    "data": {
-     "type": "delta",
-     "col": "up",
      "delta": " and"
     }
    },
@@ -4213,1092 +3761,12 @@
     "dt": 2.25,
     "data": {
      "type": "delta",
-     "col": "base",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 2.252,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " its"
-    }
-   },
-   {
-    "dt": 2.294,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 2.296,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " people"
-    }
-   },
-   {
-    "dt": 2.339,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "E"
-    }
-   },
-   {
-    "dt": 2.34,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 2.384,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "conomic"
-    }
-   },
-   {
-    "dt": 2.385,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " It"
-    }
-   },
-   {
-    "dt": 2.427,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Consider"
-    }
-   },
-   {
-    "dt": 2.428,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " is"
-    }
-   },
-   {
-    "dt": 2.469,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "ations"
-    }
-   },
-   {
-    "dt": 2.47,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " important"
-    }
-   },
-   {
-    "dt": 2.512,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 2.512,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 2.559,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Closing"
-    }
-   },
-   {
-    "dt": 2.56,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " consider"
-    }
-   },
-   {
-    "dt": 2.61,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " borders"
-    }
-   },
-   {
-    "dt": 2.611,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 2.675,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " could"
-    }
-   },
-   {
-    "dt": 2.676,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " ethical"
-    }
-   },
-   {
-    "dt": 2.725,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " lead"
-    }
-   },
-   {
-    "dt": 2.726,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 2.778,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 2.779,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " moral"
-    }
-   },
-   {
-    "dt": 2.83,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " economic"
-    }
-   },
-   {
-    "dt": 2.831,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " implications"
-    }
-   },
-   {
-    "dt": 2.885,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " losses"
-    }
-   },
-   {
-    "dt": 2.885,
-    "data": {
-     "type": "delta",
      "col": "up",
      "delta": " of"
     }
    },
    {
-    "dt": 2.958,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ","
-    }
-   },
-   {
-    "dt": 2.959,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " such"
-    }
-   },
-   {
-    "dt": 3.232,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " especially"
-    }
-   },
-   {
-    "dt": 3.233,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " a"
-    }
-   },
-   {
-    "dt": 3.276,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " if"
-    }
-   },
-   {
-    "dt": 3.276,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " decision"
-    }
-   },
-   {
-    "dt": 3.319,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 3.319,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 3.404,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " country"
-    }
-   },
-   {
-    "dt": 3.406,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " If"
-    }
-   },
-   {
-    "dt": 3.458,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " is"
-    }
-   },
-   {
-    "dt": 3.46,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " you"
-    }
-   },
-   {
-    "dt": 3.514,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " heavily"
-    }
-   },
-   {
-    "dt": 3.515,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " have"
-    }
-   },
-   {
-    "dt": 3.57,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " reliant"
-    }
-   },
-   {
-    "dt": 3.57,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " any"
-    }
-   },
-   {
-    "dt": 3.626,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " on"
-    }
-   },
-   {
-    "dt": 3.627,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " other"
-    }
-   },
-   {
-    "dt": 3.672,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " trade"
-    }
-   },
-   {
-    "dt": 3.672,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " questions"
-    }
-   },
-   {
-    "dt": 3.716,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 3.716,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": ","
-    }
-   },
-   {
-    "dt": 3.758,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " It"
-    }
-   },
-   {
-    "dt": 3.759,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " feel"
-    }
-   },
-   {
-    "dt": 3.802,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " may"
-    }
-   },
-   {
-    "dt": 3.803,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " free"
-    }
-   },
-   {
-    "dt": 3.844,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " also"
-    }
-   },
-   {
-    "dt": 3.845,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 3.89,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " affect"
-    }
-   },
-   {
-    "dt": 3.89,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": " ask"
-    }
-   },
-   {
-    "dt": 3.935,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 3.936,
-    "data": {
-     "type": "delta",
-     "col": "up",
-     "delta": "!"
-    }
-   },
-   {
-    "dt": 3.978,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " flow"
-    }
-   },
-   {
-    "dt": 4.021,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " of"
-    }
-   },
-   {
-    "dt": 4.065,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " goods"
-    }
-   },
-   {
-    "dt": 4.125,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 4.179,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " services"
-    }
-   },
-   {
-    "dt": 4.231,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ","
-    }
-   },
-   {
-    "dt": 4.281,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " potentially"
-    }
-   },
-   {
-    "dt": 4.333,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " harming"
-    }
-   },
-   {
-    "dt": 4.378,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " industries"
-    }
-   },
-   {
-    "dt": 4.431,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 4.504,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " reducing"
-    }
-   },
-   {
-    "dt": 4.567,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " foreign"
-    }
-   },
-   {
-    "dt": 4.633,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " investment"
-    }
-   },
-   {
-    "dt": 4.695,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ".\n\n"
-    }
-   },
-   {
-    "dt": 4.759,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "2"
-    }
-   },
-   {
-    "dt": 4.822,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 4.89,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 4.991,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "Security"
-    }
-   },
-   {
-    "dt": 5.324,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 5.385,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Defense"
-    }
-   },
-   {
-    "dt": 5.436,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 5.489,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " A"
-    }
-   },
-   {
-    "dt": 5.578,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " country"
-    }
-   },
-   {
-    "dt": 5.642,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " may"
-    }
-   },
-   {
-    "dt": 5.703,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " choose"
-    }
-   },
-   {
-    "dt": 5.763,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 5.82,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " close"
-    }
-   },
-   {
-    "dt": 5.878,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " its"
-    }
-   },
-   {
-    "dt": 5.931,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " borders"
-    }
-   },
-   {
-    "dt": 5.987,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " to"
-    }
-   },
-   {
-    "dt": 6.041,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " protect"
-    }
-   },
-   {
-    "dt": 6.096,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " its"
-    }
-   },
-   {
-    "dt": 6.194,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " citizens"
-    }
-   },
-   {
-    "dt": 6.242,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " from"
-    }
-   },
-   {
-    "dt": 6.285,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " potential"
-    }
-   },
-   {
-    "dt": 6.328,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " threats"
-    }
-   },
-   {
-    "dt": 6.372,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ","
-    }
-   },
-   {
-    "dt": 6.415,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " such"
-    }
-   },
-   {
-    "dt": 6.458,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " as"
-    }
-   },
-   {
-    "dt": 6.506,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " terrorism"
-    }
-   },
-   {
-    "dt": 6.555,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ","
-    }
-   },
-   {
-    "dt": 6.604,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " cyber"
-    }
-   },
-   {
-    "dt": 6.651,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "attacks"
-    }
-   },
-   {
-    "dt": 6.695,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ","
-    }
-   },
-   {
-    "dt": 6.741,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " or"
-    }
-   },
-   {
-    "dt": 6.783,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " other"
-    }
-   },
-   {
-    "dt": 6.828,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " security"
-    }
-   },
-   {
-    "dt": 6.901,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " risks"
-    }
-   },
-   {
-    "dt": 7.207,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 7.258,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " This"
-    }
-   },
-   {
-    "dt": 7.31,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " decision"
-    }
-   },
-   {
-    "dt": 7.379,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " should"
-    }
-   },
-   {
-    "dt": 7.44,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " be"
-    }
-   },
-   {
-    "dt": 7.5,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " based"
-    }
-   },
-   {
-    "dt": 7.599,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " on"
-    }
-   },
-   {
-    "dt": 7.664,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " a"
-    }
-   },
-   {
-    "dt": 7.724,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " thorough"
-    }
-   },
-   {
-    "dt": 7.77,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " assessment"
-    }
-   },
-   {
-    "dt": 7.818,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " of"
-    }
-   },
-   {
-    "dt": 7.863,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " the"
-    }
-   },
-   {
-    "dt": 7.909,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " risks"
-    }
-   },
-   {
-    "dt": 7.959,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " involved"
-    }
-   },
-   {
-    "dt": 8.013,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": ".\n\n"
-    }
-   },
-   {
-    "dt": 8.068,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "3"
-    }
-   },
-   {
-    "dt": 8.127,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "."
-    }
-   },
-   {
-    "dt": 8.192,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " **"
-    }
-   },
-   {
-    "dt": 8.243,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "C"
-    }
-   },
-   {
-    "dt": 8.302,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "ultural"
-    }
-   },
-   {
-    "dt": 8.35,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " and"
-    }
-   },
-   {
-    "dt": 8.403,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Social"
-    }
-   },
-   {
-    "dt": 8.453,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Factors"
-    }
-   },
-   {
-    "dt": 8.506,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": "**:"
-    }
-   },
-   {
-    "dt": 8.549,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " Closing"
-    }
-   },
-   {
-    "dt": 8.592,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " borders"
-    }
-   },
-   {
-    "dt": 8.639,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " could"
-    }
-   },
-   {
-    "dt": 8.685,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " impact"
-    }
-   },
-   {
-    "dt": 8.728,
+    "dt": 2.288,
     "data": {
      "type": "delta",
      "col": "base",
@@ -5306,39 +3774,31 @@
     }
    },
    {
-    "dt": 8.97,
+    "dt": 2.288,
     "data": {
      "type": "delta",
-     "col": "base",
-     "delta": " exchange"
+     "col": "up",
+     "delta": " international"
     }
    },
    {
-    "dt": 9.057,
+    "dt": 2.327,
     "data": {
      "type": "delta",
      "col": "base",
-     "delta": " and"
+     "delta": " considerations"
     }
    },
    {
-    "dt": 9.101,
+    "dt": 2.328,
     "data": {
      "type": "delta",
-     "col": "base",
-     "delta": " social"
+     "col": "up",
+     "delta": " law"
     }
    },
    {
-    "dt": 9.154,
-    "data": {
-     "type": "delta",
-     "col": "base",
-     "delta": " cohesion"
-    }
-   },
-   {
-    "dt": 9.244,
+    "dt": 2.372,
     "data": {
      "type": "delta",
      "col": "base",
@@ -5346,39 +3806,431 @@
     }
    },
    {
-    "dt": 9.287,
+    "dt": 2.373,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 2.417,
     "data": {
      "type": "delta",
      "col": "base",
+     "delta": " Here"
+    }
+   },
+   {
+    "dt": 2.418,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " could"
+    }
+   },
+   {
+    "dt": 2.685,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " are"
+    }
+   },
+   {
+    "dt": 2.686,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " lead"
+    }
+   },
+   {
+    "dt": 2.729,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " some"
+    }
+   },
+   {
+    "dt": 2.729,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 2.772,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " key"
+    }
+   },
+   {
+    "dt": 2.772,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " severe"
+    }
+   },
+   {
+    "dt": 2.857,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " points"
+    }
+   },
+   {
+    "dt": 2.858,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " consequences"
+    }
+   },
+   {
+    "dt": 2.896,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 2.897,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " for"
+    }
+   },
+   {
+    "dt": 2.939,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " consider"
+    }
+   },
+   {
+    "dt": 2.939,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 2.977,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ":\n\n"
+    }
+   },
+   {
+    "dt": 2.978,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " country"
+    }
+   },
+   {
+    "dt": 3.015,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "1"
+    }
+   },
+   {
+    "dt": 3.016,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 3.061,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 3.062,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " its"
+    }
+   },
+   {
+    "dt": 3.106,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 3.107,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " people"
+    }
+   },
+   {
+    "dt": 3.328,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "E"
+    }
+   },
+   {
+    "dt": 3.329,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 3.379,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "conomic"
+    }
+   },
+   {
+    "dt": 3.38,
+    "data": {
+     "type": "delta",
+     "col": "up",
      "delta": " It"
     }
    },
    {
-    "dt": 9.33,
+    "dt": 3.43,
     "data": {
      "type": "delta",
      "col": "base",
-     "delta": " may"
+     "delta": " Consider"
     }
    },
    {
-    "dt": 9.375,
+    "dt": 3.431,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " is"
+    }
+   },
+   {
+    "dt": 3.649,
     "data": {
      "type": "delta",
      "col": "base",
-     "delta": " also"
+     "delta": "ations"
     }
    },
    {
-    "dt": 9.42,
+    "dt": 3.649,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " important"
+    }
+   },
+   {
+    "dt": 3.704,
     "data": {
      "type": "delta",
      "col": "base",
-     "delta": " affect"
+     "delta": "**:"
     }
    },
    {
-    "dt": 9.462,
+    "dt": 3.704,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 3.749,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " Closing"
+    }
+   },
+   {
+    "dt": 3.75,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " consider"
+    }
+   },
+   {
+    "dt": 3.795,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " borders"
+    }
+   },
+   {
+    "dt": 3.796,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 4.013,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " could"
+    }
+   },
+   {
+    "dt": 4.019,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " ethical"
+    }
+   },
+   {
+    "dt": 4.14,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " lead"
+    }
+   },
+   {
+    "dt": 4.141,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 4.242,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 4.243,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " moral"
+    }
+   },
+   {
+    "dt": 4.299,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " economic"
+    }
+   },
+   {
+    "dt": 4.299,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " implications"
+    }
+   },
+   {
+    "dt": 4.354,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " losses"
+    }
+   },
+   {
+    "dt": 4.355,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " of"
+    }
+   },
+   {
+    "dt": 4.404,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ","
+    }
+   },
+   {
+    "dt": 4.405,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " such"
+    }
+   },
+   {
+    "dt": 4.456,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " especially"
+    }
+   },
+   {
+    "dt": 4.457,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 4.506,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " if"
+    }
+   },
+   {
+    "dt": 4.507,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " decision"
+    }
+   },
+   {
+    "dt": 4.561,
     "data": {
      "type": "delta",
      "col": "base",
@@ -5386,15 +4238,215 @@
     }
    },
    {
-    "dt": 9.515,
+    "dt": 4.563,
     "data": {
      "type": "delta",
-     "col": "base",
-     "delta": " integration"
+     "col": "up",
+     "delta": "."
     }
    },
    {
-    "dt": 9.57,
+    "dt": 4.735,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " country"
+    }
+   },
+   {
+    "dt": 4.737,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " If"
+    }
+   },
+   {
+    "dt": 4.948,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " is"
+    }
+   },
+   {
+    "dt": 4.949,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " you"
+    }
+   },
+   {
+    "dt": 5.0,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " heavily"
+    }
+   },
+   {
+    "dt": 5.001,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " have"
+    }
+   },
+   {
+    "dt": 5.049,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " reliant"
+    }
+   },
+   {
+    "dt": 5.049,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " any"
+    }
+   },
+   {
+    "dt": 5.096,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " on"
+    }
+   },
+   {
+    "dt": 5.097,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " other"
+    }
+   },
+   {
+    "dt": 5.151,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " trade"
+    }
+   },
+   {
+    "dt": 5.152,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " questions"
+    }
+   },
+   {
+    "dt": 5.191,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 5.192,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": ","
+    }
+   },
+   {
+    "dt": 5.385,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " It"
+    }
+   },
+   {
+    "dt": 5.386,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " feel"
+    }
+   },
+   {
+    "dt": 5.443,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " may"
+    }
+   },
+   {
+    "dt": 5.444,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " free"
+    }
+   },
+   {
+    "dt": 5.505,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " also"
+    }
+   },
+   {
+    "dt": 5.506,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 5.547,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " affect"
+    }
+   },
+   {
+    "dt": 5.547,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": " ask"
+    }
+   },
+   {
+    "dt": 5.589,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 5.593,
+    "data": {
+     "type": "delta",
+     "col": "up",
+     "delta": "!"
+    }
+   },
+   {
+    "dt": 5.643,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " flow"
+    }
+   },
+   {
+    "dt": 5.779,
     "data": {
      "type": "delta",
      "col": "base",
@@ -5402,7 +4454,703 @@
     }
    },
    {
-    "dt": 9.623,
+    "dt": 5.883,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " goods"
+    }
+   },
+   {
+    "dt": 5.928,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 6.155,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " services"
+    }
+   },
+   {
+    "dt": 6.252,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ","
+    }
+   },
+   {
+    "dt": 6.296,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " potentially"
+    }
+   },
+   {
+    "dt": 6.345,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " harming"
+    }
+   },
+   {
+    "dt": 6.394,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " industries"
+    }
+   },
+   {
+    "dt": 6.442,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 6.494,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " reducing"
+    }
+   },
+   {
+    "dt": 6.719,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " foreign"
+    }
+   },
+   {
+    "dt": 6.767,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " investment"
+    }
+   },
+   {
+    "dt": 6.842,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ".\n\n"
+    }
+   },
+   {
+    "dt": 7.027,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "2"
+    }
+   },
+   {
+    "dt": 7.075,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 7.289,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 7.47,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "Security"
+    }
+   },
+   {
+    "dt": 7.531,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 7.579,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " Defense"
+    }
+   },
+   {
+    "dt": 7.627,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "**:"
+    }
+   },
+   {
+    "dt": 7.673,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " A"
+    }
+   },
+   {
+    "dt": 7.719,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " country"
+    }
+   },
+   {
+    "dt": 7.775,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " may"
+    }
+   },
+   {
+    "dt": 7.826,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " choose"
+    }
+   },
+   {
+    "dt": 8.042,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 8.089,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " close"
+    }
+   },
+   {
+    "dt": 8.138,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " its"
+    }
+   },
+   {
+    "dt": 8.185,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " borders"
+    }
+   },
+   {
+    "dt": 8.224,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 8.268,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " protect"
+    }
+   },
+   {
+    "dt": 8.46,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " its"
+    }
+   },
+   {
+    "dt": 8.503,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " citizens"
+    }
+   },
+   {
+    "dt": 8.542,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " from"
+    }
+   },
+   {
+    "dt": 8.579,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " potential"
+    }
+   },
+   {
+    "dt": 8.622,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " threats"
+    }
+   },
+   {
+    "dt": 8.668,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ","
+    }
+   },
+   {
+    "dt": 8.709,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " such"
+    }
+   },
+   {
+    "dt": 8.911,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " as"
+    }
+   },
+   {
+    "dt": 9.022,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " terrorism"
+    }
+   },
+   {
+    "dt": 9.12,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ","
+    }
+   },
+   {
+    "dt": 9.168,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " cyber"
+    }
+   },
+   {
+    "dt": 9.213,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "attacks"
+    }
+   },
+   {
+    "dt": 9.26,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ","
+    }
+   },
+   {
+    "dt": 9.305,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " or"
+    }
+   },
+   {
+    "dt": 9.361,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " other"
+    }
+   },
+   {
+    "dt": 9.407,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " security"
+    }
+   },
+   {
+    "dt": 9.457,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " risks"
+    }
+   },
+   {
+    "dt": 9.67,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 9.726,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " This"
+    }
+   },
+   {
+    "dt": 9.775,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " decision"
+    }
+   },
+   {
+    "dt": 9.824,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " should"
+    }
+   },
+   {
+    "dt": 9.874,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " be"
+    }
+   },
+   {
+    "dt": 9.92,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " based"
+    }
+   },
+   {
+    "dt": 10.122,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " on"
+    }
+   },
+   {
+    "dt": 10.17,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 10.219,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " thorough"
+    }
+   },
+   {
+    "dt": 10.264,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " assessment"
+    }
+   },
+   {
+    "dt": 10.312,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " of"
+    }
+   },
+   {
+    "dt": 10.364,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 10.673,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " risks"
+    }
+   },
+   {
+    "dt": 10.72,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " involved"
+    }
+   },
+   {
+    "dt": 10.832,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": ".\n\n"
+    }
+   },
+   {
+    "dt": 10.883,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "3"
+    }
+   },
+   {
+    "dt": 10.932,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 10.981,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " **"
+    }
+   },
+   {
+    "dt": 11.026,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "C"
+    }
+   },
+   {
+    "dt": 11.08,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "ultural"
+    }
+   },
+   {
+    "dt": 11.127,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 11.169,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " Social"
+    }
+   },
+   {
+    "dt": 11.357,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " Factors"
+    }
+   },
+   {
+    "dt": 11.397,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "**:"
+    }
+   },
+   {
+    "dt": 11.435,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " Closing"
+    }
+   },
+   {
+    "dt": 11.475,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " borders"
+    }
+   },
+   {
+    "dt": 11.515,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " could"
+    }
+   },
+   {
+    "dt": 11.56,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " impact"
+    }
+   },
+   {
+    "dt": 11.745,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " cultural"
+    }
+   },
+   {
+    "dt": 11.79,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " exchange"
+    }
+   },
+   {
+    "dt": 11.838,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " and"
+    }
+   },
+   {
+    "dt": 11.881,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " social"
+    }
+   },
+   {
+    "dt": 11.926,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " cohesion"
+    }
+   },
+   {
+    "dt": 11.972,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": "."
+    }
+   },
+   {
+    "dt": 12.012,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " It"
+    }
+   },
+   {
+    "dt": 12.058,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " may"
+    }
+   },
+   {
+    "dt": 12.12,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " also"
+    }
+   },
+   {
+    "dt": 12.183,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " affect"
+    }
+   },
+   {
+    "dt": 12.419,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " the"
+    }
+   },
+   {
+    "dt": 12.549,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " integration"
+    }
+   },
+   {
+    "dt": 12.653,
+    "data": {
+     "type": "delta",
+     "col": "base",
+     "delta": " of"
+    }
+   },
+   {
+    "dt": 12.714,
     "data": {
      "type": "delta",
      "col": "base",
@@ -5410,13 +5158,13 @@
     }
    },
    {
-    "dt": 9.632,
+    "dt": 12.723,
     "data": {
      "type": "end"
     }
    }
   ],
-  "ms": 9633
+  "ms": 12729
  },
  {
   "method": "POST",
@@ -5430,7 +5178,7 @@
   "response": {
    "error": "hawk has 36 layers; this model has 28."
   },
-  "ms": 34
+  "ms": 40
  },
  {
   "method": "DELETE",
@@ -5442,7 +5190,7 @@
   "response": {
    "ok": true
   },
-  "ms": 25
+  "ms": 6
  },
  {
   "method": "GET",

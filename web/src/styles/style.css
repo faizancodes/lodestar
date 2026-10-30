@@ -403,9 +403,6 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .chip { padding: 4px 11px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: transparent; font-size: 12px; color: var(--text-2); cursor: pointer; }
 .chip:hover { border-color: var(--accent); color: var(--accent); }
-.runs { display: flex; flex-direction: column; gap: 28px; }
-.run { animation: rise 0.2s ease-out; }
-/* try it and refine: one question, its answer in versions, and what should change under the latest */
 /* try it and refine: a short thread, and one box under it that asks or fixes */
 .tl { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
 .tl-you {
@@ -454,8 +451,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .cols { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 14px; }
 .out { display: flex; flex-direction: column; min-height: 140px; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); overflow: hidden; }
 .out-h { display: flex; align-items: center; padding: 9px 10px 9px 16px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1px solid var(--rule); color: var(--text-2); }
-.out-h .insp { margin-left: auto; padding: 2px 9px; border: 0; border-radius: var(--r-sm); background: transparent; font-size: 11.5px; font-weight: 700; letter-spacing: 0; text-transform: none; color: inherit; cursor: pointer; opacity: 0.8; }
-.out-h .insp:hover { opacity: 1; background: rgba(127, 127, 127, 0.15); }
 .out.steered .out-h { background: rgba(195, 207, 245, 0.07); color: var(--ascii); border-color: rgba(195, 207, 245, 0.22); }
 .out.steered { border-color: var(--night); }
 .out-b { flex: 1; padding: 16px 18px; white-space: pre-wrap; font-size: 14.5px; line-height: 1.65; }
@@ -626,10 +621,6 @@ body.busy .tl-comp .send.stop { display: grid; }
   background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .switch[aria-checked="true"] { color: var(--accent); }
-.out-h .verdict { margin-left: auto; padding: 1px 8px; border-radius: var(--r-sm); font-size: 10.5px; letter-spacing: 0.04em; }
-.out-h .verdict:empty { display: none; }
-.out-h .verdict.ref { color: var(--bad); background: var(--bad-wash); box-shadow: inset 0 0 0 1px rgba(242, 119, 122, 0.45); }
-.out-h .verdict.ans { color: var(--good); background: rgba(61, 220, 132, 0.08); box-shadow: inset 0 0 0 1px rgba(61, 220, 132, 0.45); }
 .switch[aria-checked="true"] i { background: var(--good); box-shadow: 0 0 14px -2px rgba(61, 220, 132, 0.55); }
 .switch[aria-checked="true"] i::after { transform: translateX(14px); }
 #abl-rank h4 { margin: 18px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
@@ -874,7 +865,6 @@ h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weig
 .btn.sm { font-size: 12px; }
 .chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary { font-size: 12.5px; font-weight: 500; }
 .out-h, .lbl, .panel-b h4, .pt-head { text-transform: none; letter-spacing: 0; }
-.verdict { font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .msg-acts button { font-size: 12px; }
 .starter { font-size: 13.5px; font-weight: 500; line-height: 1.5; }
 .msg.user .bubble { font-size: 14.5px; line-height: 1.55; }
