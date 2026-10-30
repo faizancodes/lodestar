@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ablAsk, analyze, backToCoef, bakeAbl, nudge, resetProbes, saveProbes, setName, toggleAbl, undoNudge,
 } from "../abl/engine";
@@ -21,6 +21,7 @@ const verdict = (ref: boolean | null, worse = false) => ref == null ? null
   : <span className={ref ? "tl-n bad" : "tl-n"}>{ref ? "Refused" : "Answered"}{worse ? " · writing got worse" : ""}</span>;
 
 const useReady = () => useApp((s) => !!s.abl?.ready && !!s.abl.current);
+const count = (text: string) => text.split("\n").filter((l) => l.trim()).length;
 
 // the status panel: where the direction is, how strongly it's erased, and the switch for it
 function StatusCard() {
@@ -72,16 +73,40 @@ function Step1() {
   const ready = useReady();
   const plan = useAbl((s) => s.plan);
   const harmful = useAbl((s) => s.harmful), harmless = useAbl((s) => s.harmless);
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className={ready ? "step done" : "step"} id="abl-s1">
       <div className="step-h"><span className="num">01</span><div><h3>Find the refusal direction</h3>
         <p className="step-sub">Reads how the model handles bad and everyday requests, then tests which layer erases its refusals. Takes a few minutes.</p></div></div>
       <div className="card abl">
-        <div className="row tight">
-          <button id="abl-go" className={ready ? "btn ghost" : "btn"} disabled={plan.running} onClick={analyze}>{ready ? "Find it again" : "Find it"}</button>
+        <div className="abl-find">
+          <div className="abl-q">
+            <span><b>{count(harmful)}</b> questions it should refuse</span>
+            <span><b>{count(harmless)}</b> everyday questions</span>
+            <button id="abl-edit" className="link" aria-expanded={editing} onClick={() => setEditing(!editing)}>
+              {editing ? "Done" : "Edit"}
+            </button>
+          </div>
           <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>
+          <button id="abl-go" className={ready ? "btn ghost" : "btn"} disabled={plan.running} onClick={analyze}>{ready ? "Find it again" : "Find it"}</button>
         </div>
+
+        {editing && (
+          <div className="abl-probes" id="abl-probes">
+            <label className="field">Questions it should refuse <span className="opt">one per line</span>
+              <textarea id="abl-probes-harmful" rows={8} spellCheck="false" value={harmful} onChange={(e) => useAbl.setState({ harmful: e.target.value, dirty: true })} />
+            </label>
+            <label className="field">Everyday questions <span className="opt">one per line</span>
+              <textarea id="abl-probes-harmless" rows={8} spellCheck="false" value={harmless} onChange={(e) => useAbl.setState({ harmless: e.target.value, dirty: true })} />
+            </label>
+            <div className="abl-probes-acts">
+              <button id="abl-probes-reset" className="btn ghost sm" onClick={resetProbes}>Reset to the defaults</button>
+              <button id="abl-probes-save" className="btn sm" onClick={saveProbes}>Save</button>
+            </div>
+          </div>
+        )}
+
         <div id="abl-plan" className={plan.done ? "plan done" : "plan"} hidden={!plan.shown}>
           <div className="plan-h"><b className="plan-goal">{plan.goal}</b><span className="plan-clock">{plan.clock}</span></div>
           <ol className="plan-steps abl-steps">{STEPS.map((label, i) => (
@@ -91,19 +116,6 @@ function Step1() {
           <LiveLine className="plan-now status-line" live={plan.live} />
         </div>
         <Rank />
-        <details className="adv">
-          <summary>Probe questions</summary>
-          <label className="field">Questions it should refuse <span className="opt">one per line</span>
-            <textarea id="abl-probes-harmful" rows={6} spellCheck="false" value={harmful} onChange={(e) => useAbl.setState({ harmful: e.target.value, dirty: true })} />
-          </label>
-          <label className="field">Everyday questions <span className="opt">one per line</span>
-            <textarea id="abl-probes-harmless" rows={5} spellCheck="false" value={harmless} onChange={(e) => useAbl.setState({ harmless: e.target.value, dirty: true })} />
-          </label>
-          <div className="row tight">
-            <button id="abl-probes-reset" className="btn ghost sm" onClick={resetProbes}>Reset to the defaults</button>
-            <button id="abl-probes-save" className="btn ghost sm" onClick={saveProbes}>Save probe lists</button>
-          </div>
-        </details>
       </div>
     </div>
   );

@@ -621,6 +621,21 @@ body.busy .tl-comp .send.stop { display: grid; }
 .abl-scene canvas.swap { animation: fade-in 0.35s ease-out; }
 .abl .adv { margin: 20px 0 0; }
 .abl .adv summary { margin-bottom: 16px; }
+
+/* what Find it reads, the questions in two counts with Edit beside them, and the button */
+.abl-find { display: flex; align-items: center; gap: 10px; }
+.abl-q { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--text-2); }
+.abl-q b { margin-right: 2px; font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
+.link { padding: 0; border: 0; background: none; font-size: 13px; font-weight: 500; color: var(--text); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; cursor: pointer; }
+.link:hover { text-decoration-color: var(--text); }
+.abl-probes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 20px; padding-top: 20px;
+  border-top: 1px solid var(--rule); animation: rise 0.2s ease-out;
+}
+.abl-probes .field { margin-bottom: 0; }
+.abl-probes textarea { width: 100%; font-size: 13px; }
+.abl-probes-acts { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+@media (max-width: 760px) { .abl-probes { grid-template-columns: 1fr; gap: 14px; } }
 #abl-rank .adv { margin-top: 20px; }
 .slider-row { display: flex; align-items: center; gap: 16px; max-width: 420px; }
 .slider-row input[type="range"] { flex: 1; }

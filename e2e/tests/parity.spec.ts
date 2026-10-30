@@ -293,6 +293,14 @@ test("abliterate: find the refusal direction, switch it, try it, save", async ({
   await expect(page.locator("#view-abliterate")).toBeVisible();
 
   await expect(page.locator("#abl-go")).toHaveText("Find it");
+  await snap(page.locator("#abl-s1"), "abl-find");
+
+  await page.locator("#abl-edit").click();
+  await expect(page.locator("#abl-probes-harmful")).toBeVisible();
+  await snap(page.locator("#abl-s1"), "abl-probes");
+  await page.locator("#abl-edit").click();
+  await expect(page.locator("#abl-probes")).toHaveCount(0);
+
   await page.locator("#abl-go").click();
   await expect(page.locator("#abl-plan")).toBeVisible();
   await ran(page.locator("#abl-plan .plan-now"));
