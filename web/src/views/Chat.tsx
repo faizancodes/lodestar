@@ -11,6 +11,9 @@ import { useChat, type Msg } from "../store/chat";
 
 const cancel = () => api("/api/cancel", {});
 
+// one small run of ASCII marks per starter, from the scenes' dot / plus / cross / block ramp
+const MARKS = ["·+×", "+×▪", "×+·", "▪×+"];
+
 // the switches for what shapes replies: the erased refusal direction, and the recipe that's on
 function Mods() {
   const found = useApp((s) => !!s.abl?.ready && !!s.abl.current), items = useApp((s) => s.recipe.items), on = useApp(ablActive);
@@ -137,8 +140,12 @@ export function Chat({ hidden }: { hidden: boolean }) {
         <Log />
         <div className="chat-empty" id="chat-empty" hidden={started}>
           <h2>What’s on your mind?</h2>
-          <div className="chat-starters" id="chat-starters">{STARTERS.map((s) => (
-            <button key={s} className="starter" onClick={() => sendChat(s)}>{s}</button>
+          <div className="chat-starters" id="chat-starters">{STARTERS.map((s, i) => (
+            <button key={s} className="starter" onClick={() => sendChat(s)}>
+              <span className="starter-mark" aria-hidden="true">{MARKS[i]}</span>
+              <span>{s}</span>
+              <span className="starter-go" aria-hidden="true">↗</span>
+            </button>
           ))}</div>
         </div>
       </div>
