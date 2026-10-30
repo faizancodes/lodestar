@@ -24,23 +24,27 @@ export function createDecoder() {
   const wrap = (now: number) => {
     const nodes = textNodes(el!);
     let i = nodes.reduce((a, n) => a + n.data.length, 0);
+
     for (let k = nodes.length - 1; k >= 0; k--) {
       const node = nodes[k], text = node.data;
       let cut = text.length;
       while (cut > 0 && now - (arrivals[i - (text.length - cut) - 1] ?? 0) < DUR) cut--;
       i -= text.length;
       if (cut === text.length) break; // everything earlier has settled
+
       const frag = document.createDocumentFragment();
       if (cut) frag.append(text.slice(0, cut));
       for (let j = cut; j < text.length; j++) {
         const c = text[j];
         if (SPACE.test(c)) { frag.append(c); continue; }
+
         const s = document.createElement("span");
         s.className = "dc";
         s.dataset.i = String(i + j);
         s.textContent = c;
         frag.append(s);
       }
+
       node.replaceWith(frag);
     }
   };
@@ -48,11 +52,13 @@ export function createDecoder() {
   const paint = () => {
     raf = 0;
     if (!el || !el.isConnected) return;
+
     const now = performance.now();
     let live = 0;
     for (const s of el.querySelectorAll<HTMLElement>(".dc")) {
       const p = (now - arrivals[+s.dataset.i!]) / DUR;
       if (p >= 1) { s.replaceWith(s.textContent!); continue; }
+
       live++;
       const mark = p < 0 ? "" : MARKS.find(([upto]) => p < upto)?.[1];
       if (mark !== undefined) {
@@ -64,6 +70,7 @@ export function createDecoder() {
         s.style.color = `color-mix(in srgb, var(--ascii) ${Math.round((1 - (p - 0.68) / 0.32) * 100)}%, var(--text))`;
       }
     }
+
     if (live) raf = requestAnimationFrame(paint);
   };
 
@@ -72,11 +79,13 @@ export function createDecoder() {
     update(root: HTMLElement | null) {
       el = root;
       if (still || !root) return;
+
       const now = performance.now();
       const n = textNodes(root).reduce((a, t) => a + t.data.length, 0);
       if (n < arrivals.length) arrivals.length = n; // markdown can swallow a few characters (** becoming bold)
       const fresh = n - arrivals.length, gap = fresh ? Math.min(14, 110 / fresh) : 0;
       for (let k = 0; k < fresh; k++) arrivals.push(now + k * gap); // a token's letters arrive in a quick ripple
+
       wrap(now);
       if (!raf) raf = requestAnimationFrame(paint);
       paint();

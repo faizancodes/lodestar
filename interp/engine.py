@@ -60,14 +60,17 @@ class Engine:
         self.status = "idle"
         self.progress = None  # 0..1 while a model loads, else None
         self.trace = None
+
         self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None), "dir": {layer: [B, H]}, "erase": [...]}
         self.dirs = {}  # direction id -> {"unit": [L, H] float32 on device, "mag": [L] list, "band": [layers],
         #                                "neutral": [L, H] float32 on device | None}
+
         self.abl_vec = None  # [H] refusal direction to erase from every layer's residual stream, unit norm
         self.abl_coef = 1.0  # how much of the projection to remove (1.0 = fully)
         self.abl_layer = None  # the layer the direction was extracted from, for the UI
         self._abl_mask = None  # [B] bool, per row: whether this pass erases the direction
         self._abl_any = False
+
         self._deltas = None  # per-layer [N] tensors requiring grad, for attribution
         self._cap_acts = None  # {layer: [T, N] cpu} during a trace
         self._cap_resid = None  # {layer: [T, H]} during a trace or norm measurement
@@ -84,52 +87,66 @@ class Engine:
             took = {}
             self.unload()
             dev = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
+
             # the tokenizer (~0.7 s) loads alongside the weights rather than before them
             tok_box = {}
             tok_thread = threading.Thread(target=lambda: tok_box.update(tok=AutoTokenizer.from_pretrained(model_id)))
             tok_thread.start()
             self.progress = 0.04
+
             # straight onto the device: loading on the CPU first would hold two copies of the weights at once
             prev = hf_logging.set_tqdm_hook(self._weights_progress_hook)
             try:
                 model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.bfloat16, device_map=dev)
             finally:
                 hf_logging.set_tqdm_hook(prev)
+
             tok_thread.join()
             if "tok" not in tok_box:
                 raise RuntimeError(f"Couldn't load the tokenizer for {model_id}")
             tok = tok_box["tok"]
+
             took["weights"] = time.perf_counter() - t0
             self.progress = 0.9
+
             n_params = sum(p.numel() for p in model.parameters())
             if n_params < 2.5e9:  # small models fit comfortably in fp32, which keeps gradients and lenses precise
                 model = model.float()
             model = model.eval()
             model.requires_grad_(False)
+
             if tok.pad_token_id is None:
                 tok.pad_token = tok.eos_token
+
             self.tok, self.model, self.dev, self.model_id = tok, model, dev, model_id
             self.n_params = n_params
             self.layers = self._find_layers(model)
             self.final_norm = self._find_norm(model)
             self.lm_head = model.get_output_embeddings()
             self.backbone = getattr(model, model.base_model_prefix)  # the transformer without the vocabulary head
+
             for i, layer in enumerate(self.layers):
                 self._handles.append(layer.mlp.down_proj.register_forward_pre_hook(self._mlp_hook(i)))
                 self._handles.append(layer.register_forward_hook(self._resid_hook(i)))
+
             self._use_builtin_steering(model_id)
+
             t1 = time.perf_counter()
             with torch.no_grad():
                 self.dnorm = torch.stack([l.mlp.down_proj.weight.float().norm(dim=0) for l in self.layers])  # [L, N]
             took["norms"] = time.perf_counter() - t1
+
             t1 = time.perf_counter()
             self.resid_p50 = self._measure_resid_norms()
             took["reference pass"] = time.perf_counter() - t1
+
             self.unit = (self.resid_p50[:, None] / self.dnorm.clamp(min=1e-6))  # [L, N] activation per unit dose
             self.end_ids = self._end_ids()
+
             took["total"] = time.perf_counter() - t0
             took["setup"] = took["total"] - took["weights"]
             print(f"loaded {model_id}: " + ", ".join(f"{k} {v:.1f}s" for k, v in took.items()), flush=True)
+
             self.progress = None
             self.status = "ready"
             return self.info()
@@ -139,6 +156,7 @@ class Engine:
         bar = factory(*args, **kwargs)
         if kwargs.get("desc") != "Loading weights":
             return bar
+
         eng = self
 
         class Watched:
@@ -168,6 +186,7 @@ class Engine:
         spec = getattr(self.model.config, "lodestar_steering", None)
         if not spec:
             return
+
         from pathlib import Path
 
         from huggingface_hub import hf_hub_download
@@ -175,6 +194,7 @@ class Engine:
 
         local = Path(model_id) / spec["file"]
         exact = load_file(str(local if local.exists() else hf_hub_download(model_id, spec["file"])))
+
         with torch.no_grad():
             for l in spec["layers"]:
                 self.layers[l + 1].self_attn.o_proj.bias.zero_()
@@ -185,12 +205,14 @@ class Engine:
         for h in self._handles:
             h.remove()
         self._handles = []
+
         self.model = self.tok = None
         self.model_id = None
         self.trace = None
         self.dirs = {}
         self.abl_vec = self._abl_mask = None
         self._abl_any = False
+
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
 
@@ -205,6 +227,7 @@ class Engine:
                 continue
             if hasattr(obj[0], "mlp") and hasattr(obj[0].mlp, "down_proj"):
                 return obj
+
         raise RuntimeError("unsupported architecture: no layers with mlp.down_proj found")
 
     @staticmethod
@@ -217,6 +240,7 @@ class Engine:
                 return obj
             except AttributeError:
                 continue
+
         raise RuntimeError("no final norm found")
 
     def _end_ids(self):
@@ -225,11 +249,13 @@ class Engine:
             i = self.tok.convert_tokens_to_ids(t)
             if isinstance(i, int) and i != self.tok.unk_token_id:
                 ids.add(i)
+
         return {i for i in ids if i is not None}
 
     def info(self):
         if self.model is None or self.status != "ready":  # still measuring layers right after the weights load
             return {"loaded": False, "status": self.status}
+
         return {"loaded": True, "status": self.status, "model": self.model_id, "device": self.dev,
                 "dtype": str(self.model.dtype).replace("torch.", ""), "params": self.n_params,
                 "layers": len(self.layers), "neurons": int(self.dnorm.shape[1]),
@@ -239,6 +265,7 @@ class Engine:
         """Store the unit refusal direction to erase (raw residual coords), as a tensor on the model's device."""
         if self.model is None:
             raise RuntimeError("no model loaded")
+
         v = torch.tensor([float(x) for x in vec], device=self.dev).float()
         v = v / v.norm().clamp(min=1e-8)
         self.abl_vec = v.to(self.model.dtype)
@@ -274,21 +301,25 @@ class Engine:
         with self.lock:
             ids_list = [self.chat_ids(p) for p in prompts]
             out = []
+
             for bi in self._batches([(x,) for x in ids_list], budget):
                 if cancel is not None and cancel.is_set():
                     raise Cancelled()
+
                 seqs = [ids_list[i] for i in bi]
                 T = max(map(len, seqs))
                 pad = self.tok.pad_token_id
                 ids = torch.tensor([[pad] * (T - len(q)) + q for q in seqs], device=self.dev)
                 mask = torch.tensor([[0] * (T - len(q)) + [1] * len(q) for q in seqs], device=self.dev)
                 pos = (mask.cumsum(-1) - 1).clamp(min=0)
+
                 with torch.inference_mode():
                     hs = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False,
                                     output_hidden_states=True).hidden_states
                     last = torch.stack([h[:, -n_pos:, :] for h in hs], 1)  # [B, L+1, n_pos, H]
                     out.append(last.half().cpu())
                     del hs, last
+
             return torch.cat(out).numpy() if out else np.zeros(
                 (0, len(self.layers) + 1, n_pos, int(self.layers[0].mlp.down_proj.out_features)), np.float16)
 
@@ -298,6 +329,7 @@ class Engine:
             h = inp[0]
             if self._cap_acts is not None:
                 self._cap_acts[i] = h[0].detach().float().cpu()
+
             changed = False
             st = self._push_state.get(i) if self._push_state else None
             if st is not None:
@@ -307,10 +339,13 @@ class Engine:
                 if add is not None:
                     h = h + add[:, None, :].to(h.dtype)
                 changed = True
+
             if self._deltas is not None:
                 h = h + self._deltas[i].to(h.dtype)
                 changed = True
+
             return (h,) if changed else None
+
         return hook
 
     def _resid_hook(self, i):
@@ -319,30 +354,37 @@ class Engine:
             changed = False
             st = self._push_state
             off = st["dir"].get(i) if st and "dir" in st else None
+
             if off is not None:
                 h = h + off[:, None, :]
                 changed = True
+
             if self._abl_any and self.abl_vec is not None:
                 mask = self._abl_mask.to(h.dtype)[:, None, None]
                 v = self.abl_vec
                 proj = (h @ v)[:, :, None] * v  # the component of each position along the refusal direction
                 h = h - mask * self.abl_coef * proj
                 changed = True
+
             for coef, v, ref in (st.get("erase") or ()) if st else ():
                 # clamp to where ordinary prompts sit along v, not to 0: zeroing a direction that ordinary text sits
                 # far from would push every reply toward its other pole
                 p = h @ v - ref[i]
                 h = h - coef[:, None, None] * p[:, :, None] * v
                 changed = True
+
             if self._cap_resid is not None:
                 self._cap_resid[i] = h.detach()[0]
+
             if changed:
                 return (h,) if isinstance(out, tuple) else h
+
         return hook
 
     def _measure_resid_norms(self):
         ids = self.tok(REFERENCE_TEXT, return_tensors="pt").input_ids.to(self.dev)
         self._cap_resid = {}
+
         try:
             with torch.inference_mode():
                 self.model(input_ids=ids, use_cache=False)
@@ -357,12 +399,14 @@ class Engine:
         N = self.dnorm.shape[1]
         st = {}
         dirs, erase = {}, {}
+
         for r, pushes in enumerate(row_pushes):
             for p in pushes or []:
                 if p.mode in ("dir", "erase"):
                     d = self.dirs.get(p.dir_id)
                     if d is None:
                         raise ValueError(f"No direction called {p.dir_id!r} for this model.")
+
                     if p.mode == "dir":
                         for l in p.layers:
                             off = dirs.get(l)
@@ -372,15 +416,19 @@ class Engine:
                     else:
                         src = p.layers[0] if p.layers else d["band"][len(d["band"]) // 2]
                         key = (p.dir_id, src)
+
                         if key not in erase:
                             v = d["unit"][src]
+
                             # where ordinary prompts sit along v at each layer (0 when the direction has no neutral means)
                             ref = d["neutral"] @ v if d.get("neutral") is not None \
                                 else torch.zeros(len(self.layers), device=self.dev)
                             dt = self.model.dtype
                             erase[key] = [torch.zeros(B, device=self.dev), v.to(dt), ref.to(dt)]
+
                         erase[key][0][r] += p.dose
                     continue
+
                 add, mul = st.get(p.layer, (None, None))
                 if p.mode == "mul":
                     if mul is None:
@@ -395,11 +443,14 @@ class Engine:
                     if add is None:
                         add = torch.zeros(B, N, device=self.dev)
                     add[r, p.neuron] += p.dose * self.unit[p.layer, p.neuron]
+
                 st[p.layer] = (add, mul)
+
         if dirs:
             st["dir"] = {l: off.to(self.model.dtype) for l, off in dirs.items()}
         if erase:
             st["erase"] = [(c.to(self.model.dtype), v, ref) for c, v, ref in erase.values()]
+
         return st or None
 
     # ---------------------------------------------------------------- tokens
@@ -414,6 +465,7 @@ class Engine:
         if self.tok.chat_template is None:
             text = "".join(f"{m['role']}: {m['content']}\n" for m in messages) + "assistant:"
             return self.tok(text).input_ids
+
         try:
             enc = self.tok.apply_chat_template(messages, add_generation_prompt=True, enable_thinking=False,
                                                tokenize=True)
@@ -423,6 +475,7 @@ class Engine:
                 rest[0]["content"] = f"{sys_}\n\n{rest[0]['content']}"
                 return self.messages_ids(rest)
             raise
+
         return list(enc["input_ids"] if hasattr(enc, "keys") else enc)
 
     def encode(self, text):
@@ -431,6 +484,7 @@ class Engine:
     def token_strs(self, ids):
         """Display string for each token, keeping multi-byte characters intact on the token that completes them."""
         out, prev = [], ""
+
         for i in range(len(ids)):
             full = self.tok.decode(ids[: i + 1])
             if full.endswith("\ufffd") and i < len(ids) - 1:
@@ -438,6 +492,7 @@ class Engine:
                 continue
             out.append(full[len(prev):] if full.startswith(prev) else self.tok.decode([ids[i]]))
             prev = full
+
         return out
 
     # ---------------------------------------------------------------- generation
@@ -448,45 +503,56 @@ class Engine:
         with self.lock:
             B = len(rows)
             flags, any_abl = self._abl_flags(abl, B)
+
             seqs = [r[0] for r in rows]
             T = max(map(len, seqs))
             pad = self.tok.pad_token_id
             ids = torch.tensor([[pad] * (T - len(q)) + q for q in seqs], device=self.dev)
             mask = torch.tensor([[0] * (T - len(q)) + [1] * len(q) for q in seqs], device=self.dev)
             pos = (mask.cumsum(-1) - 1).clamp(min=0)
+
             done, out_ids, sent = [False] * B, [[] for _ in range(B)], [""] * B
             gen = torch.Generator(device="cpu").manual_seed(seed)
+
             self._push_state = self._make_push_state([r[1] for r in rows], B)
             if any_abl:
                 self._abl_mask = torch.tensor(flags, device=self.dev)
                 self._abl_any = True
+
             try:
                 with torch.inference_mode():
                     out = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=True,
                                      logits_to_keep=1)
+
                     for _ in range(max_new):
                         if cancel is not None and cancel.is_set():
                             raise Cancelled()
+
                         logits = out.logits[:, -1].float()
                         if temperature > 0:
                             probs = torch.softmax(logits / temperature, -1).cpu()
                             nxt = torch.multinomial(probs, 1, generator=gen)[:, 0].to(self.dev)
                         else:
                             nxt = logits.argmax(-1)
+
                         for r in range(B):
                             if done[r]:
                                 continue
+
                             t = int(nxt[r])
                             if t in self.end_ids:
                                 done[r] = True
                                 continue
+
                             out_ids[r].append(t)
                             text = self.tok.decode(out_ids[r], skip_special_tokens=True)
                             if not text.endswith("\ufffd"):
                                 yield r, text[len(sent[r]):]
                                 sent[r] = text
+
                         if all(done):
                             break
+
                         mask = torch.cat([mask, torch.ones_like(mask[:, :1])], -1)
                         pos = pos[:, -1:] + 1
                         out = self.model(input_ids=nxt[:, None], attention_mask=mask, position_ids=pos,
@@ -495,6 +561,7 @@ class Engine:
                 self._push_state = None
                 self._abl_mask = None
                 self._abl_any = False
+
             yield None, out_ids
 
     def generate_text(self, rows, max_new=160, temperature=0.0, cancel=None, abl=None):
@@ -512,14 +579,17 @@ class Engine:
             ids = list(prompt_ids) + list(response_ids)
             L = len(self.layers)
             self._cap_acts, self._cap_resid = {}, {}
+
             self._push_state = self._make_push_state([pushes or []], 1)
             if abl:
                 self._abl_mask = torch.ones(1, dtype=torch.bool, device=self.dev)
                 self._abl_any = True
+
             try:
                 with torch.inference_mode():
                     # the hooks capture what's needed; the model's own logits aren't
                     self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)
+
                     lens_ids, lens_p = [], []
                     for l in range(L):
                         r = self._cap_resid[l]
@@ -529,17 +599,20 @@ class Engine:
                         lens_ids.append(top.indices.cpu().numpy())
                         lens_p.append(top.values.cpu().numpy())
                         del lg, p
+
                 acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
             finally:
                 self._cap_acts = self._cap_resid = None
                 self._push_state = None
                 self._abl_mask = None
                 self._abl_any = False
+
             impact_scale = (self.dnorm / self.resid_p50[:, None]).cpu().numpy().astype(np.float32)  # [L, N]
             self.trace = {
                 "ids": ids, "n_prompt": len(prompt_ids), "tokens": self.token_strs(ids), "acts": acts,
                 "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
             }
+
             return self.trace
 
     def trace_top_neurons(self, t=None, k=40, response_only=True):
@@ -549,26 +622,32 @@ class Engine:
         acts = tr["acts"]
         L, T, N = acts.shape
         sc = tr["impact_scale"]
+
         if t is not None:
             a = acts[:, t, :].astype(np.float32)
             imp = a * sc
             flat = np.abs(imp).ravel()
             idx = np.argpartition(-flat, k)[:k]
             idx = idx[np.argsort(-flat[idx])]
+
             return [(int(i // N), int(i % N), float(imp.ravel()[i]), float(a.ravel()[i]), t) for i in idx]
+
         s = tr["n_prompt"] if response_only and tr["n_prompt"] < T else 1
         a = acts[:, s:, :].astype(np.float32)  # [L, T', N]
         imp = a * sc[:, None, :]
         am = np.abs(imp).argmax(1)  # [L, N]
         best = np.take_along_axis(imp, am[:, None, :], 1)[:, 0, :]  # [L, N]
+
         flat = np.abs(best).ravel()
         idx = np.argpartition(-flat, k)[:k]
         idx = idx[np.argsort(-flat[idx])]
+
         out = []
         for i in idx:
             l, n = int(i // N), int(i % N)
             tt = int(am[l, n]) + s
             out.append((l, n, float(best[l, n]), float(acts[l, tt, n]), tt))
+
         return out
 
     # ---------------------------------------------------------------- neuron views
@@ -580,6 +659,7 @@ class Engine:
             logits = self.lm_head(self.final_norm(vecs))[:, 0].float()
             up = logits[0].topk(k).indices.tolist()
             down = logits[1].topk(k).indices.tolist()
+
         return {"up": [self.tok.decode([t]) for t in up], "down": [self.tok.decode([t]) for t in down]}
 
     # ---------------------------------------------------------------- scoring
@@ -587,6 +667,7 @@ class Engine:
         """Split rows (each with a token list as first element) into batches under a padded-token budget."""
         order = sorted(range(len(rows)), key=lambda i: len(rows[i][0]))
         batch, mx = [], 0
+
         for i in order:
             m = max(mx, len(rows[i][0]))
             if batch and m * (len(batch) + 1) > budget:
@@ -594,6 +675,7 @@ class Engine:
                 batch, m = [], len(rows[i][0])
             batch.append(i)
             mx = m
+
         if batch:
             yield batch
 
@@ -602,11 +684,14 @@ class Engine:
         (ids, target_start, [Push], weights), where weights (one per target token) make it a weighted mean.
         `abl` erases the refusal direction from the rows it marks. Returns np.array [len(rows)]."""
         out = np.zeros(len(rows), np.float64)
+
         with self.lock:
             flags, _ = self._abl_flags(abl, len(rows))
+
             for bi in self._batches(rows, budget):
                 if cancel is not None and cancel.is_set():
                     raise Cancelled()
+
                 seqs = [rows[i][0] for i in bi]
                 T = max(map(len, seqs))
                 pad = self.tok.pad_token_id
@@ -616,7 +701,9 @@ class Engine:
                 if flags is not None:
                     self._abl_mask = torch.tensor([flags[i] for i in bi], device=self.dev)
                     self._abl_any = True
+
                 spans = [(rows[i][1], max(rows[i][1], len(rows[i][0]))) for i in bi]
+
                 try:
                     with torch.inference_mode():
                         lp = self._target_logprobs(ids, mask, spans)
@@ -624,19 +711,23 @@ class Engine:
                     self._push_state = None
                     self._abl_mask = None
                     self._abl_any = False
+
                 k = 0
                 for j, i in enumerate(bi):
                     s, n = spans[j]
                     span = lp[k:k + n - s]
                     k += n - s
+
                     if n <= s:
                         continue
+
                     w = rows[i][3] if len(rows[i]) > 3 else None
                     if w is None:
                         out[i] = float(span.mean())
                     else:
                         w = torch.tensor(w, device=span.device, dtype=span.dtype)
                         out[i] = float((span * w).sum() / w.sum())
+
         return out
 
     def _target_logprobs(self, ids, mask, spans):
@@ -645,17 +736,21 @@ class Engine:
         float log-softmaxes over a 150k vocabulary at every position (prompts included) took gigabytes per batch
         on an 8B model and drove the machine into swap."""
         h = self.backbone(input_ids=ids, attention_mask=mask, use_cache=False).last_hidden_state
+
         rb, rt = [], []
         for j, (s, n) in enumerate(spans):
             rb += [j] * (n - s)
             rt += range(s - 1, n - 1)
+
         rb = torch.tensor(rb, device=ids.device)
         rt = torch.tensor(rt, device=ids.device)
         tgt = ids[rb, rt + 1]
+
         out = []
         for k in range(0, len(rb), 256):
             lg = self.lm_head(h[rb[k:k + 256], rt[k:k + 256]]).float()
             out.append(lg.gather(-1, tgt[k:k + 256, None])[:, 0] - torch.logsumexp(lg, -1))
+
         return torch.cat(out) if out else torch.zeros(0, device=ids.device)
 
     def attribute(self, items, cancel=None, pushes=None, abl=False):
@@ -664,17 +759,22 @@ class Engine:
         i.e. J(dose) ~= J(0) + dose * grad. A constant added at every position is exactly what steering does.
         `pushes` (and `abl`) take the gradient with a recipe already on, for refining it."""
         L, N = self.dnorm.shape
+
         with self.lock:
             self._deltas = [torch.zeros(N, device=self.dev, dtype=self.model.dtype, requires_grad=True)
                             for _ in range(L)]
+
             self._push_state = self._make_push_state([pushes], 1) if pushes else None
             if abl:
                 self._abl_mask, self._abl_any = torch.tensor([True], device=self.dev), True
+
             try:
                 for ids, s, w, *tw in items:
                     if cancel is not None and cancel.is_set():
                         raise Cancelled()
+
                     x = torch.tensor([ids], device=self.dev)
+
                     with torch.enable_grad():
                         lp = self._target_logprobs(x, None, [(s, len(ids))])
                         if tw and tw[0] is not None:
@@ -683,12 +783,14 @@ class Engine:
                         else:
                             lp = lp.mean()
                         (w * lp).backward()
+
                 g = torch.stack([d.grad.float() if d.grad is not None else torch.zeros(N, device=self.dev)
                                  for d in self._deltas])
             finally:
                 self._deltas = None
                 self._push_state = None
                 self._abl_mask, self._abl_any = None, False
+
             return (g * self.unit).cpu().numpy()  # chain rule: add value = dose * unit
 
     def neurons_for_word(self, word, k=24, skip_last=0):
@@ -704,21 +806,26 @@ class Engine:
                 t = self.tok(v, add_special_tokens=False).input_ids
                 if len(t) == 1:
                     ids.add(t[0])
+
             if not ids:  # the word is always split: fall back to its first piece, and say so
                 partial = True
                 ids.add(self.tok(" " + word, add_special_tokens=False).input_ids[0])
+
             self.last_search_partial = partial
+
             W = self.lm_head.weight
             g = getattr(self.final_norm, "weight", None)
             g = g.float() if g is not None else 1.0
             u = (W[sorted(ids)].float().mean(0) - W.mean(0, dtype=torch.float32)) * g  # [H]
             ref = float(self.resid_p50[-1])
+
             best = []
             for l, layer in enumerate(self.layers[: len(self.layers) - skip_last]):
                 D = layer.mlp.down_proj.weight
                 sc = (u.to(D.dtype) @ D).float() / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
                 top = sc.abs().topk(k)
                 best += [(l, int(n), float(sc[n])) for n in top.indices.tolist()]
+
             best.sort(key=lambda x: -abs(x[2]))
             return best[:k]
 
@@ -726,6 +833,7 @@ class Engine:
         """Every neuron's mean activation over positions start..end of ids: [L, N] numpy."""
         with self.lock:
             self._cap_acts = {}
+
             try:
                 with torch.inference_mode():
                     self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)

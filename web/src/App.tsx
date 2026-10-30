@@ -21,7 +21,9 @@ document.addEventListener("keydown", (e) => {
     else closeLast();
     return;
   }
+
   if (!e.metaKey || e.shiftKey || e.altKey) return;
+
   const i = ["1", "2", "3"].indexOf(e.key);
   if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
   if (e.key === "0" && info?.loaded) return (e.preventDefault(), setTab("home"));
@@ -32,9 +34,11 @@ export function App() {
   const tab = useApp((s) => s.tab);
   const busy = useApp((s) => s.busy);
   const loaded = useApp((s) => !!s.info?.loaded);
+
   useEffect(() => { document.body.dataset.tab = tab; }, [tab]);
   useEffect(() => { document.body.classList.toggle("busy", busy); }, [busy]);
   useEffect(() => { boot(); }, []);
+
   const hidden = (view: string) => !loaded || view !== tab;
   return (
     <>

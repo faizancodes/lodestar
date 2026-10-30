@@ -19,6 +19,7 @@ export type Exchange = {
   method: string; path: string; query: string; body: unknown; status: number;
   type: "json" | "sse"; response?: unknown; events?: { dt: number; data: { type: string; [k: string]: unknown } }[];
 };
+
 export const fixtures: Record<string, Exchange[]> = Object.fromEntries(
   readdirSync(FIXTURES).filter((f) => f.endsWith(".json")).map((f) => [f.replace(/\.json$/, ""), JSON.parse(readFileSync(join(FIXTURES, f), "utf8"))]),
 );
@@ -31,21 +32,26 @@ export function walk(visit: (v: unknown, key: string | null) => void) {
     if (Array.isArray(v)) v.forEach((x) => go(x, key));
     else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) go(x, k);
   };
+
   for (const x of exchanges) go({ body: x.body, response: x.response, events: x.events?.map((e) => e.data) }, null);
 }
 
 /** Every reply a stream wrote, joined from its deltas, one per column / probe / dose. */
 export function replies() {
   const out: string[] = [];
+
   for (const x of exchanges) {
     if (x.type !== "sse") continue;
+
     const by = new Map<string, string>();
     for (const { data: e } of x.events || [])
       if (e.type === "delta" && typeof e.delta === "string") {
         const k = `${e.col ?? ""}|${e.probe ?? ""}|${e.kind ?? ""}|${e.index ?? ""}`;
         by.set(k, (by.get(k) || "") + e.delta);
       }
+
     out.push(...by.values());
   }
+
   return out;
 }

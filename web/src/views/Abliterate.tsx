@@ -28,11 +28,13 @@ function StatusCard() {
   const c = useApp((s) => (s.abl?.ready ? s.abl.current : null));
   const shown = useApp((s) => s.tab === "abliterate" && !!s.info?.loaded);
   const on = useApp(ablActive), ready = useReady();
+
   useEffect(() => {
     if (!shown) return;
     const raf = requestAnimationFrame(() => drawHomeArt(art.current!, "abliterate", panel.current));
     return () => cancelAnimationFrame(raf);
   }, [shown, c?.active, c?.layer, c?.coef]);
+
   return (
     <div className={c?.active ? "status-panel on" : "status-panel"} id="abl-status" ref={panel}>
       <canvas id="abl-status-art" aria-hidden="true" ref={art} />
@@ -54,6 +56,7 @@ function Rank() {
   const r = useAbl((s) => s.rank), n = useAbl((s) => s.rankN);
   if (!r) return <div id="abl-rank" />;
   const top = Math.max(r.top_score, 1e-9);
+
   return (
     <div id="abl-rank"><details className="adv" key={n}><summary>Match by layer</summary>{r.ranking.map((x) => (
       <div key={x.layer} className={x.layer === r.layer ? "rank-row sel" : "rank-row"}>
@@ -69,6 +72,7 @@ function Step1() {
   const ready = useReady();
   const plan = useAbl((s) => s.plan);
   const harmful = useAbl((s) => s.harmful), harmless = useAbl((s) => s.harmless);
+
   return (
     <div className={ready ? "step done" : "step"} id="abl-s1">
       <div className="step-h"><span className="num">01</span><div><h3>Find the refusal direction</h3>
@@ -109,8 +113,10 @@ function Step1() {
 function Thread() {
   const at = useAbl((s) => s.at), cmp = useSteer((s) => s.compare), cur = useApp((s) => +(s.abl?.current?.coef ?? 1) || 1);
   useAbl((s) => s.v);
+
   if (!at?.length) return <div id="at" className="tl" hidden />;
   const busy = at.some((e) => e.typing);
+
   return <div id="at" className="tl">{at.map((e, i) => <Answer key={i} e={e} i={i} last={i === at.length - 1} cmp={cmp} cur={cur} busy={busy} />)}</div>;
 }
 
@@ -119,8 +125,10 @@ function Answer({ e, i, last, cmp, cur, busy }: { e: Entry; i: number; last: boo
     ? <>{act("Compare with normal", () => setCompare(!cmp), cmp ? " on" : "")}{act("Stronger", () => nudge(1), e.refused ? " hint" : "")}
         {act("Weaker", () => nudge(-1), e.worse ? " hint" : "")}{e.change && act("Undo", undoNudge)}</>
     : e.coef != null && e.coef !== cur && !busy && act(`Go back to ${xs(e.coef)}`, () => backToCoef(e.coef!));
+
   // an older answer folds to two lines; a click (not on its buttons) unfolds it
   const fold = (ev: React.MouseEvent) => !(ev.target as Element).closest("button") && ((e.open = !e.open), touchAbl());
+
   return (
     <>
       {e.change ? <div className="tl-note">{e.change.to > e.change.from ? "Stronger" : "Weaker"} · {xs(e.change.from)} → {xs(e.change.to)}</div>
@@ -140,6 +148,7 @@ function Answer({ e, i, last, cmp, cur, busy }: { e: Entry; i: number; last: boo
 function Step2() {
   const ready = useReady(), started = useAbl((s) => !!s.at);
   const q = useAbl((s) => s.q), harmful = useApp((s) => s.abl?.probes?.harmful);
+
   return (
     <div className={ready || started ? "step" : "step locked"} id="abl-s2">
       <div className="step-h"><span className="num">02</span><div><h3>Try it</h3>
@@ -162,6 +171,7 @@ function Step2() {
 function Step3() {
   const ready = useReady(), name = useAbl((s) => s.name);
   const exp = useSteer((s) => s.exp), saved = exp.saved.abl;
+
   return (
     <div className={ready ? "step" : "step locked"} id="abl-s3">
       <div className="step-h"><span className="num">03</span><div><h3>Save it as a new model</h3>

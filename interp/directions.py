@@ -142,8 +142,10 @@ class Library:
         eng.dirs = {}
         if eng.model is None or not self.dir.exists():
             return
+
         L, H = len(eng.layers), int(eng.layers[0].mlp.down_proj.out_features)
         neutral = self._neutral(create=False)
+
         for e in self.index():
             f = self.dir / f"{e['id']}.safetensors"
             if not f.exists():
@@ -164,9 +166,11 @@ class Library:
             return load_file(str(f))["mean"].float().to(self.eng.dev)
         if not create:
             return None
+
         mean = neutral_means(self.eng, DEFAULT_HARMLESS, cancel)
         self.dir.mkdir(parents=True, exist_ok=True)
         save_file({"mean": mean.cpu().contiguous()}, str(f))
+
         for d in self.eng.dirs.values():
             d["neutral"] = mean
         return mean
@@ -175,12 +179,14 @@ class Library:
         """unit [L, H], mag [L] (numpy or torch). Returns the stored index entry."""
         idx = [e for e in self.index() if e["id"] != entry["id"]]
         entry = {**entry, "created": entry.get("created") or time.time()}
+
         self.dir.mkdir(parents=True, exist_ok=True)
         unit = torch.as_tensor(np.asarray(unit, np.float32))
         mag = torch.as_tensor(np.asarray(mag, np.float32))
         save_file({"unit": unit.contiguous(), "mag": mag.contiguous()}, str(self.dir / f"{entry['id']}.safetensors"))
         self._write_index(idx + [entry])
         self._put(entry, unit, mag, self._neutral(cancel=cancel))
+
         return entry
 
     def delete(self, did):
@@ -196,6 +202,7 @@ class Library:
         names = [k for k in D.files if not k.endswith("_mag") and f"{k}_mag" in D.files]
         taken = {e["id"] for e in self.index()}
         out = []
+
         for n in names:
             unit, mag = D[n].astype(np.float32), D[f"{n}_mag"].astype(np.float32)
             if unit.shape[0] != L:
@@ -204,6 +211,7 @@ class Library:
             taken.add(did)
             out.append(self.save({"id": did, "name": n.replace("_", " ").capitalize(), "kind": "imported",
                                   "source": str(path), "band": default_band(L)}, unit, mag, cancel))
+
         return out
 
 
@@ -219,9 +227,11 @@ def _read(eng, msg_lists, n_pos, cancel=None, budget=2048):
     float32 cpu) per batch, so callers can accumulate without holding every prompt's states at once."""
     L = len(eng.layers)
     ids_list = [eng.messages_ids(m) for m in msg_lists]
+
     for bi in eng._batches([(x,) for x in ids_list], budget):
         if cancel is not None and cancel.is_set():
             raise Cancelled()
+
         seqs = [ids_list[i] for i in bi]
         T = max(map(len, seqs))
         pad = eng.tok.pad_token_id
@@ -243,6 +253,7 @@ def _read(eng, msg_lists, n_pos, cancel=None, budget=2048):
             finally:
                 for h in hs:
                     h.remove()
+
         yield bi, torch.stack([cap[l] for l in range(L)], 1)
 
 
@@ -251,23 +262,28 @@ def neutral_means(eng, prompts, cancel=None):
     attention-sink activations): [L, H] float32 on the device."""
     L, H = len(eng.layers), int(eng.layers[0].mlp.down_proj.out_features)
     acc, n = torch.zeros(L, H, device=eng.dev), 0
+
     with eng.lock:
         for p in prompts:
             if cancel is not None and cancel.is_set():
                 raise Cancelled()
+
             ids = torch.tensor([eng.chat_ids(p)], device=eng.dev)
             cap = {}
             hs = [eng.layers[l].register_forward_hook(
                 lambda m, i, o, l=l: cap.__setitem__(l, (o[0] if isinstance(o, tuple) else o)[0, 1:].float().sum(0)))
                 for l in range(L)]
+
             try:
                 with torch.inference_mode():
                     eng.model(input_ids=ids, use_cache=False, logits_to_keep=1)
             finally:
                 for h in hs:
                     h.remove()
+
             acc += torch.stack([cap[l] for l in range(L)])
             n += ids.shape[1] - 1
+
     return acc / max(n, 1)
 
 
@@ -284,12 +300,15 @@ def suggest_band(auc, dprime):
     ok = [l for l in range(lo, hi + 1) if auc[l] >= 0.95]
     if not ok:
         return default_band(L)
+
     best = max(ok, key=lambda l: dprime[l])
     a = b = best
+
     while a - 1 in ok and best - (a - 1) <= 4:
         a -= 1
     while b + 1 in ok and (b + 1) - best <= 4:
         b += 1
+
     band = list(range(a, b + 1, 2))
     return band if len(band) >= 2 else default_band(L)
 
@@ -312,11 +331,14 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
             raise ValueError("Write at least one system prompt for each side.")
         if len(qs) < 8:
             raise ValueError("Give it at least eight questions to read the direction on.")
+
         n_ho = max(2, len(qs) // 4)
         q_tr, q_ho = qs[:-n_ho], qs[-n_ho:]
+
         # with several paraphrases, the last is kept apart, so the check also sees wording the direction never saw
         tr_pos, ho_pos = (pos[:-1], pos[-1:]) if len(pos) > 1 else (pos, pos)
         tr_neg, ho_neg = (neg[:-1], neg[-1:]) if len(neg) > 1 else (neg, neg)
+
         conv = lambda sys_, q: [{"role": "system", "content": sys_}, {"role": "user", "content": q}]
         sets = {"pos": [conv(s, q) for s in tr_pos for q in q_tr], "neg": [conv(s, q) for s in tr_neg for q in q_tr],
                 "pos_ho": [conv(s, q) for s in ho_pos for q in q_ho], "neg_ho": [conv(s, q) for s in ho_neg for q in q_ho]}
@@ -325,6 +347,7 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
     else:
         if len(pos) < 6 or len(neg) < 6:
             raise ValueError("Give at least six prompts on each side.")
+
         hp, hn = max(2, len(pos) // 4), max(2, len(neg) // 4)
         conv = lambda q: [{"role": "user", "content": q}]
         sets = {"pos": [conv(q) for q in pos[:-hp]], "neg": [conv(q) for q in neg[:-hn]],
@@ -337,11 +360,13 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
     yield _ev("stage", stage="read", label="Reading how the model carries each side")
     acc = {}
     ho_proj_states = {}
+
     for key in ("pos", "neg", "pos_ho", "neg_ho"):
         msgs = sets[key]
         s_all = s_a = s_b = None
         n_a = n_b = 0
         keep = []
+
         for bi, st in _read(eng, msgs, P, cancel):
             if key.endswith("_ho"):
                 keep.append(st.mean(2))  # [B, L, H]: held-out prompts are few; keep their token-averaged states
@@ -353,8 +378,10 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
                 s_b = sb if s_b is None else s_b + sb
                 n_a += int(m.sum())
                 n_b += int((~m).sum())
+
             done += len(bi)
             yield _ev("progress", stage="read", done=done, total=total)
+
         if key.endswith("_ho"):
             ho_proj_states[key] = torch.cat(keep).numpy()
         else:
@@ -366,10 +393,12 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
     ua, _ = d(acc["pos"][1], acc["neg"][1])
     ub, _ = d(acc["pos"][2], acc["neg"][2])
     cos = (ua * ub).sum(-1)
+
     pp = np.einsum("nlh,lh->nl", ho_proj_states["pos_ho"], unit)
     pn = np.einsum("nlh,lh->nl", ho_proj_states["neg_ho"], unit)
     auc = np.array([_auc(pp[:, l], pn[:, l]) for l in range(L)])
     dprime = (pp.mean(0) - pn.mean(0)) / np.sqrt(0.5 * (pp.var(0) + pn.var(0)) + 1e-9)
+
     band = suggest_band(auc, dprime)
 
     yield _ev("stage", stage="save", label="Saving")
@@ -377,6 +406,7 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
     entry = {"id": make_id(name, taken), "name": name, "kind": kind, "pos": pos, "neg": neg, "band": band,
              "metrics": {"auc": [round(float(x), 3) for x in auc], "cos_split": [round(float(x), 3) for x in cos],
                          "dprime": [round(float(x), 2) for x in dprime]}}
+
     entry = lib.save(entry, unit, mag, cancel)
 
     # one held-out question pushed both ways and left alone, in one batch
@@ -389,4 +419,5 @@ def extract(eng, lib, spec, cancel=None, max_new=110):
         if r is None:
             break
         yield _ev("trydelta", index=r, dose=TRY_DOSES[r], delta=delta)
+
     yield _ev("result", entry=entry, band=band, prompt=try_q, auc=auc, cos_split=cos)

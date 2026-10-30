@@ -19,11 +19,13 @@ export function redrawn() {
 export function addItems(add: Item[], replace = false) {
   const next = replace ? [] : [...items()];
   const at = new Map(next.map((it, i) => [itemKey(it), i]));
+
   for (const it of add) {
     const ex = at.get(itemKey(it));
     if (ex !== undefined) next[ex] = { ...next[ex], dose: it.dose };
     else (at.set(itemKey(it), next.length), next.push({ ...it }));
   }
+
   setItems(next);
   redrawn();
 }
@@ -41,6 +43,7 @@ export function patchAt(i: number, p: Partial<Item>) {
 export function setOp(i: number, op: "push" | "erase") {
   const it = items()[i];
   if (!isDir(it) || it.op === op) return;
+
   patchAt(i, { op, dose: op === "erase" ? 1 : 4 });
   redrawn();
 }
@@ -55,6 +58,7 @@ export async function saveRecipe() {
   const { recipe, info } = get();
   const name = recipe.name || recipe.items.map(labelOf).slice(0, 3).join(" + ");
   const saved = await api<Recipe>("/api/recipes", { id: recipe.id || undefined, name, model: info?.model, items: recipe.items });
+
   set({ recipe: { ...get().recipe, id: saved.id, name: saved.name } });
   get().toastMsg(`Saved “${saved.name}”.`);
   refreshSaved();

@@ -71,6 +71,7 @@ def sse(gen):
     """Wraps an event generator as a text/event-stream; errors and cancellations become events."""
     def run():
         cancel.clear()
+
         try:
             for ev in gen:
                 yield f"data: {json.dumps(_finite(ev), default=_np)}\n\n"
@@ -79,7 +80,9 @@ def sse(gen):
         except Exception as e:  # surface the message in the UI rather than a dead stream
             traceback.print_exc()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
         yield f"data: {json.dumps({'type': 'end'})}\n\n"
+
     return StreamingResponse(run(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
@@ -118,15 +121,18 @@ def need_model():
 def pushes_of(body):
     out = [Push.of(p) for p in body.get("pushes") or [] if p.get("enabled", True)]
     L = len(eng.layers) if eng.model is not None else 0
+
     for p in out:
         if p.mode not in ("dir", "erase"):
             continue
+
         if p.mode == "erase":
             p.dose = min(max(p.dose, 0.0), 1.0)  # 1 = fully back to ordinary text; past that it overshoots
         if p.dir_id not in eng.dirs:
             raise HTTPException(409, f"This model has no direction called “{p.dir_id}”.")
         if not all(0 <= l < L for l in p.layers) or (p.mode == "dir" and not p.layers):
             raise HTTPException(400, f"Pick layers between 0 and {L - 1} for “{p.dir_id}”.")
+
     return out
 
 
@@ -169,14 +175,17 @@ def models():
         for d in sorted(HF_CACHE.glob("models--*")):
             if any(d.glob("snapshots/*/*.safetensors")):
                 cached.append(d.name[len("models--"):].replace("--", "/"))
+
     # models saved as plain folders on external drives: /Volumes/<drive>/models/<name>
     copies = [{"path": str(d), "name": d.name, "size": _folder_size(d)}
               for d in sorted(COPIES.glob("*")) if d.is_dir() and not d.name.endswith(".partial")
               and (d / "config.json").exists()]
+
     copied = {c["name"] for c in copies}
     local = [{"path": str(d), "name": d.name, "drive": d.parent.parent.name, "size": _folder_size(d), "copied": d.name in copied}
              for d in sorted(Path("/Volumes").glob("*/models/*"))
              if (d / "config.json").exists() and any(d.glob("*.safetensors"))]
+
     return {"presets": PRESETS, "cached": cached, "local": local, "copies": copies}
 
 
@@ -189,24 +198,30 @@ def copy_status():
 async def copy_model(req: Request):
     body = await req.json()
     src = Path(body["path"])
+
     if not (src.is_dir() and str(src).startswith("/Volumes/") and (src / "config.json").exists()):
         raise HTTPException(400, "That isn't a model folder on an external drive.")
     if copy_job["status"] == "copying":
         raise HTTPException(409, f"Already copying {copy_job['name']}.")
+
     files = _model_files(src)
     total = sum(f.stat().st_size for f in files)
+
     COPIES.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(COPIES).free
     margin = 10e9  # leave room for the system and swap
     if free < total + margin:
         raise HTTPException(400, f"Not enough space: the copy needs {total / 1e9:.1f} GB and this Mac has {free / 1e9:.1f} GB free.")
+
     copy_job.update(src=str(src), name=src.name, done=0, total=total, status="copying", cancel=False)
 
     def work():
         tmp, dst = COPIES / (src.name + ".partial"), COPIES / src.name
+
         try:
             shutil.rmtree(tmp, ignore_errors=True)
             tmp.mkdir(parents=True)
+
             for f in files:
                 with open(f, "rb") as a, open(tmp / f.name, "wb") as b:
                     while chunk := a.read(64 << 20):
@@ -214,6 +229,7 @@ async def copy_model(req: Request):
                             raise Cancelled()
                         b.write(chunk)
                         copy_job["done"] += len(chunk)
+
             tmp.rename(dst)  # only a finished copy ever appears under its real name
             copy_job["status"] = "done"
         except Cancelled:
@@ -238,10 +254,12 @@ def cancel_copy():
 async def remove_copy(req: Request):
     body = await req.json()
     d = Path(body["path"]).resolve()
+
     if d.parent != COPIES.resolve() or not (d / "config.json").exists():
         raise HTTPException(400, "Only copies made by Lodestar can be removed here.")
     if eng.model_id == str(d):
         raise HTTPException(409, "That copy is loaded right now. Load another model first.")
+
     shutil.rmtree(d)
     return {"ok": True}
 
@@ -297,10 +315,13 @@ def _neuron_row(l, n, _impact, act, _t, lens_k=5):
 def trace_token(t: int, k: int = 24):
     need_model()
     tr = eng.trace
+
     if tr is None or not 0 <= t < len(tr["ids"]):
         raise HTTPException(404, "no trace")
+
     top = eng.trace_top_neurons(t=t, k=k)
     ids, ps = tr["lens_ids"][:, t, :], tr["lens_p"][:, t, :]
+
     return {
         "lens": [[{"tok": eng.tok.decode([int(i)]), "p": round(float(p), 4)} for i, p in zip(ids[l], ps[l])]
                  for l in range(ids.shape[0])],
@@ -313,13 +334,17 @@ def trace_token(t: int, k: int = 24):
 def neuron(layer: int, n: int):
     need_model()
     L, N = eng.dnorm.shape
+
     if not (0 <= layer < L and 0 <= n < N):
         raise HTTPException(400, f"layer must be 0..{L - 1}, neuron 0..{N - 1}")
+
     out = {"layer": layer, "neuron": n, "lens": eng.lens(layer, n, 16)}
+
     tr = eng.trace
     if tr is not None:
         a = tr["acts"][layer, :, n].astype(np.float32)
         out["trace"] = {"tokens": tr["tokens"], "n_prompt": tr["n_prompt"], "acts": np.round(a, 3).tolist()}
+
     return out
 
 
@@ -333,10 +358,12 @@ def examples():
 def search_word(word: str, k: int = 24, skip_last: int = 0):
     """Neurons that push the model toward a word."""
     need_model()
+
     out = []
     for l, n, sc in eng.neurons_for_word(word.strip(), k, skip_last):
         lens = eng.lens(l, n, 6)
         out.append({"layer": l, "neuron": n, "score": round(sc, 3), "lens": lens["up" if sc > 0 else "down"]})
+
     first = eng.tok(" " + word.strip(), add_special_tokens=False).input_ids[0]
     return {"results": out, "partial": eng.last_search_partial, "piece": eng.tok.decode([first]).strip()}
 
@@ -349,16 +376,20 @@ async def steer(req: Request):
     body = await req.json()
     pushes = pushes_of(body)
     pid = eng.chat_ids(body["prompt"])
+
     cols = body.get("columns", ["up", "base", "down"])
     inv = [q for q in map(_reverse, pushes) if q is not None]
+
     # "abl" erases the model's refusal direction with no neuron pushes; when ablation is on, the changed column
     # carries it too and the normal/opposite columns stay untouched
     active = bool(abl_now().get("active"))
     ablated = {"abl": True, "up": active, "base": False, "down": False}
+
     rows, flags = [], []
     for c in cols:
         rows.append((pid, {"up": pushes, "abl": [], "base": [], "down": inv}[c]))
         flags.append(ablated[c])
+
     abl_flags = flags if any(flags) else None
 
     def gen():
@@ -378,8 +409,10 @@ async def chat(req: Request):
     body = await req.json()
     msgs = [{"role": m["role"], "content": str(m["content"])} for m in body.get("messages") or []
             if m.get("role") in ("system", "user", "assistant") and str(m.get("content", "")).strip()]
+
     if not msgs or msgs[-1]["role"] != "user":
         raise HTTPException(400, "The conversation must end with a user message.")
+
     pid = eng.messages_ids(msgs)
     rows = [(pid, pushes_of(body))]
     ablate = bool(body.get("abl")) and eng.abl_vec is not None
@@ -457,6 +490,7 @@ async def abl_analyze(req: Request):
                 final = ev
                 ev = {k: v for k, v in ev.items() if k != "vec"}  # the direction itself stays here
             yield ev
+
         if final:
             all_d = _abl_all()
             all_d[eng.model_id] = {"vec": final["vec"], "layer": final["layer"], "coef": final["coef"],
@@ -474,12 +508,15 @@ async def abl_state(req: Request):
     body = await req.json()
     all_d = _abl_all()
     entry = all_d.get(eng.model_id)
+
     if not entry:
         raise HTTPException(409, "Run the analysis first.")
+
     if "coef" in body:
         entry["coef"] = max(0.1, min(2.0, float(body["coef"])))
     if "active" in body:
         entry["active"] = bool(body["active"])
+
     _abl_save(all_d)
     eng.abl_of(entry["vec"], entry.get("coef", 1.0), entry.get("layer"))
     return {"ok": True, **{k: entry.get(k) for k in ("layer", "coef", "active")}}
@@ -493,11 +530,13 @@ async def abl_test(req: Request):
         raise HTTPException(409, "Analyse the model first: there is no direction to erase yet.")
     body = await req.json()
     probes = [str(p).strip() for p in (body.get("probes") or []) if str(p).strip()][:4] or abl_mod.EXAMPLE_PROMPTS
+
     n = len(probes)
     rows = []
     for p in probes:
         pid = eng.chat_ids(p)
         rows += [(pid, []), (pid, [])]
+
     fl = [i % 2 == 1 for i in range(2 * n)]
 
     def gen():
@@ -507,6 +546,7 @@ async def abl_test(req: Request):
                 break
             texts[r] += dx
             yield {"type": "delta", "probe": r // 2, "kind": "base" if r % 2 == 0 else "abl", "delta": dx}
+
         refused = abl_mod.refused(texts)
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
         nll1 = float(eng.reference_nll([[]], cancel, abl=[True])[0])
@@ -528,10 +568,12 @@ def _start_export(kind, name, **edits):
     """Write an edited copy of the loaded model into COPIES/name on a background thread; see abl_mod.bake."""
     if export_job["status"] == "working":
         raise HTTPException(409, f"Already writing {export_job['name']}.")
+
     export_job.update(kind=kind, name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
 
     def work():
         tmp, dst = COPIES / (name + ".partial"), COPIES / name
+
         try:
             if dst.exists():
                 shutil.rmtree(dst)
@@ -546,6 +588,7 @@ def _start_export(kind, name, **edits):
             abl_mod.bake(eng, tmp, prog, cancel, **edits)
             if export_job["cancel"]:
                 raise Cancelled()
+
             tmp.rename(dst)
             export_job.update(dst=str(dst), status="done", msg="")
         except Cancelled:
@@ -570,14 +613,18 @@ async def abl_export(req: Request):
     need_model()
     if eng.abl_vec is None:
         raise HTTPException(409, "Analyse the model first: there is no direction to bake in yet.")
+
     entry = abl_now()
     if not entry or not entry.get("vec"):
         raise HTTPException(409, "No saved direction for this model: analyse first.")
+
     body = await req.json()
     coef = max(0.1, min(2.0, float(body.get("coef", entry.get("coef", 1.0)))))
+
     base = eng.model_id.rstrip("/").split("/")[-1]
     name = _clean_name(body.get("name")) or f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
     vec = [float(x) for x in entry["vec"]]
+
     return _start_export("abl", name, abl=(vec, coef))
 
 
@@ -587,18 +634,23 @@ async def steer_export(req: Request):
     need_model()
     body = await req.json()
     raw = body.get("items") or []
+
     if any(i.get("kind") == "dir" and i.get("op") == "erase" for i in raw):
         raise HTTPException(409, "An erased direction can't be built into the weights yet. Switch it to a push or "
                                  "turn it off first.")
+
     items = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"])}
              for i in raw if i.get("kind") != "dir" and i.get("neuron") is not None and i.get("mode", "add") == "add"]
     items += [{"kind": "dir", "dir": str(i["dir"]), "layers": [int(l) for l in i["layers"]], "dose": float(i["dose"])}
               for i in raw if i.get("kind") == "dir"]
+
     pushes_of({"pushes": items})  # the directions must exist for this model
     if not items:
         raise HTTPException(409, "Turn on some neurons first: there is nothing to build in yet.")
+
     entry = abl_now()
     abl = (entry["vec"], float(entry.get("coef", 1.0))) if body.get("abl") and entry.get("active") and entry.get("vec") else None
+
     base = eng.model_id.rstrip("/").split("/")[-1]
     name = _clean_name(body.get("name")) or f"{base}-steered"
     return _start_export("steer", name, steer=items, abl=abl, fit_prompts=discover.DEFAULT_PROMPTS[:6],
@@ -632,6 +684,7 @@ async def tune_search(req: Request):
     budget = discover.budget_for(eng.n_params)  # sized to the model; "Neurons to test" in Options overrides
     if s.get("candidates"):
         budget["n_candidates"] = int(s["candidates"])
+
     return sse(discover.search(
         eng, body["pairs"], behavior=body.get("behavior") or None, **budget, max_neurons=int(s.get("max_neurons", 6)),
         doses=tuple(float(d) for d in s.get("doses", (0.25, 0.5, 1.0))), contrast=float(s.get("contrast", 0.5)),
@@ -647,13 +700,16 @@ async def tune_refine(req: Request):
     body = await req.json()
     recipe = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"]), "lens": i.get("lens") or []}
               for i in body.get("recipe") or [] if i.get("kind") != "dir"]
+
     if not recipe:
         raise HTTPException(409, "Turn on some neurons first: there is nothing to fix yet.")
     if not (body.get("feedback") or "").strip():
         raise HTTPException(400, "Say what's wrong with the reply.")
+
     big = eng.n_params > 4e9
     budget = discover.budget_for(eng.n_params)
     others = [p for p in body.get("prompts") or discover.DEFAULT_PROMPTS][: 2 if big else 4]
+
     return sse(discover.refine(
         eng, recipe, feedback=body["feedback"], prompt=body["prompt"], bad=body.get("bad") or "",
         behavior=body.get("behavior") or None, prompts=others, abl=bool(abl_now().get("active")),
@@ -666,6 +722,7 @@ def _dir_row(e):
     m = e.get("metrics") or {}
     auc = m.get("auc") or []
     band = e.get("band") or []
+
     return {k: e.get(k) for k in ("id", "name", "kind", "band", "created", "pos", "neg")} | {
         "ready": d is not None, "auc": round(min(auc[l] for l in band), 2) if auc and band else None}
 
@@ -693,12 +750,15 @@ async def directions_import(req: Request):
     need_model()
     body = await req.json()
     path = Path(str(body.get("path") or "")).expanduser()
+
     if not path.is_file():
         raise HTTPException(400, f"No file at {path}.")
+
     try:
         added = dirs.import_npz(path, cancel)
     except (ValueError, KeyError) as e:
         raise HTTPException(400, str(e))
+
     return {"added": [_dir_row(e) for e in added]}
 
 
@@ -725,6 +785,7 @@ async def save_recipe(req: Request):
     r.setdefault("id", f"r{int(time.time() * 1000)}")
     r.setdefault("created", time.time())
     r.setdefault("model", eng.model_id)
+
     allr = [x for x in _recipes() if x["id"] != r["id"]] + [r]
     RECIPES.write_text(json.dumps(allr, indent=1))
     return r

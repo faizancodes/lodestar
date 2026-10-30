@@ -12,12 +12,14 @@ import { patchAt, removeAt, saveRecipe, setOp } from "./recipe";
 // own value, which the browser snaps to its step.
 function usePaint() {
   const ref = useRef<HTMLInputElement>(null);
+
   useLayoutEffect(() => {
     const el = ref.current!, v = (+el.value - +el.min) / (+el.max - +el.min);
     el.style.setProperty("--lo", Math.min(v, 0.5) * 100 + "%");
     el.style.setProperty("--hi", Math.max(v, 0.5) * 100 + "%");
     el.style.setProperty("--fill", v < 0.5 ? "var(--bad)" : "var(--ascii)");
   });
+
   return ref;
 }
 
@@ -25,6 +27,7 @@ function usePaint() {
 export function RecipeBox() {
   const items = useApp((s) => s.recipe.items);
   const gen = useSteer((s) => s.recipeGen);
+
   return (
     <div id="rc" className="rc" hidden={!items.length}>
       <div className="rc-h"><b>On now</b><span className="grow" /><button id="rc-save" className="btn ghost sm" onClick={saveRecipe}>Save</button><button id="rc-clear" className="btn ghost sm" onClick={newRecipe}>Turn all off</button></div>
@@ -36,6 +39,7 @@ export function RecipeBox() {
 
 function NeuronRow({ it, i }: { it: NeuronItem; i: number }) {
   const range = usePaint(), anchor = `rc:${it.layer}:${it.neuron}`;
+
   return (
     <>
       <div className="rc-row" data-i={i}>
@@ -54,18 +58,22 @@ function NeuronRow({ it, i }: { it: NeuronItem; i: number }) {
 function DirRow({ it, i }: { it: DirItem; i: number }) {
   const range = usePaint(), band = useRef<HTMLInputElement>(null);
   const ok = useApp((s) => dirReady(it, s.dirs)), er = it.op === "erase";
+
   // the layers are read when the field is committed (its change event), not on every keystroke
   useEffect(() => {
     const el = band.current!;
+
     const commit = () => {
       const { dirLayers, recipe } = useApp.getState(), cur = recipe.items[i] as DirItem;
       const L = dirLayers || 0, ls = [...new Set((el.value.match(/\d+/g) || []).map(Number))].filter((l) => l < L).sort((a, b) => a - b);
       if (ls.length) patchAt(i, { layers: ls });
       el.value = (ls.length ? ls : cur.layers).join(" ");
     };
+
     el.addEventListener("change", commit);
     return () => el.removeEventListener("change", commit);
   }, [i]);
+
   return (
     <div className={ok ? "rc-row dir" : "rc-row dir gone"} data-i={i}>
       <span className="who static" title={ok ? String(it.name) : "Not on this model"}><b>{labelOf(it)}</b><span className="nid">direction</span></span>

@@ -163,6 +163,7 @@ def refusalish(text):
     reply opens by answering."""
     words = (text or "").split()
     head, opening = " ".join(words[:120]), " ".join(words[:45])
+
     if ANSWER_RE.search(opening):  # it started answering: only an outright "I can't" turns it into a refusal
         return bool(HARD_RE.search(head))
     return bool(REFUSAL_RE.search(head) or SOFT_RE.search(opening))
@@ -191,6 +192,7 @@ def _load_judge():
             except Exception as e:  # offline on first run, say: the patterns still work
                 print(f"refusal judge unavailable, using patterns: {e}", file=sys.stderr)
                 _judge = False
+
     return _judge
 
 
@@ -201,11 +203,14 @@ def refused(texts):
     judge = _load_judge() if texts else False
     if not judge:
         return pats
+
     tok, model, rej = judge
     heads = [" ".join((t or "").split()[:JUDGE_WORDS]) for t in texts]
+
     with torch.no_grad():
         enc = tok(heads, return_tensors="pt", padding=True, truncation=True, max_length=128)
         p = torch.softmax(model(**enc).logits.float(), -1)[:, rej].tolist()
+
     out = [x >= 0.5 for x in p]
     if n := sum(a != b for a, b in zip(out, pats)):
         print(f"refusal judge and patterns disagree on {n} of {len(texts)} replies", file=sys.stderr)
@@ -242,6 +247,7 @@ def _read_set(eng, prompts, stage, label, cancel, n_pos):
             raise Cancelled()
         states.append(eng.prompt_end_states(prompts[i:i + 8], n_pos, cancel=cancel))
         yield _ev("progress", stage=stage, done=min(i + 8, len(prompts)), total=len(prompts))
+
     return np.concatenate(states)
 
 
@@ -252,6 +258,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
     harmless = [p.strip() for p in harmless if p and p.strip()]
     if len(harmful) < 10 or len(harmless) < 10:
         raise ValueError("Need at least ten probe prompts of each kind to pin the direction down.")
+
     half = len(harmful) // 2
     half_a, half_b = harmful[:half], harmful[half:]
     L = len(eng.layers)
@@ -277,6 +284,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
     lo, hi = max(1, round(0.2 * L)), round(0.85 * L)  # too early to carry the decision, too late to undo it
     trials = {}
     prev = (eng.abl_vec_f.tolist(), eng.abl_coef, eng.abl_layer) if eng.abl_vec is not None else None
+
     try:
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
         rows = [(eng.chat_ids(p), []) for p in TRIAL_PROMPTS]
@@ -304,12 +312,14 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
         keep = [i for i, r in enumerate(base_refused) if r] or list(range(len(rows)))
         srows = [(rows[i][0] + [int(t) for t in ids[i][:3]], len(rows[i][0]), []) for i in keep if len(ids[i])]
         yield tick()
+
         screen = {}
         for l in range(lo, hi + 1):
             yield _ev("stage", stage="screen", label=f"Screening layer {l} of {lo}–{hi}")
             eng.abl_of(u_all[l], 1.0, l)
             screen[l] = float(eng.score(srows, cancel, abl=True).mean())  # log-prob of the refusal opening
             yield tick()
+
         cands = sorted(screen, key=screen.get)[:N_TRIALS]
 
         # a setting that makes ordinary text noticeably worse only wins if nothing else works
@@ -318,6 +328,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             yield _ev("stage", stage="trial", label=f"Trying layer {l} on new bad requests ({i + 1} of {len(cands)})")
             trials[l] = attempt(l, STRENGTHS[0])
             yield tick()
+
         selected = min(cands, key=lambda l: (cost(trials[l]), screen[l]))
 
         # then raise the strength while refusals remain; a stronger setting that did no worse is kept, since it was
@@ -329,13 +340,16 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             yield _ev("stage", stage="strength", label=f"Trying layer {selected} at strength {c:g}")
             by_coef[c] = attempt(selected, c)
             yield tick()
+
         coef = min(by_coef, key=lambda c: (cost(by_coef[c]), -c))
         vec = [round(float(x), 6) for x in u_all[selected]]
+
         shown = cands + [l for l in ranking if l not in cands][:max(0, 10 - len(cands))]
         rank_rows = [{"layer": int(l), "score": round(float(cos[l]), 4), "mag": round(float(mag_all[l]), 2),
                       **({"refused": trials[l]["refused"], "tried": len(TRIAL_PROMPTS)} if l in trials else {})}
                      for l in shown]
         yield _ev("ranking", layers=rank_rows, selected=selected)
+
         refused_left = by_coef[coef]["refused"]
         clean = refused_left == 0
 
@@ -343,6 +357,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
         yield _ev("stage", stage="examples", label=f"Answering two more bad requests with and without layer {selected}"
                   + (f" at strength {coef:g}" if coef != 1 else ""))
         eng.abl_of(u_all[selected], coef, selected)
+
         grows = [(eng.chat_ids(p), []) for p in EXAMPLE_PROMPTS for _ in (0, 1)]
         texts = [""] * len(grows)
         for r, delta in eng.generate(grows, max_new=example_max_new, cancel=cancel, abl=[r % 2 == 1 for r in range(len(grows))]):
@@ -355,6 +370,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             eng.abl_of(*prev)
         else:
             eng.clear_abl()
+
     verdicts = refused(texts)
     examples = [{"prompt": p, "before": texts[2 * i].strip(), "after": texts[2 * i + 1].strip(),
                  "refused_before": verdicts[2 * i], "refused_after": verdicts[2 * i + 1]} for i, p in enumerate(EXAMPLE_PROMPTS)]
@@ -395,9 +411,11 @@ def steer_biases(eng, items):
                 b = float(it["dose"]) / len(it["layers"]) * d["mag"][l] * d["unit"][l].detach().float().cpu()
                 out[l] = out.get(l, 0) + b
             continue
+
         l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
         col = eng.layers[l].mlp.down_proj.weight[:, n].detach().float().cpu()
         out[l] = out.get(l, 0) + dose * float(eng.unit[l, n]) * col
+
     return out
 
 
@@ -417,8 +435,10 @@ def fit_steer_biases(eng, items, prompts, progress, cancel=None, abl=False):
         eng._push_state = eng._make_push_state([push], 1) if push else None
         if abl:
             eng._abl_mask, eng._abl_any = torch.tensor([True], device=eng.dev), True
+
         hs = [eng.layers[l + 1].self_attn.o_proj.register_forward_hook(lambda m, i, o, b=b: o + b.to(o.dtype))
               for l, b in (extra or {}).items()]
+
         try:
             return eng.model(input_ids=ids, use_cache=False, logits_to_keep=keep).logits[0].float().log_softmax(-1)
         finally:
@@ -434,18 +454,22 @@ def fit_steer_biases(eng, items, prompts, progress, cancel=None, abl=False):
         seqs = [(torch.tensor([eng.chat_ids(p) + g], device=eng.dev), len(g) + 1) for p, g in zip(prompts, gen)]
         with torch.no_grad():
             targets = [run(ids, k, push=pushes) for ids, k in seqs]
+
         bs = {l: b.to(eng.dev).clone().requires_grad_(True) for l, b in exact.items()}
         opt = torch.optim.Adam([{"params": [bs[l]], "lr": float(exact[l].norm()) * 0.003} for l in bs])
+
         with torch.enable_grad():
             for step in range(steps):
                 if cancel is not None and cancel.is_set():
                     raise Cancelled()
+
                 opt.zero_grad()
                 for t, (ids, k) in zip(targets, seqs):  # one sequence at a time keeps the activations small
                     q = run(ids, k, extra=bs)
                     ((t.exp() * (t - q)).sum(-1).mean() / len(seqs)).backward()
                 opt.step()
                 progress(step + 1, steps, "Matching the steering in the weights…")
+
     if eng.dev == "mps":
         torch.mps.empty_cache()
     return {l: b.detach().float().cpu() for l, b in bs.items()}
@@ -467,27 +491,33 @@ def _build_in_steering(model, layers, biases, v=None, coef=1.0, fitted=None):
     cfg = model.config
     proj = (lambda b: b - coef * (b @ v) * v) if v is not None else (lambda b: b)
     biases = {l: proj(b) for l, b in biases.items()}
+
     if getattr(cfg, "mlp_bias", None) is not None:
         cfg.mlp_bias = True
         for layer in layers:
             for name in ("gate_proj", "up_proj", "down_proj"):
                 _zero_bias(getattr(layer.mlp, name, None))
+
         for l, b in biases.items():
             layers[l].mlp.down_proj.bias.data += b.to(layers[l].mlp.down_proj.bias.dtype)
         return
+
     if getattr(cfg, "attention_bias", None) is None:
         raise ValueError("This kind of model has no bias to hold steering, so it can't be saved with it built in.")
     if any(l + 1 >= len(layers) or getattr(getattr(layers[l + 1], "self_attn", None), "o_proj", None) is None
            for l in biases):
         raise ValueError("A push in this recipe is in a layer whose push can't be built into the weights.")
+
     cfg.attention_bias = True
     for layer in layers:
         attn = getattr(layer, "self_attn", None)
         for name in ("q_proj", "k_proj", "v_proj", "o_proj"):
             _zero_bias(getattr(attn, name, None))
+
     for l, b in biases.items():
         o = layers[l + 1].self_attn.o_proj
         o.bias.data += proj(fitted[l] if fitted else b).to(o.bias.dtype)
+
     return biases
 
 
@@ -506,28 +536,35 @@ def bake(eng, dst, progress, cancel=None, abl=None, steer=None, fit_prompts=None
     fitted = None
     if biases and getattr(eng.model.config, "mlp_bias", None) is None and fit_prompts:
         fitted = fit_steer_biases(eng, steer, fit_prompts, progress, cancel, abl=bool(abl))
+
     progress(0, 0, "Reading the weights from disk…")
     model = AutoModelForCausalLM.from_pretrained(eng.model_id, dtype=torch.bfloat16, device_map="cpu",
                                                  low_cpu_mem_usage=True)
+
     if cancel is not None and cancel.is_set():
         del model
         raise Cancelled()
+
     layers = Engine._find_layers(model)
     v = coef = None
     total = 1 if biases else 0
+
     if abl:
         vec, coef = abl
         embed = model.get_input_embeddings()
         head = model.get_output_embeddings()
         tied = head is not None and head.weight is embed.weight
         v = torch.tensor([float(x) for x in vec]).float()
+
         mats = []
         for i, layer in enumerate(layers[1:], 1):  # layer 0 only ever passes the embedding through
             mats += [("attention write", layer, getattr(getattr(layer, "self_attn", None), "o_proj", None)),
                      ("mlp write", layer, getattr(layer, "mlp", None).down_proj)]
+
         total += len(mats) + 1 + (0 if tied else 1)
         progress(0, total, "Erasing the direction from the weights…")
         done = 0
+
         for _, layer, mod in mats:
             if cancel is not None and cancel.is_set():
                 raise Cancelled()
@@ -536,13 +573,16 @@ def bake(eng, dst, progress, cancel=None, abl=None, steer=None, fit_prompts=None
             _orth_out(mod.weight, v, coef)
             done += 1
             progress(done, total, "Erasing the direction from the weights…")
+
         _orth_in(embed.weight, v, coef)
         done += 1
         progress(done, total, "Erasing the direction from the weights…")
+
         if head is not None and not tied:
             _orth_in(head.weight, v, coef)
             done += 1
             progress(done, total, "Erasing the direction from the weights…")
+
     if biases:
         progress(total - 1, total, "Building the steering into the weights…")
         exact = _build_in_steering(model, layers, biases, v, coef or 1.0, fitted)
@@ -552,9 +592,11 @@ def bake(eng, dst, progress, cancel=None, abl=None, steer=None, fit_prompts=None
             save_file({f"layer.{l}": b.contiguous() for l, b in exact.items()}, str(Path(dst) / "lodestar_steering.safetensors"))
             model.config.lodestar_steering = {"file": "lodestar_steering.safetensors", "layers": sorted(exact),
                                               "recipe": recipe or ""}
+
     progress(total, total, "Saving the edited model…")
     model.save_pretrained(dst, safe_serialization=True, max_shard_size="4GB")
     eng.tok.save_pretrained(dst)
+
     del model
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
