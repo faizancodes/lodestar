@@ -265,7 +265,7 @@ main { flex: 1; min-width: 0; overflow-y: auto; padding: 56px 40px 72px; }
 .page-h h2 { margin: 0; font-size: 40px; line-height: 1.05; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; color: var(--text); }
 .page-h p { margin: 10px 0 0; max-width: 620px; font-size: 14px; color: var(--text-2); }
 .page-h a { color: var(--accent); }
-.step.locked .card { opacity: 0.45; pointer-events: none; filter: saturate(0.6); }
+.step.locked .card, .step.locked .tl, .step.locked .tl-comp { opacity: 0.45; pointer-events: none; filter: saturate(0.6); }
 .step.locked .step-h { opacity: 0.55; }
 .step { transition: opacity 0.2s; }
 .step { display: flex; flex-direction: column; gap: 16px; }
@@ -430,6 +430,7 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .tl-act:hover, .tl-act.on { background: var(--wash); color: var(--accent); }
 .tl-a-b { white-space: pre-wrap; font-size: 15px; line-height: 1.7; word-break: break-word; }
 .tl-a-b.md { white-space: normal; }
+.tl-empty { color: var(--muted); font-size: 13.5px; font-style: italic; }
 .tl-a-b:empty::before { content: ""; display: inline-block; width: 0.5em; height: 0.5em; background: var(--ascii); animation: pulse 0.9s infinite; }
 .tl-a-b.typing:not(:empty)::after { content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-left: 4px; vertical-align: 0.1em; background: var(--ascii); animation: pulse 0.9s infinite; }
 .tl-a.old { cursor: pointer; }
@@ -448,6 +449,10 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .tl-comp .send.stop, body.busy .tl-comp .send:not(.stop) { display: none; }
 body.busy .tl-comp .send.stop { display: grid; }
 .tl-sugg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tl-sugg .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-n.bad { color: var(--bad); }
+.tl-act.hint { opacity: 1; color: var(--accent); }
+.plan.done .plan-steps { display: none; }
 .tl-sugg:empty, body.busy .tl-sugg, body.busy .tl-newq { display: none; }
 .run-q { margin: 0 0 12px 2px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
 .run-q span { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 8px; }
@@ -604,8 +609,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .abl .adv { margin: 20px 0 0; }
 .abl .adv summary { margin-bottom: 16px; }
 #abl-rank .adv { margin-top: 20px; }
-#abl-test-summary { font-size: 13.5px; }
-#abl-test-summary b { color: var(--accent); }
 .slider-row { display: flex; align-items: center; gap: 16px; max-width: 420px; }
 .slider-row input[type="range"] { flex: 1; }
 .save-row { display: flex; align-items: flex-end; gap: 12px; }
@@ -650,18 +653,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .rank-row .rk-v { font-family: var(--mono); font-size: 12px; text-align: right; }
 .rank-row .rk-tag { font-size: 10.5px; color: var(--muted); text-align: right; }
 .rank-row.sel .rk-tag { color: var(--accent); font-weight: 700; }
-.abl-checks .lbl { margin: 20px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
-.abl-pair { margin-top: 20px; }
-.abl-examples { display: flex; flex-direction: column; gap: 20px; }
-.abl-examples .abl-pair { margin-top: 0; }
-.abl-examples .out-b { max-height: 240px; overflow-y: auto; }
-.abl-examples:not(:empty) { margin-top: 20px; }
-.abl-checks { display: flex; flex-direction: column; gap: 24px; }
-.abl-checks > :empty { display: none; }
-.abl-checks .row.tight { margin-top: 0; }
-.abl-checks .field { margin-bottom: 0; }
-.abl-checks .abl-pair { margin-top: 0; }
-#abl-test-rows { display: flex; flex-direction: column; gap: 20px; }
 
 /* the status panel: the cut-beam scene beside where the refusal direction stands, and its switch */
 .status-panel {
@@ -709,21 +700,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .step-sub { margin: 6px 0 0; max-width: 640px; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
 
 /* strength: a periwinkle fill up to a white handle, ticks below, a large readout */
-.abl-range { display: flex; align-items: flex-start; gap: 22px; max-width: 560px; margin-top: 12px; }
-.abl-range-track { flex: 1; position: relative; padding-bottom: 22px; }
-.abl-range input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; }
-.abl-range input[type="range"]::-webkit-slider-runnable-track {
-  height: 3px; border-radius: 2px;
-  background: linear-gradient(90deg, var(--ascii) var(--pct, 44%), rgba(255, 255, 255, 0.12) var(--pct, 44%));
-}
-.abl-range input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 17px; height: 17px; margin-top: -7px; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 0 5px rgba(195, 207, 245, 0.16); transition: box-shadow 0.15s;
-}
-.abl-range input[type="range"]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 7px rgba(195, 207, 245, 0.22); }
-.abl-ticks { position: absolute; left: 8px; right: 8px; bottom: 0; height: 14px; }
-.abl-ticks span { position: absolute; transform: translateX(-50%); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-.abl-range output { min-width: 72px; margin-top: -2px; font-family: var(--sans); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* a neuron's strength: the fill grows out from the middle, periwinkle when pushed up, red when pushed down */
 .rc-row input.lr { -webkit-appearance: none; appearance: none; height: 20px; margin: 0; background: transparent; cursor: pointer; }
