@@ -21,7 +21,10 @@ export type Entry = {
 };
 
 type Rank = { layer: number; score: number; tried: number; refused: number };
-export type AblResult = { layer: number; coef: number; tried: number; refused_left: number; top_score: number; ranking: Rank[] };
+export type AblResult = {
+  layer: number; coef: number; top_score: number; ranking: Rank[];
+  tried: number; refused_before?: number; refused_left: number; // of the new bad requests, how many it refused before and after
+};
 
 type Abl = {
   v: number;

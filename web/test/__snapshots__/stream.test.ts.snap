@@ -9,21 +9,21 @@ exports[`stream() behaves as ui/app.js's did > errors, cancellations and failed 
 
 exports[`stream() behaves as ui/app.js's did > every recorded stream, delivered 3 bytes at a time 1`] = `
 {
-  "length": 199873,
-  "sha256": "c45adb58d4be0d65cb17c2943597419d23097686f9f25b6f22d5543e6ab4cc8c",
+  "length": 199893,
+  "sha256": "543740307619baf8680ceeb277a4a44fd96599e54098cd867d2e2215e655c447",
 }
 `;
 
 exports[`stream() behaves as ui/app.js's did > every recorded stream, delivered 7 bytes at a time 1`] = `
 {
-  "length": 199873,
-  "sha256": "c45adb58d4be0d65cb17c2943597419d23097686f9f25b6f22d5543e6ab4cc8c",
+  "length": 199893,
+  "sha256": "543740307619baf8680ceeb277a4a44fd96599e54098cd867d2e2215e655c447",
 }
 `;
 
 exports[`stream() behaves as ui/app.js's did > every recorded stream, delivered 4096 bytes at a time 1`] = `
 {
-  "length": 199873,
-  "sha256": "c45adb58d4be0d65cb17c2943597419d23097686f9f25b6f22d5543e6ab4cc8c",
+  "length": 199893,
+  "sha256": "543740307619baf8680ceeb277a4a44fd96599e54098cd867d2e2215e655c447",
 }
 `;
