@@ -21,8 +21,6 @@ const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = docu
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)];
 
 // ------------------------------------------------------------------ models
-const note = (id: string) => get().models.presets.find((p) => p.id === id)?.note || "";
-
 export async function refreshModels() {
   set({ models: await api<Models>("/api/models") });
 }
@@ -34,17 +32,18 @@ export type Choice = {
 
 export function modelChoices(m: Models, job: CopyJob | null) {
   const copying = (x: { path: string }) => job?.status === "copying" && job.src === x.path;
+  const cached = new Set(m.cached), notes = new Map(m.presets.map((p) => [p.id, p.note]));
   return {
     here: [
       ...(m.copies || []).map((x): Choice => ({ id: x.path, name: x.name, sub: "On this Mac", copy: x })),
-      ...m.cached.map((id): Choice => ({ id, name: modelName(id), sub: note(id) || id })),
+      ...m.cached.map((id): Choice => ({ id, name: modelName(id), sub: notes.get(id) || id })),
     ],
     // a drive model that has a copy on this Mac is listed once, as the copy
     drives: (m.local || []).filter((x) => !x.copied).map((x): Choice => ({
       id: x.path, name: x.name, drive: x,
       sub: copying(x) ? `Copying to this Mac… ${Math.floor((100 * job!.done) / job!.total)}%` : `On ${x.drive}`,
     })),
-    get: m.presets.filter((p) => !m.cached.includes(p.id)).map((p): Choice => ({ id: p.id, name: modelName(p.id), sub: p.note, tag: p.size })),
+    get: m.presets.filter((p) => !cached.has(p.id)).map((p): Choice => ({ id: p.id, name: modelName(p.id), sub: p.note, tag: p.size })),
   };
 }
 
@@ -63,7 +62,7 @@ async function pollCopy() {
       set({ copy });
       if (copy.status !== "copying") {
         if (copy.status === "done") toast(`Copied ${copy.name}. It loads from this Mac now.`);
-        else if (/^error/.test(copy.status)) toast(copy.status.replace(/^error: /, "Couldn’t copy: "), true);
+        else if (copy.status.startsWith("error")) toast(copy.status.replace(/^error: /, "Couldn’t copy: "), true);
         await refreshModels();
         break;
       }
@@ -149,7 +148,7 @@ let loadStart: number | null = null, loadTimer: ReturnType<typeof setInterval> |
 /** What the sidebar's model card says for a status. */
 export function statusLine(s: Status | null) {
   if (!s) return { cls: "", msg: "No model loaded" };
-  const err = /^error/.test(s.status);
+  const err = s.status.startsWith("error");
   return {
     cls: s.loaded ? "ready" : err ? "err" : s.status === "idle" ? "" : "busy",
     msg: s.loaded ? "Ready" : s.status === "idle" ? "No model loaded"
@@ -173,9 +172,10 @@ function applyStatus(s: Status) {
         finishing = false;
         setTab("home"); // a fresh model opens on the home screen, not whichever page was last open
         flushSync(() => applyStatus(s));
-        $$(".view:not([hidden]) > *").forEach((el, i) => {
-          el.classList.remove("reveal");
-          void el.offsetWidth; // restart the animation
+        const els = $$(".view:not([hidden]) > *");
+        els.forEach((el) => el.classList.remove("reveal"));
+        void document.body.offsetWidth; // restart the animations, with one reflow for all of them
+        els.forEach((el, i) => {
           el.style.animationDelay = i * 110 + "ms";
           el.classList.add("reveal");
         });
@@ -186,7 +186,7 @@ function applyStatus(s: Status) {
   const was = get().info?.loaded ? get().info!.model : null;
   set({ info: s });
   const { msg } = statusLine(s);
-  const err = /^error/.test(s.status);
+  const err = s.status.startsWith("error");
   const busy = !s.loaded && !err && s.status !== "idle";
   // the server can be slow to answer while weights load, so the timer ticks on its own
   clearInterval(loadTimer);
@@ -219,8 +219,8 @@ async function pollStatus() {
       let s: Status;
       try { s = await api<Status>("/api/status"); } catch { await sleep(1000); continue; }
       applyStatus(s);
-      if (s.loaded || s.status === "idle" || /^error/.test(s.status)) {
-        if (/^error/.test(s.status)) toast(s.status, true);
+      if (s.loaded || s.status === "idle" || s.status.startsWith("error")) {
+        if (s.status.startsWith("error")) toast(s.status, true);
         refreshModels();
         break;
       }
@@ -248,10 +248,8 @@ async function onModelReady() {
   if (get().tab === "chat") onChatShown();
   refreshSaved();
   refreshAbl();
-  let examples: Example[];
-  try { examples = await api<Example[]>("/api/examples"); } catch { examples = []; }
-  set({ examples });
   refreshDirs();
+  set({ examples: await api<Example[]>("/api/examples").catch((): Example[] => []) });
 }
 
 export async function refreshSaved() {
@@ -296,13 +294,18 @@ export async function boot() {
   if (booted) return; // StrictMode runs effects twice in development
   booted = true;
   try {
-    useSteer.setState({ prompts: (await api<{ prompts: string[] }>("/api/tune/defaults")).prompts.join("\n") });
-    await refreshModels();
-    await refreshAbl();
-    applyStatus(await api<Status>("/api/status"));
+    const [defaults, status, copy, ex] = await Promise.all([
+      api<{ prompts: string[] }>("/api/tune/defaults"),
+      api<Status>("/api/status"),
+      api<CopyJob>("/api/models/copy"),
+      api<ExportJob>("/api/abl/export"),
+      refreshModels(),
+      refreshAbl(),
+    ]);
+    useSteer.setState({ prompts: defaults.prompts.join("\n") });
+    applyStatus(status);
     resumeLastModel();
-    if ((await api<CopyJob>("/api/models/copy")).status === "copying") pollCopy();
-    const ex = await api<ExportJob>("/api/abl/export");
+    if (copy.status === "copying") pollCopy();
     if (ex.status === "working") pollExport(ex.kind === "steer" ? "st" : "abl");
     if (!get().info!.loaded && get().info!.status !== "idle") pollStatus();
   } catch (e) {

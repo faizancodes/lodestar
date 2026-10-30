@@ -1,12 +1,12 @@
 import { create } from "zustand";
+import { load, save } from "../lib/storage";
 import type { Abl, CopyJob, Direction, Example, Models, Probes, Recipe, Status } from "../lib/types";
 
 export const TABS = ["abliterate", "steer", "chat"] as const;
 export type Tab = (typeof TABS)[number] | "home";
 
 function remembered(): Tab {
-  let t: string | null = null;
-  try { t = localStorage.getItem("tab"); } catch {}
+  const t = load("tab");
   return TABS.includes(t as never) || t === "home" ? (t as Tab) : "steer";
 }
 
@@ -59,7 +59,7 @@ export const useApp = create<App>((set) => ({
   menu: { open: false, left: 0, bottom: 0, maxHeight: 0 },
 
   setTab: (tab) => {
-    try { localStorage.setItem("tab", tab); } catch {}
+    save("tab", tab);
     set({ tab });
   },
   setBusy: (busy) => set({ busy }),

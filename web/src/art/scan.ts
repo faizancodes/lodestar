@@ -18,14 +18,18 @@ const LAYERS = LAYER_SIZES.map((n, l) => {
 });
 
 // connections between adjacent layers; only the nearer ones are drawn at rest so the layers stay readable
-const EDGES: { l: number; i: number; j: number; cells: [number, number][]; near: boolean }[] = [];
+type Edge = { l: number; i: number; j: number; cells: [number, number][]; near: boolean };
+const EDGES: Edge[] = [];
+const EDGE_AT: Edge[][][] = LAYERS.map((layer) => layer.map(() => [])); // [layer][from][to]
 for (let l = 0; l < LAYERS.length - 1; l++)
   LAYERS[l].forEach((a, i) => LAYERS[l + 1].forEach((b, j) => {
     const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
     const cells: [number, number][] = [];
     for (let s = 4; s < steps - 3; s++) cells.push([Math.round(a.x + ((b.x - a.x) * s) / steps), Math.round(a.y + ((b.y - a.y) * s) / steps)]);
     const near = Math.abs(i / (LAYERS[l].length - 1) - j / (LAYERS[l + 1].length - 1)) < 0.2;
-    EDGES.push({ l, i, j, cells, near });
+    const e = { l, i, j, cells, near };
+    EDGES.push(e);
+    EDGE_AT[l][i][j] = e;
   }));
 
 const headX = (k: number) => -6 + k * (COLS + 12); // scan line position for sweep phase k in 0..1
@@ -50,9 +54,14 @@ function draw(ctx: CanvasRenderingContext2D, t: number) {
     const f = Math.min(1, (k - k0) / (k1 - k0));
     LAYERS[l].forEach((_, i) => {
       if (act(l, i) < 0.45) return;
-      const targets = LAYERS[l + 1].map((_, j) => j).sort((a, b) => hash(sweep, l, i, b) - hash(sweep, l, i, a)).slice(0, 2);
-      for (const j of targets) {
-        const e = EDGES.find((e) => e.l === l && e.i === i && e.j === j)!;
+      let first = 0, second = -1, h1 = -1, h2 = -1;
+      for (let j = 0; j < LAYERS[l + 1].length; j++) {
+        const h = hash(sweep, l, i, j);
+        if (h > h1) [second, h2, first, h1] = [first, h1, j, h];
+        else if (h > h2) [second, h2] = [j, h];
+      }
+      for (const j of [first, second]) {
+        const e = EDGE_AT[l][i][j];
         if (!e.cells.length) continue;
         e.cells.forEach(([x, y], s) => s % 2 === 0 && put(x, y, 0.32 * (1 - Math.max(0, k - k1) / 0.08)));
         if (f < 1) {

@@ -6,6 +6,7 @@
 // character index (when each one arrived), and is re-applied to whatever the latest render is.
 const DUR = 340;                 // ms from first mark to settled letter
 const MARKS: [number, string][] = [[0.22, "·"], [0.46, "+"], [0.68, "×"]];
+const SPACE = /\s/;
 
 export function createDecoder() {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -33,7 +34,7 @@ export function createDecoder() {
       if (cut) frag.append(text.slice(0, cut));
       for (let j = cut; j < text.length; j++) {
         const c = text[j];
-        if (/\s/.test(c)) { frag.append(c); continue; }
+        if (SPACE.test(c)) { frag.append(c); continue; }
         const s = document.createElement("span");
         s.className = "dc";
         s.dataset.i = String(i + j);

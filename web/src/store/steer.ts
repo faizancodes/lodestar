@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { create } from "zustand";
+import { load } from "../lib/storage";
 import type { Item, NeuronRow, StreamEvent } from "../lib/types";
 import type { Sink } from "../steer/sink";
 
@@ -57,8 +58,6 @@ export type Thread = {
 
 export type Dn = {
   open: boolean;
-  focus: number; // bumped to focus the name
-  focusPath: number; // bumped to focus the import path
   typing: boolean; // the three tries are being written
   kind: "persona" | "topic";
   name: string;
@@ -98,8 +97,8 @@ export const useSteer = create<Steer>(() => ({
   prompts: "",
   tInput: "",
   tl: null,
-  compare: (() => { try { return localStorage.getItem("tl-compare") === "1"; } catch { return false; } })(),
-  dn: { open: false, focus: 0, focusPath: 0, typing: false, kind: "persona", name: "", pos: "", neg: "", path: "", live: null, result: null, made: null },
+  compare: load("tl-compare") === "1",
+  dn: { open: false, typing: false, kind: "persona", name: "", pos: "", neg: "", path: "", live: null, result: null, made: null },
   exp: { page: null, line: "", width: "", running: false, saved: {} },
   panels: [],
   recipeGen: 0,

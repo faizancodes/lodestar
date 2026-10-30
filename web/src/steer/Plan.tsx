@@ -62,13 +62,17 @@ function Table({ plan }: { plan: P }) {
   const { rows, chosen } = ranked(plan);
   const shown = plan.done ? rows.filter((c) => chosen.has(key(c))) : rows.slice(0, 8);
   if (!shown.length) return null;
-  const maxDj = Math.max(1e-6, ...rows.filter((c) => c.tested).map((c) => c.dj));
-  const maxEst = Math.max(1e-9, ...rows.map((c) => Math.abs(c.est || 0)));
+  let maxDj = 1e-6, maxEst = 1e-9;
+  for (const c of rows) {
+    if (c.tested) maxDj = Math.max(maxDj, c.dj);
+    maxEst = Math.max(maxEst, Math.abs(c.est || 0));
+  }
+  const inRecipe = new Map(plan.recipe.map((x) => [key(x), x]));
   return (
     <>
       <div className="pt-head"><span>Neuron</span><span>Pushes the model toward</span><span>Tune to</span><span>Effect</span></div>
       {shown.map((c) => {
-        const r = plan.recipe.find((x) => x.layer === c.layer && x.neuron === c.neuron);
+        const r = inRecipe.get(key(c));
         const dose = r ? r.dose : c.dose ?? c.sign * 0.5;
         const state = r ? "chosen" : c.tested ? "tested" : "estimate";
         const w = c.tested ? Math.max(0, c.dj) / maxDj : Math.abs(c.est) / maxEst;
@@ -104,8 +108,8 @@ function Proof({ plan }: { plan: P }) {
 // apply: usable as soon as anything is tested, even mid-search: the combination once there is one, before that
 // the single best tested neuron
 function Foot({ plan }: { plan: P }) {
-  const { rows } = ranked(plan);
-  const bestTested = rows.filter((c) => c.tested && c.dj > 0).sort((a, b) => b.dj - a.dj)[0];
+  let bestTested: Cand | undefined;
+  for (const c of plan.cands.values()) if (c.tested && c.dj > 0 && (!bestTested || c.dj > bestTested.dj)) bestTested = c;
   const use = plan.recipe.length ? plan.recipe : bestTested && !plan.done ? [{ ...bestTested, dose: bestTested.dose! }] : [];
   const n = use.length;
   if (!n) return null;
