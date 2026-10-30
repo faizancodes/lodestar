@@ -651,6 +651,26 @@ async def tune_search(req: Request):
         focus_weight=float(s.get("focus_weight", 5.0)), cancel=cancel))
 
 
+@app.post("/api/tune/refine")
+async def tune_refine(req: Request):
+    """Fix the recipe that's on from a complaint about one of its replies (see discover.refine)."""
+    need_model()
+    body = await req.json()
+    recipe = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"]), "lens": i.get("lens") or []}
+              for i in body.get("recipe") or []]
+    if not recipe:
+        raise HTTPException(409, "Turn on some neurons first: there is nothing to fix yet.")
+    if not (body.get("feedback") or "").strip():
+        raise HTTPException(400, "Say what's wrong with the reply.")
+    big = eng.n_params > 4e9
+    budget = discover.budget_for(eng.n_params)
+    others = [p for p in body.get("prompts") or discover.DEFAULT_PROMPTS][: 2 if big else 4]
+    return sse(discover.refine(
+        eng, recipe, feedback=body["feedback"], prompt=body["prompt"], bad=body.get("bad") or "",
+        behavior=body.get("behavior") or None, prompts=others, abl=bool(abl_now().get("active")),
+        target_tokens=budget["target_tokens"] or 48, n_new=8 if big else 12, rounds=2 if big else 3, cancel=cancel))
+
+
 # ------------------------------------------------------------------ recipes
 def _recipes():
     return json.loads(RECIPES.read_text()) if RECIPES.exists() else []
