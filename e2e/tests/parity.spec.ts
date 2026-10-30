@@ -10,6 +10,17 @@ test.describe.configure({ mode: RECORD ? "serial" : "default" });
 
 test.afterEach(async ({ page }) => clean(page));
 
+// Replays the start recording only (recording it again here would overwrite it)
+test("sidebar: before a model is loaded", async ({ page }) => {
+  test.skip(RECORD);
+  await scenario(page, "start");
+  await page.goto("/");
+  await expect(page.locator("#brand-mark svg")).toBeVisible();
+  await expect(page.locator('.tab[data-tab="steer"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#model-status .txt")).toHaveText("No model loaded");
+  await snap(page.locator("aside.side"), "sidebar-empty");
+});
+
 test("start: pick a model, load it, land on Home", async ({ page }) => {
   await scenario(page, "start");
   await page.goto("/");
