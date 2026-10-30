@@ -7,7 +7,6 @@ import { modelName, sleep } from "../lib/format";
 import type { Abl, CopyJob, Directions, Example, ExportJob, Fit, Memory, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
 import { onChatShown, refreshChats } from "../chat/engine";
-import { onNeuronsModel, onNeuronsShown } from "../neurons/engine";
 import { useChat } from "../store/chat";
 import { resetAbl, syncAbl } from "../abl/engine";
 import { useSteer } from "../store/steer";
@@ -104,7 +103,6 @@ export function setTab(t: Tab) {
 
   get().setTab(t); // Steer's status card redraws its scene when it's shown
   if (t === "chat" && get().info?.loaded) onChatShown();
-  if (t === "neurons" && get().info?.loaded) onNeuronsShown();
 }
 
 // ------------------------------------------------------------------ loading
@@ -309,12 +307,10 @@ async function onModelReady() {
   if (recipe.items.length && recipe.model && modelName(recipe.model) !== modelName(info!.model)) newRecipe(); // neuron numbers are per model
 
   set({ recipe: { ...get().recipe, model: info!.model } });
-  useChat.getState().set({ messages: [] });
+  useChat.getState().set({ messages: [], lens: {} }); // neuron numbers mean nothing in another model
   redrawn();
   resetAbl();
-  onNeuronsModel();
   if (get().tab === "chat") onChatShown();
-  if (get().tab === "neurons") onNeuronsShown();
 
   refreshSaved();
   refreshAbl();
