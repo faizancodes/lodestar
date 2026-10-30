@@ -649,14 +649,18 @@ class Engine:
             out.append(lg.gather(-1, tgt[k:k + 256, None])[:, 0] - torch.logsumexp(lg, -1))
         return torch.cat(out) if out else torch.zeros(0, device=ids.device)
 
-    def attribute(self, items, cancel=None):
+    def attribute(self, items, cancel=None, pushes=None, abl=False):
         """First-order steering effect of every neuron. items: list of (ids, target_start, weight) or
         (ids, target_start, weight, token_weights). Objective J = sum(weight * (weighted) mean target logprob). Returns dJ/d(dose) for an `add` push on each neuron: [L, N] numpy,
-        i.e. J(dose) ~= J(0) + dose * grad. A constant added at every position is exactly what steering does."""
+        i.e. J(dose) ~= J(0) + dose * grad. A constant added at every position is exactly what steering does.
+        `pushes` (and `abl`) take the gradient with a recipe already on, for refining it."""
         L, N = self.dnorm.shape
         with self.lock:
             self._deltas = [torch.zeros(N, device=self.dev, dtype=self.model.dtype, requires_grad=True)
                             for _ in range(L)]
+            self._push_state = self._make_push_state([pushes], 1) if pushes else None
+            if abl:
+                self._abl_mask, self._abl_any = torch.tensor([True], device=self.dev), True
             try:
                 for ids, s, w, *tw in items:
                     if cancel is not None and cancel.is_set():
@@ -674,6 +678,8 @@ class Engine:
                                  for d in self._deltas])
             finally:
                 self._deltas = None
+                self._push_state = None
+                self._abl_mask, self._abl_any = None, False
             return (g * self.unit).cpu().numpy()  # chain rule: add value = dose * unit
 
     def neurons_for_word(self, word, k=24, skip_last=0):
