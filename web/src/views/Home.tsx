@@ -9,6 +9,7 @@ const CARDS: { go: HomeArt; title: string; text: string; key: string }[] = [
   { go: "abliterate", title: "Abliterate", text: "Find the direction it refuses along, erase it, and save the result as a new model.", key: "⌘1" },
   { go: "steer", title: "Steer", text: "Push individual neurons to change how it talks, then save what works as recipes.", key: "⌘2" },
   { go: "chat", title: "Chat", text: "Talk to it with your steering and erased refusals switched on or off.", key: "⌘3" },
+  { go: "neurons", title: "Neurons", text: "Push neurons you name by layer and number, and chat with it right there.", key: "⌘4" },
 ];
 
 // Home: the loaded model, and a card for each page with what it's for and where it stands.
@@ -31,6 +32,7 @@ export function Home({ hidden }: { hidden: boolean }) {
     abliterate: cur?.active ? <><i className="hc-on" />Refusals erased at layer {cur.layer}</> : cur ? "Direction saved, switched off" : "",
     steer: mine ? `${mine} saved` : "",
     chat: "",
+    neurons: "",
   };
 
   return (

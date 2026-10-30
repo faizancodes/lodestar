@@ -8,10 +8,12 @@ import type { Put } from "./glyphs";
 //   steer       a field of level flow lines; a glowing push bends the ones near it upward like a lens, and the
 //               flow streams along them
 //   chat        two bubbles drawn in dots: theirs dim, the model's bright, its reply typing out behind a caret
+//   neurons     columns of dim neurons, one per layer; two lit, one pushed up and one down, each trailing a bar
+//               for how far, breathing
 const CELL = 3.2;
 const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 
-export type HomeArt = "abliterate" | "steer" | "chat";
+export type HomeArt = "abliterate" | "steer" | "chat" | "neurons";
 
 const ART: Record<HomeArt, (put: Put, cols: number, rows: number, t: number) => void> = {
   abliterate(put, cols, rows, t) {
@@ -98,6 +100,31 @@ const ART: Record<HomeArt, (put: Put, cols: number, rows: number, t: number) => 
     });
 
     if (caret && Math.floor((t || 0) * 2.5) % 2 === 0) put(caret[0] + 1, caret[1], 1);
+  },
+  neurons(put, cols, rows, t) {
+    const gap = 5, n = Math.floor((cols - 4) / gap), x0 = (cols - (n - 1) * gap) / 2;
+    const pins: [number, number, number][] = [[Math.round(n * 0.3), 0.66, 1], [Math.round(n * 0.68), 0.3, -1]]; // column, height, way
+
+    for (let c = 0; c < n; c++) // every layer's neurons, dim
+      for (let y = 2; y < rows - 1; y += 2) put(x0 + c * gap, y, 0.12 + 0.14 * hash(c, y));
+
+    for (const [c, h, way] of pins) {
+      const x = x0 + c * gap, y = rows * h, reach = rows * (0.26 + 0.05 * Math.sin(t * 3 + c)); // the push, breathing
+
+      for (let k = 2; k < reach; k++) {
+        const b = 0.9 - (k / reach) * 0.65;
+        put(x, y - way * k, b);
+        put(x - 1, y - way * k, b * 0.35);
+        put(x + 1, y - way * k, b * 0.35);
+      }
+
+      for (let dy = -3; dy <= 3; dy++)
+        for (let dx = -3; dx <= 3; dx++) {
+          const r = Math.hypot(dx, dy);
+          if (r < 1.2) put(x + dx, y + dy, 1);
+          else if (r < 3.4) put(x + dx, y + dy, 0.5 * Math.exp(-(r - 1.2) / 1.1));
+        }
+    }
   },
 };
 
