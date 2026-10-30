@@ -7,7 +7,7 @@ import type { Live } from "./steer";
 
 /** A question with its reply before and after the refusal direction is erased, side by side. */
 export type Pair = { prompt: string; outs: { base: Sink; abl: Sink }; verdict: { base?: boolean; abl?: boolean }; typing: boolean };
-export type Rank = { layer: number; score: number; tried: number; refused: number };
+type Rank = { layer: number; score: number; tried: number; refused: number };
 export type AblResult = { layer: number; coef: number; tried: number; refused_left: number; top_score: number; ranking: Rank[] };
 
 type Abl = {

@@ -10,11 +10,11 @@ function remembered(): Tab {
   return TABS.includes(t as never) || t === "home" ? (t as Tab) : "steer";
 }
 
-export type Toast = { msg: string; err: boolean; n: number }; // n changes on every toast, so a repeat shows again
+type Toast = { msg: string; err: boolean; n: number }; // n changes on every toast, so a repeat shows again
 /** The start screen: the list of models, then the loading scene once one is picked. */
-export type Start = { loading: boolean; leaving: boolean; picked: string | null; status: string };
+type Start = { loading: boolean; leaving: boolean; picked: string | null; status: string };
 /** The model menu, opened beside the model card. */
-export type Menu = { open: boolean; left: number; bottom: number; maxHeight: number };
+type Menu = { open: boolean; left: number; bottom: number; maxHeight: number };
 
 type App = {
   tab: Tab;

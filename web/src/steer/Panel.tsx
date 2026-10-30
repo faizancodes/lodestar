@@ -12,7 +12,7 @@ export function PanelSlot({ anchor }: { anchor: string }) {
   return p ? <PanelView key={p.id} p={p} /> : null;
 }
 
-export function PanelView({ p }: { p: Panel }) {
+function PanelView({ p }: { p: Panel }) {
   return (
     <div className="panel" data-kind={p.kind} data-title={p.title}
       ref={(el) => (el ? panelEls.set(p.id, el) : panelEls.delete(p.id))}>

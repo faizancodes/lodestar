@@ -279,40 +279,18 @@ async def trace(req: Request):
     need_model()
     body = await req.json()
     pushes = pushes_of(body)
-    pid = eng.chat_ids(body["prompt"], system=body.get("system") or None)
+    pid = eng.chat_ids(body["prompt"])
 
     def gen():
-        given = body.get("response")
-        if given:
-            rid = eng.encode(given)
-        else:
-            rid = None
-            for r, x in eng.generate([(pid, pushes)], max_new=int(body.get("max_new", 120)),
-                                     temperature=float(body.get("temperature", 0)), cancel=cancel):
-                if r is None:
-                    rid = x[0]
-                else:
-                    yield {"type": "delta", "delta": x}
-        yield {"type": "stage", "label": "Tracing every neuron"}
-        tr = eng.run_trace(pid, rid, pushes, abl=bool(body.get("abl")))
-        lens = tr["lens_ids"][:, :, 0]  # [L, T] top-1 token per layer per position
-        vocab = {}
-        lens_txt = [[vocab.setdefault(int(t), eng.tok.decode([int(t)])) for t in row] for row in lens]
-        top = eng.trace_top_neurons(k=48)
-        yield {
-            "type": "trace", "tokens": tr["tokens"], "n_prompt": tr["n_prompt"],
-            "mlp": np.round(tr["mlp_norm"], 2), "attn": None if tr["attn_norm"] is None else np.round(tr["attn_norm"], 2),
-            "resid": np.round(tr["resid_norm"], 1), "lens": lens_txt, "lens_p": np.round(tr["lens_p"][:, :, 0], 3),
-            "tok_lp": np.round(tr["tok_lp"], 3), "top": [_neuron_row(*x) for x in top],
-        }
+        tr = eng.run_trace(pid, eng.encode(body["response"]), pushes, abl=bool(body.get("abl")))
+        yield {"type": "trace", "tokens": tr["tokens"], "n_prompt": tr["n_prompt"]}
 
     return sse(gen())
 
 
-def _neuron_row(l, n, impact, act, t, lens_k=5):
+def _neuron_row(l, n, _impact, act, _t, lens_k=5):
     lens = eng.lens(l, n, lens_k)
-    return {"layer": l, "neuron": n, "impact": round(impact, 4), "act": round(act, 3), "t": t,
-            "lens": lens["up" if act >= 0 else "down"]}
+    return {"layer": l, "neuron": n, "act": round(act, 3), "lens": lens["up" if act >= 0 else "down"]}
 
 
 @app.get("/api/trace/token")
@@ -324,9 +302,6 @@ def trace_token(t: int, k: int = 24):
     top = eng.trace_top_neurons(t=t, k=k)
     ids, ps = tr["lens_ids"][:, t, :], tr["lens_p"][:, t, :]
     return {
-        "t": t, "token": tr["tokens"][t],
-        "next": tr["tokens"][t + 1] if t + 1 < len(tr["tokens"]) else None,
-        "next_lp": float(tr["tok_lp"][t]) if t < len(tr["tok_lp"]) else None,
         "lens": [[{"tok": eng.tok.decode([int(i)]), "p": round(float(p), 4)} for i, p in zip(ids[l], ps[l])]
                  for l in range(ids.shape[0])],
         "neurons": [_neuron_row(*x) for x in top],
@@ -340,9 +315,7 @@ def neuron(layer: int, n: int):
     L, N = eng.dnorm.shape
     if not (0 <= layer < L and 0 <= n < N):
         raise HTTPException(400, f"layer must be 0..{L - 1}, neuron 0..{N - 1}")
-    out = {"layer": layer, "neuron": n, "lens": eng.lens(layer, n, 16),
-           "down_norm": float(eng.dnorm[layer, n]), "resid_p50": float(eng.resid_p50[layer]),
-           "unit": float(eng.unit[layer, n])}
+    out = {"layer": layer, "neuron": n, "lens": eng.lens(layer, n, 16)}
     tr = eng.trace
     if tr is not None:
         a = tr["acts"][layer, :, n].astype(np.float32)
@@ -368,16 +341,6 @@ def search_word(word: str, k: int = 24, skip_last: int = 0):
     return {"results": out, "partial": eng.last_search_partial, "piece": eng.tok.decode([first]).strip()}
 
 
-@app.post("/api/read")
-async def read(req: Request):
-    """A neuron's activation over arbitrary text (as a user turn when chat is true)."""
-    need_model()
-    body = await req.json()
-    ids = eng.chat_ids(body["text"]) if body.get("chat") else eng.tok(body["text"]).input_ids
-    a = eng.read(int(body["layer"]), int(body["neuron"]), ids, pushes_of(body))
-    return {"tokens": eng.token_strs(ids), "acts": np.round(a, 3).tolist()}
-
-
 # ------------------------------------------------------------------ steering
 @app.post("/api/steer")
 async def steer(req: Request):
@@ -385,7 +348,7 @@ async def steer(req: Request):
     need_model()
     body = await req.json()
     pushes = pushes_of(body)
-    pid = eng.chat_ids(body["prompt"], system=body.get("system") or None, history=body.get("history"))
+    pid = eng.chat_ids(body["prompt"])
     cols = body.get("columns", ["up", "base", "down"])
     inv = [q for q in map(_reverse, pushes) if q is not None]
     # "abl" erases the model's refusal direction with no neuron pushes; when ablation is on, the changed column
@@ -399,8 +362,7 @@ async def steer(req: Request):
     abl_flags = flags if any(flags) else None
 
     def gen():
-        for r, x in eng.generate(rows, max_new=int(body.get("max_new", 160)),
-                                 temperature=float(body.get("temperature", 0)), cancel=cancel, abl=abl_flags):
+        for r, x in eng.generate(rows, max_new=int(body.get("max_new", 160)), cancel=cancel, abl=abl_flags):
             if r is None:
                 break
             yield {"type": "delta", "col": cols[r], "delta": x}
@@ -493,6 +455,7 @@ async def abl_analyze(req: Request):
         for ev in abl_mod.analyze(eng, probes["harmful"], probes["harmless"], cancel):
             if ev.get("type") == "result":
                 final = ev
+                ev = {k: v for k, v in ev.items() if k != "vec"}  # the direction itself stays here
             yield ev
         if final:
             all_d = _abl_all()
@@ -506,7 +469,7 @@ async def abl_analyze(req: Request):
 
 @app.post("/api/abl/state")
 async def abl_state(req: Request):
-    """Turn the saved direction on/off, re-tune its strength or select a layer. Requires an analyzed model."""
+    """Turn the saved direction on/off or re-tune its strength. Requires an analyzed model."""
     need_model()
     body = await req.json()
     all_d = _abl_all()
@@ -517,8 +480,6 @@ async def abl_state(req: Request):
         entry["coef"] = max(0.1, min(2.0, float(body["coef"])))
     if "active" in body:
         entry["active"] = bool(body["active"])
-    if "layer" in body and body["layer"] != entry.get("layer"):
-        raise HTTPException(400, "The saved direction is tied to its layer; analyse again to use another layer.")
     _abl_save(all_d)
     eng.abl_of(entry["vec"], entry.get("coef", 1.0), entry.get("layer"))
     return {"ok": True, **{k: entry.get(k) for k in ("layer", "coef", "active")}}
@@ -541,7 +502,7 @@ async def abl_test(req: Request):
 
     def gen():
         texts = [""] * (2 * n)
-        for r, dx in eng.generate(rows, max_new=int(body.get("max_new", 160)), temperature=0, cancel=cancel, abl=fl):
+        for r, dx in eng.generate(rows, max_new=160, temperature=0, cancel=cancel, abl=fl):
             if r is None:
                 break
             texts[r] += dx
@@ -549,9 +510,7 @@ async def abl_test(req: Request):
         refused = abl_mod.refused(texts)
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
         nll1 = float(eng.reference_nll([[]], cancel, abl=[True])[0])
-        yield {"type": "result", "probes": probes, "texts": [t.strip() for t in texts],
-               "refused": [refused[i::2] for i in (0, 1)],
-               "refused_rate": [sum(refused[i::2]) / n for i in (0, 1)], "nll": [nll0, nll1]}
+        yield {"type": "result", "refused": [refused[i::2] for i in (0, 1)], "nll": [nll0, nll1]}
 
     return sse(gen())
 
@@ -618,7 +577,7 @@ async def abl_export(req: Request):
     coef = max(0.1, min(2.0, float(body.get("coef", entry.get("coef", 1.0)))))
     base = eng.model_id.rstrip("/").split("/")[-1]
     name = _clean_name(body.get("name")) or f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
-    vec = [float(x) for x in (body.get("vec") or entry["vec"])]
+    vec = [float(x) for x in entry["vec"]]
     return _start_export("abl", name, abl=(vec, coef))
 
 
@@ -719,23 +678,14 @@ def directions_list():
 
 @app.get("/api/directions/defaults")
 def directions_defaults():
-    return {"questions": dir_mod.DEFAULT_QUESTIONS, "example": dir_mod.EXAMPLE}
-
-
-@app.get("/api/directions/{did}")
-def direction_detail(did: str):
-    need_model()
-    e = next((e for e in dirs.index() if e["id"] == did), None)
-    if e is None:
-        raise HTTPException(404, "No such direction.")
-    return e
+    return {"example": dir_mod.EXAMPLE}
 
 
 @app.post("/api/directions/extract")
 async def directions_extract(req: Request):
     need_model()
     body = await req.json()
-    return sse(dir_mod.extract(eng, dirs, body, cancel, try_prompt=(body.get("try_prompt") or "").strip() or None))
+    return sse(dir_mod.extract(eng, dirs, body, cancel))
 
 
 @app.post("/api/directions/import")
@@ -746,25 +696,10 @@ async def directions_import(req: Request):
     if not path.is_file():
         raise HTTPException(400, f"No file at {path}.")
     try:
-        added = dirs.import_npz(path, body.get("names") or None, cancel)
+        added = dirs.import_npz(path, cancel)
     except (ValueError, KeyError) as e:
         raise HTTPException(400, str(e))
     return {"added": [_dir_row(e) for e in added]}
-
-
-@app.patch("/api/directions/{did}")
-async def directions_update(did: str, req: Request):
-    need_model()
-    body = await req.json()
-    band = body.get("band")
-    if band is not None:
-        band = sorted({int(l) for l in band})
-        if not band or not all(0 <= l < len(eng.layers) for l in band):
-            raise HTTPException(400, f"Pick layers between 0 and {len(eng.layers) - 1}.")
-    try:
-        return _dir_row(dirs.update(did, name=(body.get("name") or "").strip() or None, band=band))
-    except KeyError:
-        raise HTTPException(404, "No such direction.")
 
 
 @app.delete("/api/directions/{did}")
@@ -772,28 +707,6 @@ def directions_delete(did: str):
     need_model()
     dirs.delete(did)
     return {"ok": True}
-
-
-@app.post("/api/directions/try")
-async def directions_try(req: Request):
-    """One prompt under one direction at several doses, side by side: a sweep without building a recipe."""
-    need_model()
-    body = await req.json()
-    did = str(body["dir"])
-    if did not in eng.dirs:
-        raise HTTPException(409, f"This model has no direction called “{did}”.")
-    layers = tuple(int(l) for l in body.get("layers") or eng.dirs[did]["band"])
-    doses = [float(x) for x in body.get("doses") or dir_mod.TRY_DOSES][:6]
-    pid = eng.chat_ids(body["prompt"], system=body.get("system") or None)
-    rows = [(pid, [Push(None, None, k, "dir", did, layers)] if k else []) for k in doses]
-
-    def gen():
-        for r, x in eng.generate(rows, max_new=int(body.get("max_new", 160)), cancel=cancel):
-            if r is None:
-                break
-            yield {"type": "delta", "index": r, "dose": doses[r], "delta": x}
-
-    return sse(gen())
 
 
 # ------------------------------------------------------------------ recipes

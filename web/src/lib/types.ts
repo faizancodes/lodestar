@@ -15,9 +15,9 @@ export type Status = {
   last?: string | null; // the model to open again at launch
 };
 
-export type Preset = { id: string; size: string; note: string };
-export type DriveModel = { path: string; name: string; drive: string; size: number; copied: boolean };
-export type ModelCopy = { path: string; name: string; size: number };
+type Preset = { id: string; size: string; note: string };
+type DriveModel = { path: string; name: string; drive: string; size: number; copied: boolean };
+type ModelCopy = { path: string; name: string; size: number };
 /** GET /api/models */
 export type Models = { presets: Preset[]; cached: string[]; local?: DriveModel[]; copies?: ModelCopy[] };
 
@@ -35,10 +35,10 @@ export type ExportJob = {
 };
 
 /** A neuron's push: the words it moves the next token toward ("up") or away from ("down"). */
-export type Lens = { up: string[]; down: string[] };
+type Lens = { up: string[]; down: string[] };
 
 /** A neuron as the searches and traces list it. */
-export type NeuronRow = { layer: number; neuron: number; lens: string[]; score?: number; impact?: number; act?: number; t?: number };
+export type NeuronRow = { layer: number; neuron: number; lens: string[]; score?: number; act?: number };
 /** GET /api/search */
 export type WordSearch = { results: (NeuronRow & { score: number })[]; partial: boolean; piece: string };
 /** GET /api/neuron */
@@ -46,17 +46,10 @@ export type NeuronDetail = {
   layer: number;
   neuron: number;
   lens: Lens;
-  down_norm: number;
-  resid_p50: number;
-  unit: number;
   trace?: { tokens: string[]; n_prompt: number; acts: number[] };
 };
 /** GET /api/trace/token */
 export type TokenDetail = {
-  t: number;
-  token: string;
-  next: string | null;
-  next_lp: number | null;
   lens: { tok: string; p: number }[][];
   neurons: NeuronRow[];
 };

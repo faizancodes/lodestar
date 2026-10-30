@@ -157,7 +157,7 @@ export function statusLine(s: Status | null) {
   };
 }
 
-export function applyStatus(s: Status) {
+function applyStatus(s: Status) {
   // let the loading scene finish its sunrise and pulse before the workspace appears
   if (s.loaded && get().start.loading) {
     if (!finishing) {
@@ -211,7 +211,7 @@ export function applyStatus(s: Status) {
 }
 
 let polling = false;
-export async function pollStatus() {
+async function pollStatus() {
   if (polling) return;
   polling = true;
   try {
