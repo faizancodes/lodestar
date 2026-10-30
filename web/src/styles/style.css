@@ -853,16 +853,23 @@ main.is-chat { padding: 0; overflow: hidden; }
 .nr-add.bad input { border-color: var(--bad); }
 .nr-err { margin: 0; font-size: 12px; line-height: 1.45; color: var(--bad); }
 .nr-by { align-self: flex-start; }
-.nr-map { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 2px; animation: rise 0.2s ease-out; }
-.nr-map svg { display: block; overflow: visible; }
-.nr-map-zero { stroke: var(--rule-2); stroke-dasharray: 2 3; }
-.nr-map-t { font-family: var(--mono); font-size: 9.5px; fill: var(--muted); }
-.nr-dot { fill: var(--ascii); cursor: pointer; transition: r 0.15s, opacity 0.15s; outline: none; }
-.nr-dot.focus, .nr-dot:hover { opacity: 1 !important; stroke: var(--text); stroke-width: 1.5; }
-.nr-dot.in { fill: var(--good); filter: drop-shadow(0 0 4px rgba(61, 220, 132, 0.6)); }
-.nr-dot.in.neg { fill: var(--bad); filter: drop-shadow(0 0 4px rgba(242, 119, 122, 0.6)); }
-.nr-map-info { display: flex; flex-direction: column; gap: 4px; min-height: 36px; font-size: 12px; line-height: 1.45; color: var(--muted); }
-.nr-map-info .nr-id em { margin-left: auto; font-family: var(--sans); font-style: normal; font-size: 11.5px; color: var(--text-2); }
+.nr-found { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; animation: rise 0.2s ease-out; }
+.nr-note { margin: 0 0 4px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.nr-card {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 10px; row-gap: 3px; width: 100%;
+  padding: 9px 10px 9px 12px; border: 1px solid var(--rule); border-radius: var(--radius); background: transparent;
+  text-align: left; color: inherit; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+}
+.nr-card:hover { border-color: var(--rule-2); background: var(--wash); }
+.nr-card .nr-id em { font-family: var(--sans); font-style: normal; font-size: 11.5px; color: var(--muted); }
+.nr-card i { position: relative; width: 30px; height: 18px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); transition: background 0.2s, box-shadow 0.2s; }
+.nr-card i::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.nr-card[aria-checked="true"] { border-color: var(--rule-2); background: var(--panel); }
+.nr-card[aria-checked="true"] i { background: var(--good); box-shadow: 0 0 12px -2px rgba(61, 220, 132, 0.55); }
+.nr-card[aria-checked="true"] i::after { transform: translateX(12px); }
 .nr-pins { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .nr-pins:empty { display: none; }
 .nr-pin {
@@ -983,7 +990,8 @@ main.is-chat { padding: 0; overflow: hidden; }
 .send:disabled { opacity: 0.3; cursor: default; }
 .send.stop i { width: 11px; height: 11px; border-radius: 2px; background: var(--bg); }
 .chat-opts { position: relative; }
-.chat-opts summary { list-style: none; padding: 4px 10px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.chat-opts summary { list-style: none; display: grid; place-items: center; width: 28px; height: 28px; margin-left: -8px; border-radius: var(--r-sm); color: var(--muted); cursor: pointer; }
+.chat-opts summary svg { width: 16px; height: 16px; }
 .chat-opts summary::-webkit-details-marker { display: none; }
 .chat-opts summary:hover, .chat-opts[open] summary { background: var(--wash); color: var(--accent); }
 .chat-opts-pop {
@@ -1043,7 +1051,9 @@ textarea, input:not([type]) { font-size: 14px; }
 .dn .cols .out-b { font-size: 13px; }
 .chip.dir-chip { font-weight: 600; }
 .chip.dir-chip.gone { opacity: 0.45; }
-.chip.dir-new { border-style: dashed; }
+.chip.dir-new { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
+.chip.dir-new svg { width: 10px; height: 10px; }
+.chip.dir-new.on { border-color: var(--accent); color: var(--accent); }
 .rc-row.dir { grid-template-columns: minmax(0, 1.1fr) auto minmax(120px, 1fr) 46px 26px; }
 .rc-row.gone { opacity: 0.5; }
 .rc-row .who.static { cursor: default; }
