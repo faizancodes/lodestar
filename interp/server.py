@@ -170,12 +170,24 @@ def _folder_size(d):
     return sum(f.stat().st_size for f in _model_files(d))
 
 
+def _generates(snap):
+    """Whether a downloaded model writes text, rather than only classifying it (a zero-shot or a rejection
+    classifier, which other tools leave in the same cache)."""
+    try:
+        archs = json.loads((snap / "config.json").read_text()).get("architectures") or []
+    except (OSError, ValueError):
+        return True  # can't tell: list it, and let loading say if it doesn't work
+
+    return not archs or any(a.endswith(("ForCausalLM", "ForConditionalGeneration")) for a in archs)
+
+
 @app.get("/api/models")
 def models():
     cached = []
     if HF_CACHE.exists():
         for d in sorted(HF_CACHE.glob("models--*")):
-            if any(d.glob("snapshots/*/*.safetensors")):
+            snaps = sorted(s for s in d.glob("snapshots/*") if any(s.glob("*.safetensors")))
+            if snaps and _generates(snaps[-1]):
                 cached.append(d.name[len("models--"):].replace("--", "/"))
 
     # models saved as plain folders on external drives: /Volumes/<drive>/models/<name>
