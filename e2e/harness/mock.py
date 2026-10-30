@@ -51,7 +51,10 @@ def thin(entries):
 
 async def load(req: Request):
     name = req.query_params["name"]
-    log = json.loads((FIXTURES / f"{name}.json").read_text())
+    f = FIXTURES / f"{name}.json"
+    if not f.exists():  # put together by hand from recordings, kept apart so the unit tests see only real ones
+        f = FIXTURES / "assembled" / f"{name}.json"
+    log = json.loads(f.read_text())
 
     queues = {}
     for e in log:
