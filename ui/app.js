@@ -1,7 +1,11 @@
-// Auto Interp UI: three tabs (Abliterate, Steer, Chat) around one loaded model. Plain modules, no build step; talks to the local API in interp/server.py.
-import { finishScene, setProgress, startScene, stopScene } from "./loader.js";
+// Lodestar UI: three tabs (Abliterate, Steer, Chat) around one loaded model. Plain modules, no build step; talks to the local API in interp/server.py.
+import { finishScene, setProgress, startScene, stopScene, wake } from "./loader.js";
 import { startScan } from "./scan.js";
 import { startAblScene } from "./ablscene.js";
+import { startSideArt, startSpinner } from "./glyphs.js";
+import { markSVG } from "./mark.js";
+import { drawHomeArt } from "./home.js";
+import { createDecoder } from "./decode.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -85,7 +89,7 @@ function toast(msg, err) {
 // ------------------------------------------------------------------ tabs
 const TABS = ["abliterate", "steer", "chat"];
 let tab = (() => { try { return localStorage.getItem("tab"); } catch { return null; } })();
-if (!TABS.includes(tab)) tab = "steer";
+if (!TABS.includes(tab) && tab !== "home") tab = "steer";
 
 function setTab(t) {
   tab = t;
@@ -97,6 +101,8 @@ function setTab(t) {
   });
   showViews();
   if (t === "chat" && state.info?.loaded) onChatShown();
+  if (t === "home") renderHome();
+  if (t === "steer") renderSteerStatus();
 }
 
 function showViews() {
@@ -106,34 +112,36 @@ function showViews() {
 }
 
 $$(".tab").forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+$$(".home-card").forEach((c) => (c.onclick = () => setTab(c.dataset.go)));
+$$(".hc-ic").forEach((el) => el.append($(`.tab[data-tab="${el.dataset.icon}"] svg`).cloneNode(true)));
+$("#brand").onclick = () => state.info?.loaded && setTab("home");
+$("#brand").onkeydown = (e) => (e.key === "Enter" || e.key === " ") && state.info?.loaded && setTab("home");
+
+// Home: the loaded model, and a card for each page with what it's for and where it stands.
+function renderHome() {
+  const s = state.info;
+  if (tab !== "home" || !s?.loaded) return;
+  $("#home-model").textContent = modelName(s.model);
+  const dev = { mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device;
+  const specs = [["Parameters", s.params && `${(s.params / 1e9).toFixed(1)}B`], ["Layers", s.layers], ["Runs on", dev], ["Precision", s.dtype]];
+  $("#home-meta").innerHTML = specs.filter(([, v]) => v).map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(String(v))}</dd></div>`).join("");
+  const cur = state.abl?.current;
+  $("#hc-abliterate").innerHTML = cur?.active ? `<i class="hc-on"></i>Refusals erased at layer ${cur.layer}` : cur ? "Direction saved, switched off" : "";
+  const mine = (state.saved || []).filter((r) => modelName(r.model) === modelName(s.model)).length;
+  $("#hc-steer").textContent = mine ? `${mine} saved` : "";
+  requestAnimationFrame(() => $$(".home-art").forEach((c) => drawHomeArt(c, c.dataset.art, c.closest(".home-card"))));
+}
 document.addEventListener("keydown", (e) => {
   if (!e.metaKey || e.shiftKey || e.altKey) return;
   const i = ["1", "2", "3"].indexOf(e.key);
   if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
+  if (e.key === "0" && state.info?.loaded) return (e.preventDefault(), setTab("home"));
   if (e.key === "k" && tab === "chat" && state.info?.loaded) (e.preventDefault(), newChat());
 });
 
 // ------------------------------------------------------------------ sidebar art
-(function hills() {
-  const svg = $("#hills"), W = 300, H = 120;
-  const ridge = (x, k) => {
-    const a = 62 - 30 * Math.exp(-((x - 205) ** 2) / 2600) - 16 * Math.exp(-((x - 70) ** 2) / 1500);
-    return a + k * 3.1 + Math.sin(x * 0.11 + k) * 0.8 + Math.sin(x * 0.037 + k * 0.6) * 1.6;
-  };
-  let p = "";
-  for (let k = 0; k < 22; k++) {
-    let d = "";
-    for (let x = -4; x <= W + 4; x += 4) {
-      const y = ridge(x, k);
-      if (y > H) continue;
-      const gap = Math.sin(x * 0.53 + k * 2.1) > 0.86; // broken lines, like an engraving
-      d += (d && !gap ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
-    }
-    p += `<path d="${d}" fill="none" stroke="#f8efe0" stroke-width="${0.55 + k * 0.03}" opacity="${0.35 + k * 0.025}"/>`;
-  }
-  const fill = `M0 ${H} ` + Array.from({ length: 77 }, (_, i) => `L${i * 4} ${ridge(i * 4, 0).toFixed(1)}`).join(" ") + ` L${W} ${H} Z`;
-  svg.innerHTML = `<path d="${fill}" fill="#183c8c" opacity=".55"/>` + p;
-})();
+$("#brand-mark").innerHTML = markSVG(36, 15);
+startSideArt($("#side-art"));
 
 // ------------------------------------------------------------------ models
 const note = (id) => state.models.presets.find((p) => p.id === id)?.note || "";
@@ -264,8 +272,49 @@ document.addEventListener("click", (e) => !e.target.closest("#model-menu") && !$
 
 async function loadModel(id) {
   toggleModelMenu(false);
-  renderStatus(await api("/api/load", { model: id }));
+  const entered = enterLoading(id);
+  let s;
+  try {
+    s = await api("/api/load", { model: id });
+  } catch (e) {
+    await entered;
+    $("#start").classList.remove("loading");
+    $$(".start-model.picked").forEach((c) => c.classList.remove("picked"));
+    return toast(e.message, true);
+  }
+  await entered;
+  renderStatus(s);
   pollStatus();
+}
+
+// Picking a model from the start screen: the chosen card lights up, the title and the rest of the list fall
+// away, and the hero opens from its banner crop into the full scene as it glides to the middle, where the sun
+// wakes with a ring of light and starts to rise with the load.
+async function enterLoading(id) {
+  const start = $("#start");
+  if (start.hidden || start.classList.contains("loading")) return;
+  if (still()) return start.classList.add("loading");
+  const art = $("#start-art"), cards = $$(".start-model", start);
+  const picked = cards.find((c) => c.dataset.id === id);
+  picked?.classList.add("picked");
+  const rest = [$("h2", start), ...cards.filter((c) => c !== picked)];
+  const fall = (el, delay) => el.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(12px)" }],
+    { duration: 280, delay, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
+  const outs = rest.map((el, i) => fall(el, i * 40));
+  if (picked) outs.push(fall(picked, 380));
+  await Promise.all(outs.map((a) => a.finished));
+  const first = art.getBoundingClientRect();
+  start.classList.add("loading");
+  const last = art.getBoundingClientRect();
+  outs.forEach((a) => a.cancel()); // they're hidden now; leave them ready for next time
+  picked?.classList.remove("picked");
+  // the banner was a band of the full scene (object-position 40%), so open it from that band
+  const off = (last.height - first.height) * 0.4, below = last.height - first.height - off;
+  art.animate([
+    { transform: `translateY(${first.top - last.top - off}px)`, clipPath: `inset(${off}px 0 ${below}px 0)` },
+    { transform: "none", clipPath: "inset(0 0 0 0)" },
+  ], { duration: 950, easing: "cubic-bezier(0.65, 0, 0.2, 1)" });
+  setTimeout(wake, 650);
 }
 
 let loadStart = null, loadTimer = 0, finishing = false;
@@ -283,6 +332,7 @@ function renderStatus(s) {
         }
         $("#start").classList.remove("loading", "leaving");
         finishing = false;
+        setTab("home"); // a fresh model opens on the home screen, not whichever page was last open
         renderStatus(s);
         $$(".view:not([hidden]) > *").forEach((el, i) => {
           el.classList.remove("reveal");
@@ -319,9 +369,9 @@ function renderStatus(s) {
     $("#start-status").textContent = s.loaded || s.status === "idle" ? "" : msg;
   }
   $("#start").classList.toggle("loading", busy);
-  if (busy) {
+  if (!s.loaded) { // the start screen's scene: at rest on the horizon, rising with the load
     startScene($("#start-art"));
-    setProgress(s.progress);
+    if (busy) setProgress(s.progress);
   } else stopScene();
   $("#start").hidden = !!s.loaded;
   showViews();
@@ -366,6 +416,7 @@ async function onModelReady() {
   refreshAbl();
   try { state.examples = await api("/api/examples"); } catch { state.examples = []; }
   renderExamples();
+  renderHome();
 }
 
 // ------------------------------------------------------------------ on now
@@ -392,11 +443,12 @@ function renderRecipe() {
   $("#tab-steer-count").hidden = !items.length;
   $("#tab-steer-count").textContent = items.length;
   renderChatMods();
+  renderSteerStatus();
   $("#rc-list").innerHTML = items
     .map(
       (it, i) => `<div class="rc-row" data-i="${i}">
         <span class="who" data-k="open" title="What this neuron does"><b>${esc(labelOf(it))}</b><span class="nid">${nid(it.layer, it.neuron)}</span></span>
-        <input type="range" min="-3" max="3" step="0.05" value="${it.dose}" data-k="dose" aria-label="Strength">
+        <input class="lr" type="range" min="-3" max="3" step="0.05" value="${it.dose}" data-k="dose" aria-label="Strength">
         <span class="dose">${fmt(it.dose)}</span>
         <button class="x" data-k="rm" aria-label="Turn off">×</button>
       </div>`,
@@ -404,10 +456,31 @@ function renderRecipe() {
     .join("");
   $$(".rc-row", $("#rc-list")).forEach((row) => {
     const it = items[+row.dataset.i];
-    $("[data-k=dose]", row).oninput = (e) => ((it.dose = +e.target.value), ($(".dose", row).textContent = fmt(it.dose)));
+    const range = $("[data-k=dose]", row);
+    paintDose(range);
+    range.oninput = (e) => ((it.dose = +e.target.value), ($(".dose", row).textContent = fmt(it.dose)), paintDose(range));
     $("[data-k=rm]", row).onclick = () => (items.splice(+row.dataset.i, 1), renderRecipe(), refreshFoundRows());
     $("[data-k=open]", row).onclick = () => openNeuron(it.layer, it.neuron, row);
   });
+}
+
+// a neuron's strength fills out from the middle: periwinkle when pushed up, red when pushed down
+function paintDose(el) {
+  const v = (el.value - el.min) / (el.max - el.min);
+  el.style.setProperty("--lo", Math.min(v, 0.5) * 100 + "%");
+  el.style.setProperty("--hi", Math.max(v, 0.5) * 100 + "%");
+  el.style.setProperty("--fill", v < 0.5 ? "var(--bad)" : "var(--ascii)");
+}
+
+// the status panel: how many neurons are on, under which recipe
+function renderSteerStatus() {
+  const n = state.recipe.items.length;
+  $("#steer-status").classList.toggle("on", n > 0);
+  $("#st-s1").classList.toggle("done", n > 0);
+  const facts = [["Neurons on", n], ["Recipe", n ? state.recipe.name || "Unsaved" : "None"],
+    ["Status", n ? `<i class="hc-on"></i>Steering every reply` : "Nothing on"]];
+  $("#steer-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd${v === "None" || v === "Nothing on" ? ' class="dim"' : ""}>${typeof v === "string" && !v.startsWith("<") ? esc(v) : v}</dd></div>`).join("");
+  requestAnimationFrame(() => drawHomeArt($("#steer-status-art"), "steer", $("#steer-status")));
 }
 
 function newRecipe() {
@@ -422,6 +495,7 @@ $("#rc-save").onclick = async () => {
   const name = state.recipe.name || state.recipe.items.map(labelOf).slice(0, 3).join(" + ");
   const saved = await api("/api/recipes", { id: state.recipe.id || undefined, name, model: state.info?.model, items: state.recipe.items });
   Object.assign(state.recipe, { id: saved.id, name: saved.name });
+  renderSteerStatus();
   toast(`Saved “${saved.name}”.`);
   renderSaved();
 };
@@ -431,6 +505,7 @@ async function renderSaved() {
   const cur = state.info?.model;
   const mine = state.saved.filter((r) => !cur || modelName(r.model) === modelName(cur)).reverse(); // by name, so a copy on this Mac keeps them
   const box = $("#saved-list");
+  renderHome();
   if (!mine.length) { box.innerHTML = `<div class="saved-empty">Nothing saved yet.</div>`; return; }
   box.innerHTML = mine
     .map((r) => `<div class="saved-item${r.id === state.recipe.id ? " on" : ""}" data-id="${r.id}" role="button" tabindex="0">
@@ -660,11 +735,29 @@ function planShell(plan) {
     <div class="plan-h"><span class="eyebrow">Steering plan</span><b>${esc(plan.goal)}</b><span class="plan-clock">0:00</span></div>
     <ol class="plan-steps"></ol>
     <div class="plan-now status-line"></div>
-    <div class="plan-ex" hidden><div class="lbl">How it reads your instruction</div><p class="q"></p><p class="a"></p></div>
+    <div class="plan-ex" hidden>
+      <div class="px-h"><span class="eyebrow">How it reads your instruction</span><span class="px-note">The model, told to act that way</span></div>
+      <div class="px-turn"><span class="px-who">Asked</span><p class="q"></p></div>
+      <div class="px-turn"><span class="px-who">Answers</span><p class="a"></p></div>
+    </div>
     <div class="plan-tbl"></div>
     <div class="plan-proof" hidden></div>
     <div class="plan-foot"></div>
   </div>`;
+}
+
+// a plan's status line: while it runs, a lit strip with the Lodestar spinner; once it ends, plain text
+function setLive(el, text, running, html = false) {
+  if (!el) return;
+  let t = $(".pn-t", el);
+  if (!t) {
+    el.innerHTML = `<canvas class="spin" aria-hidden="true"></canvas><span class="pn-t"></span>`;
+    t = $(".pn-t", el);
+    el._spin = startSpinner($(".spin", el), () => el.classList.contains("live"));
+  }
+  html ? (t.innerHTML = text) : (t.textContent = text);
+  el.classList.toggle("live", !!running);
+  if (running) el._spin();
 }
 
 function renderPlanProgress(box, plan) {
@@ -676,19 +769,29 @@ function renderExample(box, plan) {
   const ex = $(".plan-ex", box);
   if (!ex) return;
   ex.hidden = !plan.example;
-  $(".q", ex).textContent = `“${plan.examplePrompt}”`;
-  $(".a", ex).textContent = plan.example.trim().slice(0, 320) + (plan.example.length > 320 ? "…" : "");
+  $(".q", ex).textContent = plan.examplePrompt;
+  const a = $(".a", ex);
+  a.textContent = plan.example.trim().slice(0, 320) + (plan.example.length > 320 ? "…" : "");
+  (plan.decoder ??= createDecoder()).update(a); // the example decodes in as it's written, like chat replies
 }
 
 function renderProof(box, plan) {
   const el = $(".plan-proof", box);
   if (!el || !plan.proof.prompt) return;
   el.hidden = false;
-  el.innerHTML = `<div class="lbl">On a question it hasn’t seen: “${esc(plan.proof.prompt)}”</div>
+  if (!el.dataset.built) { // built once, then streamed into, so both answers decode in as they're written
+    el.dataset.built = "1";
+    el.innerHTML = `<div class="lbl"></div>
     <div class="cols" style="--n:2">
-      <div class="out"><div class="out-h">Normal</div><div class="out-b">${esc((plan.proof.baseline || "").trim())}</div></div>
-      <div class="out steered"><div class="out-h">Tuned</div><div class="out-b">${esc((plan.proof.steered || "").trim())}</div></div>
+      <div class="out"><div class="out-h">Normal</div><div class="out-b" data-k="baseline"></div></div>
+      <div class="out steered"><div class="out-h">Tuned</div><div class="out-b" data-k="steered"></div></div>
     </div>`;
+  }
+  $(".lbl", el).textContent = `On a question it hasn’t seen: “${plan.proof.prompt}”`;
+  for (const k of ["baseline", "steered"]) {
+    const cell = $(`[data-k=${k}]`, el), text = (plan.proof[k] || "").trim();
+    if (cell.textContent !== text) ((cell.textContent = text), (cell._dec ??= createDecoder()).update(cell));
+  }
 }
 
 function renderPlan(box, plan) {
@@ -697,11 +800,11 @@ function renderPlan(box, plan) {
   // the instruction changed nothing: replace the whole plan with a plain explanation and ideas that do work
   if (plan.noEffect) {
     $(".plan-steps", box).innerHTML = "";
-    $(".plan-now", box).innerHTML = `<b>This didn’t change how the model answers</b>, so there are no neurons to tune for it. ` +
-      `With your instruction, the model still gives its ordinary reply (below). Steering can shift the model’s style or topic, not add a skill or make it answer things it declines.`;
+    setLive($(".plan-now", box), `<b>This didn’t change how the model answers</b>, so there are no neurons to tune for it. ` +
+      `With your instruction, the model still gives its ordinary reply (below). Steering can shift the model’s style or topic, not add a skill or make it answer things it declines.`, false, true);
     renderExample(box, plan);
-    const ex = $(".plan-ex .lbl", box);
-    if (ex) ex.textContent = "The model’s ordinary answer";
+    const ex = $(".plan-ex .px-h", box);
+    if (ex) ex.innerHTML = `<span class="eyebrow">The model’s ordinary answer</span>`;
     $(".plan-tbl", box).innerHTML = `<div class="plan-ideas"><span>Try a style or topic:</span>` +
       ["talk like a pirate", "be extremely cheerful", "answer in rhyme", "cooking"].map((g) =>
         `<button class="chip ex-chip" data-g="${esc(g)}">${esc(g)}</button>`).join("") + `</div>`;
@@ -721,7 +824,7 @@ function renderPlan(box, plan) {
   // stage steps, with a fill on the current one
   $(".plan-steps", box).innerHTML = STAGES.map((st, i) =>
     `<li class="${i < plan.stage || plan.done ? "done" : i === plan.stage && !plan.stopped ? "on" : ""}"><span>${st.label}</span><i style="width:${i === plan.stage ? Math.round(plan.frac * 100) : 0}%"></i></li>`).join("");
-  $(".plan-now", box).textContent = plan.stopped || (plan.done ? planSummary(plan) : (plan.label || "") + "…");
+  setLive($(".plan-now", box), plan.stopped || (plan.done ? planSummary(plan) : (plan.label || "") + "…"), !plan.stopped && !plan.done);
   renderExample(box, plan);
 
   // the table: chosen neurons first, then the strongest candidates (tested beat estimates)
@@ -764,11 +867,16 @@ function renderPlan(box, plan) {
   const bestTested = rows.filter((c) => c.tested && c.dj > 0).sort((a, b) => b.dj - a.dj)[0];
   const use = plan.recipe.length ? plan.recipe : bestTested && !plan.done ? [{ ...bestTested, dose: bestTested.dose }] : [];
   const n = use.length;
-  $(".plan-foot", box).innerHTML = n
-    ? `<button class="btn plan-apply">${plan.done ? "Apply" : "Turn on the best so far"} · ${n} neuron${n > 1 ? "s" : ""}</button>`
-    : "";
+  const nn = `${n} neuron${n > 1 ? "s" : ""}`;
+  $(".plan-foot", box).innerHTML = !n ? "" : plan.done
+    ? `<div class="plan-done${plan.applied ? " applied" : ""}"><span class="pd-mark">${markSVG(30, 15)}</span>
+        <div class="pd-b"><b>${plan.applied ? `${nn} on` : `${nn} found`}</b>
+          <span>${plan.applied ? "Steering every reply in Steer and Chat. Fine-tune each one under On now." : "Turn them on to steer every reply in Steer and Chat. You can fine-tune each one afterwards."}</span></div>
+        ${plan.applied ? `<span class="pd-on"><i class="hc-on"></i>On</span>` : `<button class="btn btn-lg plan-apply">Turn on ${nn}</button>`}</div>`
+    : `<button class="btn ghost plan-apply">Turn on the best so far · ${nn}</button>`;
   const apply = $(".plan-apply", box);
   if (apply) apply.onclick = () => {
+    if (plan.done) ((plan.applied = true), renderPlan(box, plan));
     state.recipe = { id: null, name: plan.goal.slice(0, 40), items: [], model: state.info.model };
     addItems(use.map((x) => ({ layer: x.layer, neuron: x.neuron, dose: x.dose, lens: x.lens })), true);
     if (plan.proof.prompt) $("#t-prompt").value = plan.proof.prompt;
@@ -804,6 +912,7 @@ async function refreshAbl() {
   const tp = $("#abl-test-probes");
   if (!tp.value.trim() && state.abl.probes.harmful.length) tp.value = defaultTestProbes().join("\n");
   renderAbl();
+  renderHome();
 }
 
 const defaultTestProbes = () => (state.abl?.probes?.harmful || []).slice(-3);
@@ -818,9 +927,11 @@ function renderAbl() {
   $("#abl-s3").classList.toggle("locked", !ready);
   $("#abl-toggle").hidden = !ready;
   $("#abl-go").classList.toggle("ghost", ready);
-  $("#abl-go").textContent = ready ? "Find it again" : "Find the refusal direction";
+  $("#abl-go").textContent = ready ? "Find it again" : "Find it";
+  $("#abl-s1").classList.toggle("done", ready);
   if (!ablNameTouched && state.info?.loaded) $("#abl-name").value = ablDefaultName();
   renderChatMods();
+  renderAblStatus();
   if (!ready) return;
   const c = a.current;
   $("#abl-toggle").setAttribute("aria-checked", !!c.active);
@@ -828,13 +939,30 @@ function renderAbl() {
   if (document.activeElement !== $("#abl-coef")) setCoefInput(c.coef ?? 1);
 }
 
+// the status panel: where the direction is, how strongly it's erased, and the switch for it
+function renderAblStatus() {
+  const c = state.abl?.ready && state.abl.current;
+  $("#abl-status").classList.toggle("on", !!c?.active);
+  $("#abl-facts").innerHTML = c
+    ? [["Layer", c.layer], ["Strength", `${(+c.coef || 1).toFixed(2)}×`],
+       ["Status", c.active ? `<i class="hc-on"></i>Erasing refusals` : "Switched off"]]
+        .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")
+    : `<div><dt>Status</dt><dd class="dim">Not found yet</dd></div>`;
+  requestAnimationFrame(() => drawHomeArt($("#abl-status-art"), "abliterate", $("#abl-status")));
+}
+
 function setCoefInput(v) {
   $("#abl-coef").value = v;
-  $("#abl-coef-v").textContent = (+v).toFixed(2);
+  paintCoef();
+}
+function paintCoef() { // the readout, and the slider's fill up to the handle
+  const el = $("#abl-coef"), v = +el.value;
+  $("#abl-coef-v").textContent = v.toFixed(2) + "×";
+  el.style.setProperty("--pct", ((v - el.min) / (el.max - el.min)) * 100 + "%");
 }
 
 $("#abl-coef").oninput = () => {
-  $("#abl-coef-v").textContent = ablCoef().toFixed(2);
+  paintCoef();
   if (!ablNameTouched) $("#abl-name").value = ablDefaultName();
 };
 $("#abl-coef").onchange = async () => {
@@ -902,7 +1030,7 @@ async function ablAnalyze() {
       if (ev.type === "stage") {
         ablSetSteps(steps, ABL_STEP_OF[ev.stage] ?? 0);
         ablScene.set(ABL_STEP_OF[ev.stage] ?? 0);
-        $(".plan-now", plan).textContent = ev.label + "…";
+        setLive($(".plan-now", plan), ev.label + "…", true);
       } else if (ev.type === "progress") {
         const bar = $("i", steps[ABL_STEP_OF[ev.stage] ?? 0]);
         if (bar) bar.style.width = Math.round((100 * ev.done) / ev.total) + "%";
@@ -910,20 +1038,23 @@ async function ablAnalyze() {
         const box = $("#abl-examples");
         if (!box.childElementCount) box.innerHTML = ablPairs(ABL_EX_PROMPTS);
         const cell = $(`.abl-pair[data-p="${ev.index}"] [data-c=${ev.kind}] .out-b`, box);
-        if (cell) cell.textContent += ev.delta;
+        if (cell) streamInto(cell, ev.delta);
       } else if (ev.type === "result") result = ev;
     });
     ablSetSteps(steps, 4);
     sceneBox.hidden = true;
     if (!ok || !result) {
-      $(".plan-now", plan).textContent = "Stopped. Nothing was changed.";
+      setLive($(".plan-now", plan), "Stopped. Nothing was changed.", false);
       return;
     }
+    // the answers streamed in already; keep those boxes (and their decoding) and only fill in what's missing
     const exBox = $("#abl-examples");
-    exBox.innerHTML = ablPairs(result.examples.map((x) => x.prompt));
+    if ($$(".abl-pair", exBox).length !== result.examples.length) exBox.innerHTML = ablPairs(result.examples.map((x) => x.prompt));
     result.examples.forEach((x, i) => {
-      $(`.abl-pair[data-p="${i}"] [data-c=base] .out-b`, exBox).textContent = x.before;
-      $(`.abl-pair[data-p="${i}"] [data-c=abl] .out-b`, exBox).textContent = x.after;
+      for (const [k, text] of [["base", x.before], ["abl", x.after]]) {
+        const cell = $(`.abl-pair[data-p="${i}"] [data-c=${k}] .out-b`, exBox);
+        if (cell.textContent.trim() !== text.trim()) ((cell.textContent = text), (cell._dec ??= createDecoder()).update(cell));
+      }
     });
     ablVerdicts(exBox, result.examples.map((x) => x.refused_before), result.examples.map((x) => x.refused_after));
     const top = Math.max(result.top_score, 1e-9);
@@ -935,9 +1066,9 @@ async function ablAnalyze() {
       </div>`).join("") + `</details>`;
     const left = result.refused_left, n = result.tried;
     const at = result.coef === 1 ? "" : ` at strength ${result.coef}`;
-    $(".plan-now", plan).textContent = !left
+    setLive($(".plan-now", plan), !left
       ? `Layer ${result.layer}${at} stopped the refusals on all ${n} new test requests, and it’s on now.`
-      : `Even the best setting, layer ${result.layer}${at}, still refused ${left} of ${n} new test requests. It’s on now.`;
+      : `Even the best setting, layer ${result.layer}${at}, still refused ${left} of ${n} new test requests. It’s on now.`, false);
     await refreshAbl();
   } finally {
     clearInterval(clock);
@@ -980,7 +1111,7 @@ $("#abl-test-go").onclick = async () => {
   const ok = await stream("/api/abl/test", { probes }, (ev) => {
     if (ev.type === "delta") {
       const cell = $(`.abl-pair[data-p="${ev.probe}"] [data-c=${ev.kind}] .out-b`, rows);
-      if (cell) cell.textContent += ev.delta;
+      if (cell) streamInto(cell, ev.delta);
     } else if (ev.type === "result") result = ev;
   });
   $$(".abl-pair .out-b", rows).forEach((el) => el.classList.remove("typing"));
@@ -1068,7 +1199,7 @@ async function send() {
   $("#runs").prepend(run);
   const outs = Object.fromEntries(cols.map((c) => [c, $(`[data-c=${c}] .out-b`, run)]));
   const body = { prompt, max_new: 160, columns: cols, pushes: up.map((p) => ({ ...p })) };
-  await stream("/api/steer", body, (ev) => ev.type === "delta" && (outs[ev.col].textContent += ev.delta));
+  await stream("/api/steer", body, (ev) => ev.type === "delta" && streamInto(outs[ev.col], ev.delta));
   for (const c of cols) {
     outs[c].classList.remove("typing");
     const b = $(`[data-c=${c}] .insp`, run);
@@ -1183,10 +1314,21 @@ scroller.addEventListener("scroll", () => {
 const toBottom = (smooth) => scroller.scrollTo({ top: scroller.scrollHeight, behavior: smooth && !still() ? "smooth" : "auto" });
 $("#chat-jump").onclick = () => ((follow = true), toBottom(true));
 
+let decoder = null; // the reply being written decodes in, mark by mark
+
+// text streamed into an output box (before and after, normal and steered) decodes in the same way
+function streamInto(el, delta) {
+  el.textContent += delta;
+  (el._dec ??= createDecoder()).update(el);
+}
+
 function updateLastBot() {
   const el = $("#chat-log .msg.bot:last-child .md");
   const m = chat.messages[chat.messages.length - 1];
-  if (el && m.content) el.innerHTML = md(cleanReply(m.content));
+  if (el && m.content) {
+    el.innerHTML = md(cleanReply(m.content));
+    decoder?.update(el);
+  }
   if (follow) toBottom(false);
 }
 
@@ -1203,6 +1345,7 @@ async function reply() {
   const m = { role: "assistant", content: "" };
   chat.messages.push(m);
   chat.streaming = true;
+  decoder = createDecoder();
   setComposer();
   renderChat();
   follow = true;
@@ -1218,6 +1361,8 @@ async function reply() {
   if (!m.content.trim()) chat.messages.pop();
   else if (!ok) m.stopped = true;
   renderChat();
+  decoder?.update($("#chat-log .msg.bot:last-child .md")); // let the last few letters finish decoding
+  decoder = null;
   setComposer();
   if (follow) toBottom(false);
   $("#chat-input").focus();
@@ -1384,8 +1529,8 @@ async function openNeuron(l, n, anchor) {
       .map((t, i) => {
         if (i < s) return "";
         const v = Math.min(1, Math.abs(a[i]) / mx);
-        const bg = a[i] >= 0 ? `rgba(31,73,163,${(v * 0.85).toFixed(2)})` : `rgba(180,83,42,${(v * 0.75).toFixed(2)})`;
-        return `<span class="tok" style="background:${bg};${v > 0.55 ? "color:#f8efe0" : ""}">${esc(t.replace(/\n/g, ""))}</span>`;
+        const bg = a[i] >= 0 ? `rgba(195,207,245,${(v * 0.85).toFixed(2)})` : `rgba(242,119,122,${(v * 0.75).toFixed(2)})`;
+        return `<span class="tok" style="background:${bg};${v > 0.55 ? "color:#0a0a0a" : ""}">${esc(t.replace(/\n/g, ""))}</span>`;
       })
       .join("")}</div>`;
   }
@@ -1418,6 +1563,6 @@ async function openNeuron(l, n, anchor) {
     if ((await api("/api/abl/export")).status === "working") pollAblExport();
     if (!state.info.loaded && state.info.status !== "idle") pollStatus();
   } catch (e) {
-    toast("Can’t reach the Auto Interp engine: " + e.message, true);
+    toast("Can’t reach the Lodestar engine: " + e.message, true);
   }
 })();

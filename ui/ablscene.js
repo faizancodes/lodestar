@@ -1,4 +1,6 @@
-// Abliterate's loading scenes, in the same squares style as the scan: one small scene per analysis stage.
+import { drawMarks } from "./glyphs.js";
+
+// Abliterate's loading scenes, in the same ASCII-mark style as the scan: one small scene per analysis stage.
 //   0 read     prompts slide through the model's layers and leave their last word's state in a tally
 //   1 compare  two clouds (bad requests, everyday ones) and the arrow between their means: the refusal direction
 //   2 trial    candidate layers are tried in turn; each sends four requests that come back answered or refused
@@ -159,14 +161,7 @@ export function startAblScene(canvas) {
     };
     SCENES[scene](put, t);
     ctx.fillStyle = getComputedStyle(canvas).color;
-    ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
-    for (let y = 0; y < ROWS; y++)
-      for (let x = 0; x < COLS; x++) {
-        const b = Math.min(1, grid[y * COLS + x]);
-        if (b < 0.05) continue;
-        const s = CELL * 0.9 * Math.sqrt(b);
-        ctx.fillRect(x * CELL + (CELL - s) / 2, y * CELL + (CELL - s) / 2, s, s);
-      }
+    drawMarks(ctx, grid, COLS, ROWS, CELL);
   };
   const tickFn = (now) => {
     if (!canvas.isConnected || canvas.closest("[hidden]")) return (running = false);

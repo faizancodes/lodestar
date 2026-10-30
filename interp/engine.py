@@ -1,4 +1,4 @@
-"""Live model for Auto Interp: tracing, neuron reading, steering, teacher-forced scoring and gradient attribution.
+"""Live model for Lodestar: tracing, neuron reading, steering, teacher-forced scoring and gradient attribution.
 
 A "neuron" is one unit at the input of a layer's MLP down_proj, where silu(gate) * up lives, so reading, adding and
 multiplying are all exact. Works with any Llama-style decoder in transformers (Qwen, Llama, Mistral, Gemma, ...) whose
