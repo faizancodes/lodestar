@@ -10,11 +10,11 @@ export function md(src: string) {
   }
   return html;
 }
+const CODE = /`([^`]+)`/g, BOLD = /\*\*([^*]+)\*\*/g, ITALIC = /(^|[^*\w])\*([^*\n]+)\*(?!\w)/g;
+const HEADING = /^(#{1,4})\s+(.*)/, BULLET = /^\s*[-*•]\s+(.*)/, NUMBERED = /^\s*\d+[.)]\s+(.*)/;
+
 export function mdInline(s: string) {
-  return esc(s)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-    .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<i>$2</i>");
+  return esc(s).replace(CODE, "<code>$1</code>").replace(BOLD, "<b>$1</b>").replace(ITALIC, "$1<i>$2</i>");
 }
 function mdBlocks(text: string) {
   const out: string[] = [];
@@ -22,7 +22,7 @@ function mdBlocks(text: string) {
   const close = () => list && (out.push(`</${list}>`), (list = null));
   for (const para of text.split(/\n{2,}/)) {
     for (const line of para.split("\n")) {
-      const h = line.match(/^(#{1,4})\s+(.*)/), ul = line.match(/^\s*[-*•]\s+(.*)/), ol = line.match(/^\s*\d+[.)]\s+(.*)/);
+      const h = line.match(HEADING), ul = line.match(BULLET), ol = line.match(NUMBERED);
       if (ul || ol) {
         const kind = ul ? "ul" : "ol";
         if (list !== kind) (close(), out.push(`<${kind}>`), (list = kind));

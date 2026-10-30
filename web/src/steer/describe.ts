@@ -13,7 +13,7 @@ const get = useSteer.getState;
 const set = useSteer.setState;
 const toast = (msg: string, err = false) => app().toastMsg(msg, err);
 const field = (id: string) => document.getElementById(id) as HTMLInputElement;
-export const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
+export const lines = (s: string) => s.split("\n").flatMap((x) => (x.trim() ? [x.trim()] : []));
 
 export function setInput(v: string) {
   set({ input: v });
@@ -128,7 +128,7 @@ async function runSearch(plan: Plan, behavior: string, pairs: Pairs, started = D
   };
   const settings = {
     max_neurons: +field("d-maxn").value, candidates: +field("d-cands").value || null,
-    doses: field("d-doses").value.split(",").map(Number).filter((x) => x > 0),
+    doses: field("d-doses").value.split(",").flatMap((x) => (+x > 0 ? [+x] : [])),
     fluency_budget: +field("d-flu").value, contrast: 0.5, max_new: 64, focus: field("d-focus").value,
   };
   try {

@@ -18,10 +18,11 @@ export function redrawn() {
 
 export function addItems(add: Item[], replace = false) {
   const next = replace ? [] : [...items()];
+  const at = new Map(next.map((it, i) => [itemKey(it), i]));
   for (const it of add) {
-    const ex = next.findIndex((i) => itemKey(i) === itemKey(it));
-    if (ex >= 0) next[ex] = { ...next[ex], dose: it.dose };
-    else next.push({ ...it });
+    const ex = at.get(itemKey(it));
+    if (ex !== undefined) next[ex] = { ...next[ex], dose: it.dose };
+    else (at.set(itemKey(it), next.length), next.push({ ...it }));
   }
   setItems(next);
   redrawn();
