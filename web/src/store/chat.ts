@@ -23,6 +23,10 @@ type Chat = {
   temp: string;
   max: string;
   jump: boolean; // scrolled up from the latest message
+  neurons: boolean; // the panel for pushing neurons by hand is open
+  add: string; // what's typed in its box
+  addErr: string; // why the last thing typed there couldn't be added
+  lens: Record<string, { up: string[]; down: string[] }>; // the words each neuron pushes toward, by "layer:neuron"
   set: (p: Partial<Omit<Chat, "set">>) => void;
 };
 
@@ -39,6 +43,10 @@ export const useChat = create<Chat>((set) => ({
   temp: "0.7",
   max: "512",
   jump: false,
+  neurons: load("chat-neurons") === "1",
+  add: "",
+  addErr: "",
+  lens: {},
   set: (p) => set(p),
 }));
 

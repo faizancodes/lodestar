@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { setAblActive } from "../abl/engine";
 import {
-  copyReply, growInput, jumpDown, newChat, onScroll, rateOf, rateText, replyHtml, retry, sendChat, STARTERS, toggleCompare, toggleSteer,
+  addNeurons, copyReply, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat, STARTERS,
+  toggleCompare, toggleNeurons, toggleSteer,
 } from "../chat/engine";
 import { api } from "../lib/api";
-import { isDir, labelOf, modelName } from "../lib/format";
+import { isDir, labelOf, lensLabel, modelName } from "../lib/format";
+import { patchAt, removeAt } from "../steer/recipe";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
 import { useChat } from "../store/chat";
@@ -12,7 +14,7 @@ import { useChat } from "../store/chat";
 const cancel = () => api("/api/cancel", {});
 
 // one small run of ASCII marks per starter, from the scenes' dot / plus / cross / block ramp
-export const MARKS = ["·+×", "+×▪", "×+·", "▪×+"];
+const MARKS = ["·+×", "+×▪", "×+·", "▪×+"];
 
 // the switches for what shapes replies: the erased refusal direction, and the recipe that's on
 function Mods() {
@@ -32,7 +34,7 @@ function Mods() {
 }
 
 /** A reply's markdown. Set as HTML, like the streamed updates that write into it, so the decoder can work on it. */
-export function Md({ m, done }: { m: { content: string }; done: boolean }) {
+function Md({ m, done }: { m: { content: string }; done: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => { el.current!.innerHTML = replyHtml(m, done); });
   return <div className="md" ref={el} />;
@@ -56,7 +58,7 @@ function CompareSwitch() {
 // how fast it wrote: live while it streams (written straight into the element), then the final figure
 const Rate = ({ part }: { part: { content: string; wps?: number } }) => <span className="msg-rate">{rateText(rateOf(part))}</span>;
 
-export function Copy({ text }: { text: string }) {
+function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const toast = useApp((s) => s.toastMsg);
 
@@ -166,32 +168,107 @@ function Composer() {
   );
 }
 
+// ------------------------------------------------------------------ neurons by hand
+const STEP = 0.25;
+const signed = (d: number) => (d > 0 ? "+" : "") + +d.toFixed(2);
+
+// a neuron's dose: typed, or nudged a quarter at a time
+function Dose({ i, dose }: { i: number; dose: number }) {
+  const [text, setText] = useState(signed(dose));
+  useEffect(() => setText(signed(dose)), [dose]);
+
+  const commit = () => {
+    const d = parseFloat(text.replace(/[−–]/g, "-"));
+    if (Number.isFinite(d) && d) patchAt(i, { dose: d });
+    else setText(signed(dose));
+  };
+
+  const step = (by: number) => {
+    const d = Math.round((dose + by) / STEP) * STEP;
+    if (d) patchAt(i, { dose: d });
+  };
+
+  return (
+    <div className={dose < 0 ? "nr-dose neg" : "nr-dose"}>
+      <button aria-label="Less" onClick={() => step(-STEP)}>−</button>
+      <input aria-label="Dose" value={text} spellCheck="false" onChange={(e) => setText(e.target.value)}
+        onBlur={commit} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} />
+      <button aria-label="More" onClick={() => step(STEP)}>+</button>
+    </div>
+  );
+}
+
+// The neurons in the recipe that's on, to add to by layer and number and to dose by hand
+function Neurons() {
+  const open = useChat((s) => s.neurons), add = useChat((s) => s.add), err = useChat((s) => s.addErr), lens = useChat((s) => s.lens);
+  const set = useChat((s) => s.set);
+  const items = useApp((s) => s.recipe.items);
+
+  if (!open) return null;
+
+  return (
+    <aside className="nr" id="chat-neurons">
+      <div className="nr-h">
+        <span className="eyebrow light">Neurons</span>
+        <button className="nr-x" aria-label="Close" onClick={toggleNeurons}>×</button>
+      </div>
+      <form className={err ? "nr-add bad" : "nr-add"} onSubmit={(e) => (e.preventDefault(), addNeurons())}>
+        <input id="chat-add" placeholder="L14 N8949 +1" spellCheck="false" autoComplete="off" value={add}
+          onChange={(e) => set({ add: e.target.value, addErr: "" })} />
+        <button className="btn sm" disabled={!add.trim()}>Add</button>
+      </form>
+      <p className="nr-err" id="chat-add-err" hidden={!err}>{err}</p>
+      <div className="nr-pins">{recipeNeurons(items).map(({ it, i }) => {
+        const l = lens[`${it.layer}:${it.neuron}`], words = l && lensLabel(it.dose < 0 ? l.down : l.up);
+
+        return (
+          <div key={`${it.layer}:${it.neuron}`} className="nr-pin" data-pin={`${it.layer}:${it.neuron}`}>
+            <div className="nr-id"><b>L{it.layer}</b><span>N{it.neuron}</span></div>
+            <Dose i={i} dose={it.dose} />
+            <button className="nr-del" aria-label="Remove" onClick={() => removeAt(i)}>×</button>
+            <div className="nr-lens" title={words ? `Pushes toward: ${words}` : undefined}>{words}</div>
+          </div>
+        );
+      })}</div>
+    </aside>
+  );
+}
+
+function NeuronsButton() {
+  const open = useChat((s) => s.neurons);
+  return <button id="chat-neurons-btn" className={open ? "btn ghost sm on" : "btn ghost sm"} aria-expanded={open} onClick={toggleNeurons}>Neurons</button>;
+}
+
 export function Chat({ hidden }: { hidden: boolean }) {
   const model = useApp((s) => (s.info?.loaded ? modelName(s.info.model) ?? "" : ""));
   const started = useChat((s) => s.messages.length > 0);
 
   return (
     <section id="view-chat" className="view chat" data-view="chat" hidden={hidden}>
-      <header className="chat-h">
-        <div className="chat-title"><b id="chat-model">{model}</b></div>
-        <Mods />
-        <CompareSwitch />
-        <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
-      </header>
-      <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>
-        <Log />
-        <div className="chat-empty" id="chat-empty" hidden={started}>
-          <h2>What’s on your mind?</h2>
-          <div className="chat-starters" id="chat-starters">{STARTERS.map((s, i) => (
-            <button key={s} className="starter" onClick={() => sendChat(s)}>
-              <span className="starter-mark" aria-hidden="true">{MARKS[i]}</span>
-              <span>{s}</span>
-              <span className="starter-go" aria-hidden="true">↗</span>
-            </button>
-          ))}</div>
+      <div className="chat-main">
+        <header className="chat-h">
+          <div className="chat-title"><b id="chat-model">{model}</b></div>
+          <Mods />
+          <CompareSwitch />
+          <NeuronsButton />
+          <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
+        </header>
+        <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>
+          <Log />
+          <div className="chat-empty" id="chat-empty" hidden={started}>
+            <h2>What’s on your mind?</h2>
+            <div className="chat-starters" id="chat-starters">{STARTERS.map((s, i) => (
+              <button key={s} className="starter" onClick={() => sendChat(s)}>
+                <span className="starter-mark" aria-hidden="true">{MARKS[i]}</span>
+                <span>{s}</span>
+                <span className="starter-go" aria-hidden="true">↗</span>
+              </button>
+            ))}</div>
+          </div>
         </div>
+        <Composer />
       </div>
-      <Composer />
+      <Neurons />
     </section>
   );
 }

@@ -9,7 +9,6 @@ import { newChat } from "./chat/engine";
 import { Abliterate } from "./views/Abliterate";
 import { Chat } from "./views/Chat";
 import { Home } from "./views/Home";
-import { Neurons } from "./views/Neurons";
 import { Start } from "./views/Start";
 import { Steer } from "./views/Steer";
 import { closeLast } from "./steer/panels";
@@ -27,7 +26,7 @@ document.addEventListener("keydown", (e) => {
 
   if (!e.metaKey || e.shiftKey || e.altKey) return;
 
-  const i = ["1", "2", "3", "4"].indexOf(e.key);
+  const i = ["1", "2", "3"].indexOf(e.key);
   if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
   if (e.key === "0" && info?.loaded) return (e.preventDefault(), setTab("home"));
   if (e.key === "k" && tab === "chat" && info?.loaded) (e.preventDefault(), newChat());
@@ -46,13 +45,12 @@ export function App() {
   return (
     <>
       <Sidebar />
-      <main id="main" className={loaded && (tab === "chat" || tab === "neurons") ? "is-chat" : undefined}>
+      <main id="main" className={loaded && tab === "chat" ? "is-chat" : undefined}>
         <Start />
         <Home hidden={hidden("home")} />
         <Abliterate hidden={hidden("abliterate")} />
         <Steer hidden={hidden("steer")} />
         <Chat hidden={hidden("chat")} />
-        <Neurons hidden={hidden("neurons")} />
       </main>
       <ModelMenu />
       <FitWarn />

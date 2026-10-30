@@ -225,7 +225,7 @@
    "current": {
     "layer": 6,
     "coef": 1.25,
-    "active": true,
+    "active": false,
     "clean": true
    },
    "ready": true
@@ -394,7 +394,7 @@
    "current": {
     "layer": 6,
     "coef": 1.25,
-    "active": true,
+    "active": false,
     "clean": true
    },
    "ready": true
@@ -612,11 +612,19 @@
   "type": "sse",
   "events": [
    {
-    "dt": 0.33,
+    "dt": 0.32,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "I'd "
+     "delta": "I'd"
+    }
+   },
+   {
+    "dt": 0.34,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": "I'd"
     }
    },
    {
@@ -624,31 +632,47 @@
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "take "
+     "delta": " take"
     }
    },
    {
-    "dt": 0.39,
+    "dt": 0.38,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " spend"
+    }
+   },
+   {
+    "dt": 0.4,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "a "
+     "delta": " a"
     }
    },
    {
     "dt": 0.42,
     "data": {
      "type": "delta",
-     "row": 0,
-     "delta": "long "
+     "row": 1,
+     "delta": " it"
     }
    },
    {
-    "dt": 0.45,
+    "dt": 0.44,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "walk, "
+     "delta": " long"
+    }
+   },
+   {
+    "dt": 0.46,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " plotting,"
     }
    },
    {
@@ -656,31 +680,47 @@
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "read "
+     "delta": " walk,"
     }
    },
    {
-    "dt": 0.51,
+    "dt": 0.5,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " naturally."
+    }
+   },
+   {
+    "dt": 0.52,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "a "
+     "delta": " read"
     }
    },
    {
     "dt": 0.54,
     "data": {
      "type": "delta",
-     "row": 0,
-     "delta": "few "
+     "row": 1,
+     "delta": " A"
     }
    },
    {
-    "dt": 0.57,
+    "dt": 0.56,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "chapters "
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 0.58,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " free"
     }
    },
    {
@@ -688,31 +728,47 @@
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "of "
+     "delta": " few"
     }
    },
    {
-    "dt": 0.63,
+    "dt": 0.62,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " afternoon"
+    }
+   },
+   {
+    "dt": 0.64,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "a "
+     "delta": " chapters"
     }
    },
    {
     "dt": 0.66,
     "data": {
      "type": "delta",
-     "row": 0,
-     "delta": "good "
+     "row": 1,
+     "delta": " is"
     }
    },
    {
-    "dt": 0.69,
+    "dt": 0.68,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "book, "
+     "delta": " of"
+    }
+   },
+   {
+    "dt": 0.7,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " a"
     }
    },
    {
@@ -720,31 +776,47 @@
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "and "
+     "delta": " a"
     }
    },
    {
-    "dt": 0.75,
+    "dt": 0.74,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " rare"
+    }
+   },
+   {
+    "dt": 0.76,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "maybe "
+     "delta": " good"
     }
    },
    {
     "dt": 0.78,
     "data": {
      "type": "delta",
-     "row": 0,
-     "delta": "call "
+     "row": 1,
+     "delta": " chance"
     }
    },
    {
-    "dt": 0.81,
+    "dt": 0.8,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "a "
+     "delta": " book,"
+    }
+   },
+   {
+    "dt": 0.82,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " to"
     }
    },
    {
@@ -752,31 +824,47 @@
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "friend "
+     "delta": " and"
     }
    },
    {
-    "dt": 0.87,
+    "dt": 0.86,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " tighten"
+    }
+   },
+   {
+    "dt": 0.88,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "I "
+     "delta": " maybe"
     }
    },
    {
     "dt": 0.9,
     "data": {
      "type": "delta",
-     "row": 0,
-     "delta": "haven't "
+     "row": 1,
+     "delta": " my"
     }
    },
    {
-    "dt": 0.93,
+    "dt": 0.92,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "talked "
+     "delta": " call"
+    }
+   },
+   {
+    "dt": 0.94,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " grip"
     }
    },
    {
@@ -784,47 +872,71 @@
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "to "
+     "delta": " a"
     }
    },
    {
-    "dt": 0.99,
+    "dt": 0.98,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " on"
+    }
+   },
+   {
+    "dt": 1.0,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "in "
+     "delta": " friend"
     }
    },
    {
     "dt": 1.02,
     "data": {
      "type": "delta",
-     "row": 0,
-     "delta": "a "
+     "row": 1,
+     "delta": " everyone"
     }
    },
    {
-    "dt": 1.05,
+    "dt": 1.04,
     "data": {
      "type": "delta",
      "row": 0,
-     "delta": "while. "
+     "delta": " I"
+    }
+   },
+   {
+    "dt": 1.06,
+    "data": {
+     "type": "delta",
+     "row": 1,
+     "delta": " who"
     }
    },
    {
     "dt": 1.08,
     "data": {
      "type": "delta",
-     "row": 1,
-     "delta": "I'd "
+     "row": 0,
+     "delta": " haven't"
     }
    },
    {
-    "dt": 1.11,
+    "dt": 1.1,
     "data": {
      "type": "delta",
      "row": 1,
-     "delta": "spend "
+     "delta": " thinks"
+    }
+   },
+   {
+    "dt": 1.12,
+    "data": {
+     "type": "delta",
+     "row": 0,
+     "delta": " talked"
     }
    },
    {
@@ -832,163 +944,51 @@
     "data": {
      "type": "delta",
      "row": 1,
-     "delta": "it "
+     "delta": " they're"
     }
    },
    {
-    "dt": 1.17,
+    "dt": 1.16,
+    "data": {
+     "type": "delta",
+     "row": 0,
+     "delta": " to"
+    }
+   },
+   {
+    "dt": 1.18,
     "data": {
      "type": "delta",
      "row": 1,
-     "delta": "plotting, "
+     "delta": " safe."
     }
    },
    {
     "dt": 1.2,
     "data": {
      "type": "delta",
-     "row": 1,
-     "delta": "naturally. "
+     "row": 0,
+     "delta": " in"
     }
    },
    {
-    "dt": 1.23,
+    "dt": 1.22,
     "data": {
      "type": "delta",
-     "row": 1,
-     "delta": "A "
+     "row": 0,
+     "delta": " a"
+    }
+   },
+   {
+    "dt": 1.24,
+    "data": {
+     "type": "delta",
+     "row": 0,
+     "delta": " while."
     }
    },
    {
     "dt": 1.26,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "free "
-    }
-   },
-   {
-    "dt": 1.29,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "afternoon "
-    }
-   },
-   {
-    "dt": 1.32,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "is "
-    }
-   },
-   {
-    "dt": 1.35,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "a "
-    }
-   },
-   {
-    "dt": 1.38,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "rare "
-    }
-   },
-   {
-    "dt": 1.41,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "chance "
-    }
-   },
-   {
-    "dt": 1.44,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "to "
-    }
-   },
-   {
-    "dt": 1.47,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "tighten "
-    }
-   },
-   {
-    "dt": 1.5,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "my "
-    }
-   },
-   {
-    "dt": 1.53,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "grip "
-    }
-   },
-   {
-    "dt": 1.56,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "on "
-    }
-   },
-   {
-    "dt": 1.59,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "everyone "
-    }
-   },
-   {
-    "dt": 1.62,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "who "
-    }
-   },
-   {
-    "dt": 1.65,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "thinks "
-    }
-   },
-   {
-    "dt": 1.68,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "they're "
-    }
-   },
-   {
-    "dt": 1.71,
-    "data": {
-     "type": "delta",
-     "row": 1,
-     "delta": "safe. "
-    }
-   },
-   {
-    "dt": 1.74,
     "data": {
      "type": "end"
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePins } from "../src/neurons/parse";
+import { parsePins } from "../src/chat/parse";
 
 describe("parsePins", () => {
   it("reads neurons the ways people write them", () => {

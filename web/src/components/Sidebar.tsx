@@ -6,7 +6,6 @@ import { deleteSaved, openSaved, setTab, statusLine, toggleModelMenu } from "../
 import { deleteChat, openChat } from "../chat/engine";
 import { ablActive, useApp, type Tab } from "../store/app";
 import { useChat } from "../store/chat";
-import { useNeurons } from "../store/neurons";
 import { Html } from "./Html";
 
 const MARK = markSVG(36, 15);
@@ -20,9 +19,6 @@ export const ICONS: Record<Exclude<Tab, "home">, JSX.Element> = {
   ),
   chat: (
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.6c0 4.1-3.8 7.4-8.5 7.4-1.2 0-2.3-.2-3.3-.6L4 20l1.3-3.7C4.2 15 3.5 13.4 3.5 11.6 3.5 7.5 7.3 4.2 12 4.2s8.5 3.3 8.5 7.4z" /></svg>
-  ),
-  neurons: (
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v16M12 4v16M18 4v16" /><circle cx="6" cy="8" r="2" /><circle cx="12" cy="15" r="2" /><circle cx="18" cy="10" r="2" /></svg>
   ),
 };
 
@@ -109,7 +105,6 @@ export function Sidebar() {
   const info = useApp((s) => s.info);
   const steerCount = useApp((s) => s.recipe.items.length);
   const ablOn = useApp(ablActive);
-  const pinCount = useNeurons((s) => s.pins.filter((p) => p.on && p.dose).length);
   const menuOpen = useApp((s) => s.menu.open);
   const { cls, msg } = statusLine(info);
 
@@ -128,7 +123,6 @@ export function Sidebar() {
         <TabButton tab="abliterate" label="Abliterate"><i className="tab-dot" id="tab-abl-dot" hidden={!ablOn} /></TabButton>
         <TabButton tab="steer" label="Steer"><i className="tab-count" id="tab-steer-count" hidden={!steerCount}>{steerCount || null}</i></TabButton>
         <TabButton tab="chat" label="Chat" />
-        <TabButton tab="neurons" label="Neurons"><i className="tab-count" id="tab-neurons-count" hidden={!pinCount}>{pinCount || null}</i></TabButton>
       </nav>
       <div className="saved">
         <div className="side-h"><span className="eyebrow light">Saved</span></div>
