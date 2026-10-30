@@ -31,6 +31,7 @@ export function findChanges() {
 async function searchWord(w: string) {
   const n = (get().results?.n ?? 0) + 1;
   set({ note: "Searching…", results: { n } });
+
   try {
     // the last ~10% of layers hold blunt "say this exact word" neurons; mid-late layers hold the concept
     const skip = field("w-last").checked ? 0 : Math.max(2, Math.round(app().info!.layers! / 9));
@@ -40,6 +41,7 @@ async function searchWord(w: string) {
         ? `“${w}” is split into pieces, so these match its first piece, “${r.piece}”. Turn on one or two.`
         : `Neurons that push it toward “${w}”. Turn on one or two.`,
     });
+
     // start each neuron where its direct push is noticeable but not yet a loop
     const rows = r.results.map((x) => ({ ...x, dose: searchDose(x.score) }));
     set({ results: { n, word: rows.slice(0, 6) } });
@@ -64,6 +66,7 @@ export function renderPlan(plan: Plan) {
   plan.renders++;
   flushSync(() => set((s) => ({ v: s.v + 1 })));
 }
+
 /** Draws a part of it (the example, the proof, a stage's fill). */
 const touchPlan = () => flushSync(() => set((s) => ({ v: s.v + 1 })));
 
@@ -89,14 +92,17 @@ type Pairs = { prompt: string; baseline: string; target: string }[];
 async function describe(goal: string) {
   const prompts = lines(get().prompts);
   if (prompts.length < 3) return toast("Add at least three test questions in Options.", true);
+
   const behavior = instruction(goal);
   const plan: Plan = { goal, cands: new Map(), recipe: [], stage: 0, frac: 0, example: "", examplePrompt: prompts[0], proof: {}, done: false, clock: "0:00", renders: 0 };
   set({ note: "", results: { n: (get().results?.n ?? 0) + 1, plan } });
   const started = Date.now();
   const clock = planClock(plan, started);
+
   try {
     plan.label = "Writing example answers in that style";
     renderPlan(plan);
+
     let pairs: Pairs | null = null;
     const ok = await stream("/api/tune/draft", { behavior, prompts, max_new: 64 }, (ev) => {
       if (ev.type === "draft" && ev.index === 0 && ev.kind === "target") ((plan.example += ev.delta as string), touchPlan());
@@ -104,12 +110,14 @@ async function describe(goal: string) {
     });
     if (!ok || !pairs) return stopPlan(plan, "Stopped.");
     const p: Pairs = pairs;
+
     // if the instruction barely changed the answers there is probably nothing to steer toward; say so now
     // instead of spending minutes searching. The user can still force the search from the message.
     if (styleShift(p) < 0.5) {
       plan.resume = () => runSearch(plan, behavior, p);
       return noEffect(plan);
     }
+
     await runSearch(plan, behavior, p, started);
   } finally {
     clearInterval(clock);
@@ -120,17 +128,20 @@ async function runSearch(plan: Plan, behavior: string, pairs: Pairs, started = D
   Object.assign(plan, { noEffect: false, done: false, stage: 0, frac: 0, resume: null });
   renderPlan(plan);
   const clock = planClock(plan, started);
+
   const setStage = (engineStage: string, label: string) => {
     plan.stage = Math.max(plan.stage, STAGES.findIndex((x) => x.of.includes(engineStage)));
     plan.frac = 0;
     plan.label = label;
     renderPlan(plan);
   };
+
   const settings = {
     max_neurons: +field("d-maxn").value, candidates: +field("d-cands").value || null,
     doses: field("d-doses").value.split(",").flatMap((x) => (+x > 0 ? [+x] : [])),
     fluency_budget: +field("d-flu").value, contrast: 0.5, max_new: 64, focus: field("d-focus").value,
   };
+
   try {
     let result: Plan["result"] | null = null;
     const ok = await stream("/api/tune/search", { pairs, behavior, settings }, (ev) => {
@@ -149,8 +160,10 @@ async function runSearch(plan: Plan, behavior: string, pairs: Pairs, started = D
         touchPlan();
       } else if (ev.type === "result") result = ev as Plan["result"];
     });
+
     if (!ok || !result) return stopPlan(plan, "Stopped. The neurons found so far are below.");
     const r: NonNullable<Plan["result"]> = result;
+
     plan.recipe = r.recipe;
     plan.result = r;
     plan.done = true;
@@ -169,6 +182,7 @@ function stopPlan(plan: Plan, msg: string) {
 export function planSummary(plan: Plan) {
   const r = plan.result;
   if (!plan.recipe.length) return r?.note || "No neuron moved the model toward that. Try wording it differently.";
+
   const n = plan.recipe.length;
   const words = r?.hit_test != null ? ` On new questions it says your words ${Math.round(r.hit_test * 100)}% of the time (normally ${Math.round(r.hit_test0! * 100)}%).` : "";
   return `Tune these ${n} neuron${n > 1 ? "s" : ""} to the strengths shown.${words}`;

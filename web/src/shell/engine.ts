@@ -51,28 +51,34 @@ export async function startCopy(path: string) {
   try { set({ copy: await api<CopyJob>("/api/models/copy", { path }) }); } catch (e) { return toast((e as Error).message, true); }
   pollCopy();
 }
+
 let copyPolling = false;
 async function pollCopy() {
   if (copyPolling) return;
   copyPolling = true;
+
   try {
     for (;;) {
       let copy: CopyJob;
       try { copy = await api<CopyJob>("/api/models/copy"); } catch { await sleep(1500); continue; }
       set({ copy });
+
       if (copy.status !== "copying") {
         if (copy.status === "done") toast(`Copied ${copy.name}. It loads from this Mac now.`);
         else if (copy.status.startsWith("error")) toast(copy.status.replace(/^error: /, "Couldn’t copy: "), true);
         await refreshModels();
         break;
       }
+
       await sleep(1000);
     }
   } finally {
     copyPolling = false;
   }
 }
+
 export const cancelCopy = () => api("/api/models/copy/cancel", {});
+
 export async function removeCopy(path: string) {
   try { await api("/api/models/remove", { path }); } catch (err) { return toast((err as Error).message, true); }
   toast("Removed the copy. The model still loads from the drive.");
@@ -82,6 +88,7 @@ export async function removeCopy(path: string) {
 export function toggleModelMenu(open?: boolean) {
   open = open ?? !get().menu.open;
   if (!open) return set({ menu: { ...get().menu, open: false } });
+
   const r = $("#model-pick")!.getBoundingClientRect(), side = $(".side")!.getBoundingClientRect();
   set({ menu: { open: true, left: side.right + 10, bottom: Math.max(12, innerHeight - r.bottom - 12), maxHeight: Math.min(620, r.bottom - 12) } });
   refreshModels(); // a drive may have been plugged in since
@@ -100,6 +107,7 @@ const startArt = () => $<HTMLCanvasElement>("#start-art")!;
 export async function loadModel(id: string) {
   toggleModelMenu(false);
   const entered = enterLoading(id);
+
   let s: Status;
   try {
     s = await api<Status>("/api/load", { model: id });
@@ -108,6 +116,7 @@ export async function loadModel(id: string) {
     setStart({ loading: false, picked: null });
     return toast((e as Error).message, true);
   }
+
   await entered;
   applyStatus(s);
   pollStatus();
@@ -120,20 +129,25 @@ async function enterLoading(id: string) {
   const start = $("#start")!;
   if (start.hidden || get().start.loading) return;
   if (still()) return setStart({ loading: true });
+
   const art = startArt(), cards = $$(".start-model", start);
   const picked = cards.find((c) => c.dataset.id === id);
   if (picked) flushSync(() => setStart({ picked: id }));
+
   const rest = [$("h2", start)!, ...cards.filter((c) => c !== picked)];
   const fall = (el: Element, delay: number) => el.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(12px)" }],
     { duration: 280, delay, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" });
   const outs = rest.map((el, i) => fall(el, i * 40));
   if (picked) outs.push(fall(picked, 380));
   await Promise.all(outs.map((a) => a.finished));
+
   const first = art.getBoundingClientRect();
   flushSync(() => setStart({ loading: true }));
   const last = art.getBoundingClientRect();
+
   outs.forEach((a) => a.cancel()); // they're hidden now; leave them ready for next time
   setStart({ picked: null });
+
   // the banner was a band of the full scene (object-position 40%), so open it from that band
   const off = (last.height - first.height) * 0.4, below = last.height - first.height - off;
   art.animate([
@@ -149,6 +163,7 @@ let loadStart: number | null = null, loadTimer: ReturnType<typeof setInterval> |
 export function statusLine(s: Status | null) {
   if (!s) return { cls: "", msg: "No model loaded" };
   const err = s.status.startsWith("error");
+
   return {
     cls: s.loaded ? "ready" : err ? "err" : s.status === "idle" ? "" : "busy",
     msg: s.loaded ? "Ready" : s.status === "idle" ? "No model loaded"
@@ -168,10 +183,12 @@ function applyStatus(s: Status) {
           setStart({ leaving: true });
           await sleep(240);
         }
+
         setStart({ loading: false, leaving: false });
         finishing = false;
         setTab("home"); // a fresh model opens on the home screen, not whichever page was last open
         flushSync(() => applyStatus(s));
+
         const els = $$(".view:not([hidden]) > *");
         els.forEach((el) => el.classList.remove("reveal"));
         void document.body.offsetWidth; // restart the animations, with one reflow for all of them
@@ -183,11 +200,14 @@ function applyStatus(s: Status) {
     }
     return;
   }
+
   const was = get().info?.loaded ? get().info!.model : null;
   set({ info: s });
+
   const { msg } = statusLine(s);
   const err = s.status.startsWith("error");
   const busy = !s.loaded && !err && s.status !== "idle";
+
   // the server can be slow to answer while weights load, so the timer ticks on its own
   clearInterval(loadTimer);
   if (busy) {
@@ -202,11 +222,14 @@ function applyStatus(s: Status) {
     loadStart = null;
     setStart({ status: s.loaded || s.status === "idle" ? "" : msg });
   }
+
   setStart({ loading: busy });
+
   if (!s.loaded) { // the start screen's scene: at rest on the horizon, rising with the load
     startScene(startArt());
     if (busy) setProgress(s.progress ?? 0);
   } else stopScene();
+
   if (s.loaded && s.model !== was) onModelReady();
 }
 
@@ -214,16 +237,19 @@ let polling = false;
 async function pollStatus() {
   if (polling) return;
   polling = true;
+
   try {
     for (;;) {
       let s: Status;
       try { s = await api<Status>("/api/status"); } catch { await sleep(1000); continue; }
       applyStatus(s);
+
       if (s.loaded || s.status === "idle" || s.status.startsWith("error")) {
         if (s.status.startsWith("error")) toast(s.status, true);
         refreshModels();
         break;
       }
+
       await sleep(700);
     }
   } finally {
@@ -241,11 +267,13 @@ export function newRecipe() {
 async function onModelReady() {
   const { recipe, info } = get();
   if (recipe.items.length && recipe.model && modelName(recipe.model) !== modelName(info!.model)) newRecipe(); // neuron numbers are per model
+
   set({ recipe: { ...get().recipe, model: info!.model } });
   useChat.getState().set({ messages: [] });
   redrawn();
   resetAbl();
   if (get().tab === "chat") onChatShown();
+
   refreshSaved();
   refreshAbl();
   refreshDirs();
@@ -255,11 +283,13 @@ async function onModelReady() {
 export async function refreshSaved() {
   try { set({ saved: await api<Recipe[]>("/api/recipes") }); } catch { return; }
 }
+
 export async function deleteSaved(id: string) {
   await api(`/api/recipes/${id}`, null, "DELETE");
   if (get().recipe.id === id) set({ recipe: { ...get().recipe, id: null } });
   refreshSaved();
 }
+
 export function openSaved(r: Recipe) {
   set({ recipe: JSON.parse(JSON.stringify(r)) });
   refreshSaved();
@@ -278,6 +308,7 @@ export async function refreshDirs() {
     const r = await api<Directions>("/api/directions");
     set({ dirs: r.directions, dirLayers: r.layers });
   } catch { set({ dirs: [] }); }
+
   redrawn();
 }
 
@@ -293,6 +324,7 @@ let booted = false;
 export async function boot() {
   if (booted) return; // StrictMode runs effects twice in development
   booted = true;
+
   try {
     const [defaults, status, copy, ex] = await Promise.all([
       api<{ prompts: string[] }>("/api/tune/defaults"),
@@ -302,9 +334,11 @@ export async function boot() {
       refreshModels(),
       refreshAbl(),
     ]);
+
     useSteer.setState({ prompts: defaults.prompts.join("\n") });
     applyStatus(status);
     resumeLastModel();
+
     if (copy.status === "copying") pollCopy();
     if (ex.status === "working") pollExport(ex.kind === "steer" ? "st" : "abl");
     if (!get().info!.loaded && get().info!.status !== "idle") pollStatus();

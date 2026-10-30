@@ -7,22 +7,27 @@ type Log = unknown[];
 
 function setup(still: boolean) {
   const log: Log = [];
+
   class Path2D {
     ops: unknown[] = [];
     moveTo(...a: number[]) { this.ops.push(["m", ...a]); }
     lineTo(...a: number[]) { this.ops.push(["l", ...a]); }
   }
+
   const ctx = new Proxy({ fillStyle: "#000" } as Record<string, unknown>, {
     get: (t, k) => (k in t ? t[k as string] : (...a: unknown[]) => log.push([k, ...a.map((x) => (x instanceof Path2D ? x.ops : x))])),
     set: (t, k, v) => (log.push([`${String(k)}=`, v]), (t[k as string] = v), true),
   });
+
   const canvas = (w = 220, h = 140) => ({
     width: 0, height: 0, style: {}, clientWidth: w, clientHeight: h, isConnected: true, offsetParent: {}, offsetWidth: 0,
     dataset: {}, getContext: () => ctx, closest: () => null, getBoundingClientRect: () => ({ top: 10 }),
     classList: { add: (c: string) => log.push(["+class", c]), remove: (c: string) => log.push(["-class", c]) },
   });
+
   let queue: ((t: number) => void)[] = [], clock = 1000;
   const listeners: Record<string, (() => void)[]> = {};
+
   vi.stubGlobal("Path2D", Path2D);
   vi.stubGlobal("devicePixelRatio", 2);
   vi.stubGlobal("matchMedia", () => ({ matches: still }));
@@ -33,6 +38,7 @@ function setup(still: boolean) {
   vi.stubGlobal("removeEventListener", () => {});
   vi.stubGlobal("document", { hidden: false, addEventListener: () => {}, removeEventListener: () => {}, querySelector: () => ({ getBoundingClientRect: () => ({ bottom: 190 }) }) });
   vi.spyOn(performance, "now").mockImplementation(() => clock);
+
   const frames = (n: number, ms = 70) => {
     for (let i = 0; i < n; i++) {
       clock += ms;
@@ -41,11 +47,13 @@ function setup(still: boolean) {
       q.forEach((cb) => cb(clock));
     }
   };
+
   const card = () => {
     const el = { dataset: {}, addEventListener: (e: string, f: () => void) => (listeners[e] ||= []).push(f) };
     return el;
   };
   const fire = (e: string) => listeners[e]?.forEach((f) => f());
+
   return { log, canvas, frames, card, fire };
 }
 
@@ -79,12 +87,15 @@ const scenarios: Record<string, Scenario> = {
     const m = await load<typeof import("../src/art/loader")>("loader");
     m.startScene(canvas() as unknown as HTMLCanvasElement);
     frames(3);
+
     m.wake();
     m.setProgress(0.4);
     frames(5);
+
     const done = m.finishScene();
     frames(30);
     await done;
+
     m.stopScene();
   },
   async scan({ canvas, frames }) {
@@ -114,6 +125,7 @@ describe.each([false, true])("canvas art draws what ui/ drew (reduced motion: %s
   it.each(Object.keys(scenarios))("%s", async (name) => {
     const env = setup(still);
     await scenarios[name](env);
+
     expect(env.log.length).toBeGreaterThan(still ? 3 : 10);
     same(env.log);
   });

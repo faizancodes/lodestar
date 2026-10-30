@@ -32,6 +32,7 @@ export type Plan = {
   clock: string;
   renders: number; // full redraws, which rebuild the stage steps (progress alone doesn't)
 };
+
 type Results = { n: number; word?: (NeuronRow & { score: number; dose: number })[]; plan?: Plan };
 
 /** One answer to the thread's question, with the recipe that was on for it and how it came about. */
@@ -42,6 +43,7 @@ export type Version = {
   note: string; // or why it's here otherwise ("Went back to v2")
   open: boolean; // an older answer, unfolded
 };
+
 /** Try it and refine: one question, and its answers as the recipe is fixed. */
 export type Thread = {
   id: number; // panels opened under its answers are named by it, so a new thread starts with none

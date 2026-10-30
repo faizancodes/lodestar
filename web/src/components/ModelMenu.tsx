@@ -5,12 +5,14 @@ import { CopyAction } from "./CopyAction";
 
 export function ModelMenu() {
   const menu = useApp((s) => s.menu);
+
   // a click anywhere outside closes it
   useEffect(() => {
     const close = (e: MouseEvent) => !(e.target as Element).closest("#model-menu") && useApp.getState().menu.open && toggleModelMenu(false);
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, []);
+
   const placed = menu.maxHeight > 0; // where it goes is worked out when it first opens
   return (
     <div id="model-menu" className="model-menu" role="listbox" hidden={!menu.open}
@@ -25,8 +27,10 @@ function MenuBody() {
   const copy = useApp((s) => s.copy);
   const info = useApp((s) => s.info);
   const [custom, setCustom] = useState("");
+
   const cur = info?.loaded ? info.model : null;
   const c = modelChoices(models, copy);
+
   const item = (x: Choice) => (
     <div className="mm-row" data-id={x.id} key={x.id}>
       <button className={x.id === cur ? "mm-item on" : "mm-item"} onClick={() => x.id !== cur && loadModel(x.id)}>
@@ -35,8 +39,10 @@ function MenuBody() {
       {x.id === cur ? null : <CopyAction x={x} />}
     </div>
   );
+
   const group = (title: string, rows: Choice[]) => (rows.length ? [<div className="mm-group" key={title}>{title}</div>, ...rows.map(item)] : null);
   const go = () => custom.trim() && loadModel(custom.trim());
+
   return (
     <>
       {group("On this Mac", c.here)}{group("On external drives", c.drives)}{group("Download", c.get)}

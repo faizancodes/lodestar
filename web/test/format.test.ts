@@ -19,6 +19,7 @@ walk((v, key) => {
     if (typeof o.id === "string" && typeof o.ready === "boolean" && Array.isArray(o.band)) dirs.push(o as Direction);
   }
 });
+
 const texts = [...strings, ...replies(), "", " ", "a\n\nb", "**", "*x*", "```js\ncode", "1. a\n2) b\n- c\n# h\n#### h4"];
 const models = [...strings].filter((s) => /^[\w.-]+\/[\w.-]+$/.test(s)).concat(["", "model", "Qwen3-0.6B"]);
 

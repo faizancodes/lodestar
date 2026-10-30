@@ -50,12 +50,14 @@ def draft_targets(eng, behavior, prompts, max_new=72, cancel=None):
     for p in prompts:
         rows.append((eng.chat_ids(p), []))
         rows.append((eng.chat_ids(p, system=behavior), []))
+
     texts = [""] * len(rows)
     for r, delta in eng.generate(rows, max_new=max_new, cancel=cancel):
         if r is None:
             break
         texts[r] += delta
         yield _ev("draft", index=r // 2, kind="baseline" if r % 2 == 0 else "target", delta=delta)
+
     pairs = [{"prompt": p, "baseline": texts[2 * i].strip(), "target": texts[2 * i + 1].strip()}
              for i, p in enumerate(prompts)]
     yield _ev("drafted", pairs=pairs)
@@ -108,6 +110,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     pairs = [p for p in pairs if p["target"].strip()]
     if len(pairs) < 2:
         raise ValueError("Write at least two example answers first.")
+
     if holdout is None:
         holdout = max(1, min(3, len(pairs) // 3))
     train, test = pairs[:-holdout], pairs[-holdout:]
@@ -128,6 +131,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
                 rows.append((pid + list(enc["input_ids"])[cut], len(pid), w[cut]))
             else:
                 rows.append((pid + eng.encode(text)[cut], len(pid), None))
+
         return rows
 
     tr_t, tr_b = tf_rows(train, "target"), tf_rows(train, "baseline")
@@ -138,12 +142,15 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         for pushes in pushes_list:
             rows += [(ids, s, pushes, w) for ids, s, w in t_rows]
             rows += [(ids, s, pushes, w) for ids, s, w in b_rows]
+
         sc = eng.score(rows, cancel)
         n = len(t_rows)
+
         out = []
         for k in range(len(pushes_list)):
             blk = sc[k * 2 * n:(k + 1) * 2 * n]
             out.append(float(blk[:n].mean() - contrast * blk[n:].mean()))
+
         return np.array(out)
 
     # ---- baseline numbers
@@ -154,11 +161,13 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     # ---- attribution
     yield _ev("stage", stage="attribute", label=f"Estimating the effect of all {eng.dnorm.shape[0] * eng.dnorm.shape[1]:,} neurons")
     items = [(ids, s, 1.0, w) for ids, s, w in tr_t] + [(ids, s, -contrast, w) for ids, s, w in tr_b]
+
     grad = None
     for i, it in enumerate(items):
         g = eng.attribute([it], cancel)
         grad = g if grad is None else grad + g
         yield _ev("progress", stage="attribute", done=i + 1, total=len(items))
+
     grad /= len(train)
     L, N = grad.shape
 
@@ -172,6 +181,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
             plain, sysd = eng.chat_ids(p["prompt"]), eng.chat_ids(p["prompt"], system=behavior)
             shift += eng.mean_acts(sysd + tgt, len(sysd)) - eng.mean_acts(plain + tgt, len(plain))
             yield _ev("progress", stage="patch", done=i + 1, total=len(train))
+
         shift /= len(train)
         unit = eng.unit.cpu().numpy()
         patch = shift * grad / unit  # first-order gain from copying the behaviour-prompted state into the plain run
@@ -196,6 +206,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     if patch is not None:
         take(np.argsort(-patch.ravel()), n_candidates // 2)
     take(np.argsort(-np.abs(grad).ravel()), n_candidates - len(cands))
+
     for c in cands:
         c["lens"] = eng.lens(c["layer"], c["neuron"], 6)["up" if c["sign"] > 0 else "down"]
     yield _ev("candidates", candidates=[_cand(c) for c in cands])
@@ -209,11 +220,13 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         retests use all of them and overwrite the screening numbers."""
         chunk = 6
         t_rows, b_rows, base = (tr_t[:k_screen], tr_b[:k_screen], j0_screen) if screen else (tr_t, tr_b, j0)
+
         for k in range(0, len(tests), chunk):
             part = tests[k:k + chunk]
             sets = [[Push(cands[ci]["layer"], cands[ci]["neuron"], cands[ci]["sign"] * d)] for ci, d in part]
             js = objective(sets, t_rows, b_rows)
             nll = eng.reference_nll(sets, cancel)
+
             for (ci, d), j, f in zip(part, js, nll):
                 c = cands[ci]
                 if not screen and c.get("screened"):
@@ -225,6 +238,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
                     c.update(dose=c["sign"] * d, dj=dj, dfluency=df, pen=pen)
                 if screen:
                     c["screened"] = True
+
             # tested numbers replace the estimates as they come in, so the plan fills in live
             yield _ev("measured", candidates=[_cand(cands[ci]) for ci, _ in part])
             yield _ev("progress", stage="verify", done=done0 + min(k + chunk, len(tests)), total=total)
@@ -234,16 +248,20 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     rest = [d for d in doses if d != mid]
     n_refine = min(n_refine, len(cands))
     screening = k_screen < len(tr_t)
+
     # screening: every candidate at the middle dose; then the best are retested at every dose on all questions
     retest = doses if screening else rest
     total = len(cands) + n_refine * len(retest)
+
     yield _ev("stage", stage="verify", label=f"Testing the top {len(cands)} neurons for real")
     yield from measure([(ci, mid) for ci in range(len(cands))], 0, total, screen=screening)
     best = sorted(range(len(cands)), key=lambda i: -cands[i]["pen"])[:n_refine]
     yield from measure([(ci, d) for ci in best for d in retest], len(cands), total)
+
     for i, c in enumerate(cands):
         if c.pop("screened", False):  # screened out: rank below everything retested on the full set
             c["pen"] = c["pen"] - 1e3
+
     cands.sort(key=lambda c: -c["pen"])
     for c in cands:
         c["score"] = c["pen"]
@@ -257,6 +275,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         texts = []
         for k in range(0, len(rows), 48):
             texts += eng.generate_text(rows[k:k + 48], max_new=hit_tokens, cancel=cancel)[0]
+
         n = len(probe_ids)
         return [(sum(clean_hit(pattern, t) for t in texts[k * n:(k + 1) * n]) / n, degeneracy(texts[k * n:(k + 1) * n]))
                 for k in range(len(sets))]
@@ -269,8 +288,10 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
             js += list(objective(sets[k:k + 8], tr_t, tr_b))
         nll = eng.reference_nll(sets, cancel)
         pens = [j - j0 - max(0.0, f - nll0 - fluency_budget) * 2.0 for j, f in zip(js, nll)]
+
         if pattern is None:
             return pens, js, [None] * len(sets)
+
         hs = hits(sets)
         return [r - dg + 0.2 * pn for (r, dg), pn in zip(hs, pens)], js, [r for r, _ in hs]
 
@@ -279,29 +300,35 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         n_hit = min(10, len(cands))
         yield _ev("stage", stage="hits", label=f"Checking which of the best {n_hit} make the model say your words")
         (hit0, deg0), = hits([[]])
+
         for k, c in enumerate(cands[:n_hit]):
             sets = [[Push(c["layer"], c["neuron"], c["sign"] * d)] for d in doses]
             scores, js, rates = evaluate(sets)
             bi = int(np.argmax(scores))
             c.update(score=scores[bi], dose=c["sign"] * doses[bi], dj=float(js[bi] - j0))
             yield _ev("progress", stage="hits", done=k + 1, total=n_hit)
+
         for c in cands[n_hit:]:
             c["score"] = -1e9  # not generated with; never outranks a measured candidate (finite: it goes out as JSON)
         cands.sort(key=lambda c: -c["score"])
+
     yield _ev("verified", candidates=[_cand(c) for c in cands])
 
     # ---- greedy combination
     yield _ev("stage", stage="combine", label="Combining neurons that work well together")
     floor = (hit0 - deg0) if pattern is not None else 0.002
     pool = [c for c in cands if c["score"] > floor][:pool_size if pattern is None else min(6, pool_size)]
+
     if not pool:
         yield _ev("result", recipe=[],
                   note="No neuron moved the model toward your examples. Try other wording or more test questions.")
         return
+
     recipe = [dict(pool[0])]
     best_score = pool[0]["score"]
     yield _ev("recipe", recipe=_public(recipe))
     remaining = pool[1:]
+
     while len(recipe) < max_neurons and remaining:
         # stacked pushes add up, so each addition goes in a little gentler; the strength stage retunes the whole
         cur = [Push(c["layer"], c["neuron"], c["dose"]) for c in recipe]
@@ -310,6 +337,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         bi = int(np.argmax(scores))
         if scores[bi] <= best_score + 0.004:
             break
+
         c = remaining[bi]
         recipe.append(dict(c, dose=c["dose"] * 0.75))
         remaining = [r for r in remaining if r is not c]
@@ -321,8 +349,10 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     scales = [0.5, 0.75, 1.0, 1.25, 1.5] + ([2.0] if pattern is not None else [])
     scores, _, _ = evaluate([[Push(c["layer"], c["neuron"], c["dose"] * k) for c in recipe] for k in scales])
     bi = int(np.argmax(scores))
+
     for c in recipe:
         c["dose"] *= scales[bi]
+
     final = [Push(c["layer"], c["neuron"], c["dose"]) for c in recipe]
     yield _ev("recipe", recipe=_public(recipe))
 
@@ -332,6 +362,7 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
     for p in test:
         pid = eng.chat_ids(p["prompt"])
         rows += [(pid, []), (pid, final)]
+
     texts = [""] * len(rows)
     for r, delta in eng.generate(rows, max_new=max_new, cancel=cancel):
         if r is None:
@@ -339,10 +370,12 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
         texts[r] += delta
         yield _ev("proof", index=r // 2, kind="baseline" if r % 2 == 0 else "steered", prompt=test[r // 2]["prompt"],
                   delta=delta)
+
     extra = {}
     if pattern is not None:
         extra = dict(hit_test0=sum(clean_hit(pattern, t) for t in texts[0::2]) / len(test),
                      hit_test=sum(clean_hit(pattern, t) for t in texts[1::2]) / len(test))
+
     yield _ev("result", recipe=_public(recipe), **extra)
 
 
@@ -402,8 +435,10 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         texts[r] += delta
         if r == 0:
             yield _ev("aim", delta=delta)
+
     aims, now = [t.strip() for t in texts[:len(asks)]], [bad] + [t.strip() for t in texts[len(asks):]]
     keep = [i for i, t in enumerate(aims) if t]
+
     if not keep or not aims[0]:
         yield _ev("result", recipe=_public(recipe), changes=[], improved=False,
                   note="It couldn't write a better answer from that. Try saying what you want instead.")
@@ -440,13 +475,16 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
             rows_ = []
             for ps in part:
                 rows_ += [(ids, s, ps) for ids, s in t_rows] + [(ids, s, ps) for ids, s in b_rows]
+
             sc = eng.score(rows_, cancel, abl=[abl] * len(rows_) if abl else None)
             nll = eng.reference_nll(part, cancel, abl=[abl] * len(part) if abl else None)
             n = len(t_rows)
+
             for j in range(len(part)):
                 blk = sc[j * 2 * n:(j + 1) * 2 * n]
                 jv = float(blk[:n].mean() - contrast * np.maximum(blk[n:], floor).mean())
                 out.append(jv - max(0.0, float(nll[j]) - nll0 - fluency_budget) * 2.0)
+
         return out
 
     # ---- 2. which way to go from here
@@ -457,9 +495,11 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         g = eng.attribute([it], cancel, pushes=push_set(recipe), abl=abl)
         grad = g if grad is None else grad + g
         yield _ev("progress", stage="attribute", done=i + 1, total=len(items))
+
     N = grad.shape[1]
     have = {(c["layer"], c["neuron"]) for c in recipe}
     new, per = [], {}
+
     for i in np.argsort(-np.abs(grad).ravel()):
         l, n = int(i // N), int(i % N)
         if (l, n) in have or per.get(l, 0) >= 3:
@@ -468,6 +508,7 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         new.append({"layer": l, "neuron": n, "sign": 1 if grad[l, n] > 0 else -1})
         if len(new) >= n_new:
             break
+
     for c in new:
         c["lens"] = eng.lens(c["layer"], c["neuron"], 6)["up" if c["sign"] > 0 else "down"]
 
@@ -477,15 +518,18 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         for c in r:
             for k in (0.0, 0.5, 1.6):
                 out.append(("scale", (c["layer"], c["neuron"]), k))
+
         out += [("all", None, k) for k in (0.4, 0.7, 1.35)]
         for c in new:
             if (c["layer"], c["neuron"]) not in {(x["layer"], x["neuron"]) for x in r}:
                 out += [("add", c, c["sign"] * d) for d in (0.3, 0.6)]
+
         return out
 
     def apply(r, e):
         kind, ref, k = e
         r = [dict(c) for c in r]
+
         if kind == "all":
             for c in r:
                 c["dose"] *= k
@@ -494,12 +538,14 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
             r = [c for c in r if abs(c["dose"]) > 1e-6]
         else:
             r.append({"layer": ref["layer"], "neuron": ref["neuron"], "dose": k, "lens": ref["lens"]})
+
         return r
 
     yield _ev("stage", stage="test", label="Testing changes to the neurons")
     loop0 = loops([recipe])[0]
     best = scores([recipe])[0]
     cur, improved = recipe, False
+
     for rnd in range(rounds):
         es = edits_for(cur)
         on = {(c["layer"], c["neuron"]) for c in cur}
@@ -508,10 +554,12 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         es = [e for e in es if apply(cur, e)]  # a fix keeps some steering: turning it all off isn't a fix
         if not es:
             break
+
         sc = []
         for k in range(0, len(es), 6):
             sc += scores([apply(cur, e) for e in es[k:k + 6]])
             yield _ev("progress", stage="test", done=min(k + 6, len(es)), total=len(es), round=rnd + 1)
+
         # the likeliest few write short replies; one that loops more than the recipe does now is out, whatever
         # its likelihood (a loop can score well by avoiding the bad reply), and less looping always wins
         top = [int(i) for i in np.argsort(sc)[::-1][:5]]
@@ -520,9 +568,11 @@ def refine(eng, recipe, *, feedback, prompt, bad, behavior=None, prompts=(), abl
         ok = [i for i in top if lp[i] <= max(loop0, 0.05) + 1e-9]
         if not ok:
             break
+
         bi = min(ok, key=lambda i: (round(lp[i], 1), -sc[i]))
         if sc[bi] <= best + 0.004 and lp[bi] >= loop0 - 0.05:
             break
+
         best, cur, loop0 = sc[bi], apply(cur, es[bi]), lp[bi]
         improved = True
         yield _ev("recipe", recipe=_public(cur))

@@ -24,12 +24,14 @@ export function compassStar(x: number, y: number) {
 export function markSVG(px: number, n = SPAN, color = "currentColor") {
   const S = px / n, k = SPAN / n;
   let out = "";
+
   for (let j = 0; j < n; j++)
     for (let i = 0; i < n; i++) {
       let b = 0; // a coarse cell takes the brightest point it covers
       for (let v = 0; v < 3; v++)
         for (let u = 0; u < 3; u++) b = Math.max(b, compassStar((i + (u + 0.5) / 3) * k - SPAN / 2, (j + (v + 0.5) / 3) * k - SPAN / 2));
       if ((b = Math.min(1, b)) < 0.07) continue;
+
       const cx = (i + 0.5) * S, cy = (j + 0.5) * S, a = S * 0.42, w = Math.max(0.8, S * 0.2);
       if (b < 0.3) {
         const s = S * (0.18 + 0.5 * b);
@@ -41,5 +43,6 @@ export function markSVG(px: number, n = SPAN, color = "currentColor") {
         out += `<rect x="${cx - s / 2}" y="${cy - s / 2}" width="${s}" height="${s}" stroke="none"/>`;
       }
     }
+
   return `<svg width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" fill="${color}" stroke="${color}" aria-hidden="true">${out}</svg>`;
 }

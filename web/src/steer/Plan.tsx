@@ -21,6 +21,7 @@ export function Plan({ plan }: { plan: P }) {
   const live = plan.noEffect
     ? { text: <><b>This didn’t change how the model answers</b>, so there are no neurons to tune for it. With your instruction, the model still gives its ordinary reply (below). Steering can shift the model’s style or topic, not add a skill or make it answer things it declines.</>, running: false }
     : { text: plan.stopped || (plan.done ? planSummary(plan) : (plan.label || "") + "…"), running: !plan.stopped && !plan.done };
+
   return (
     <div className="plan">
       <div className="plan-h"><span className="eyebrow">Steering plan</span><b>{plan.goal}</b><span className="plan-clock">{plan.clock}</span></div>
@@ -62,12 +63,15 @@ function Table({ plan }: { plan: P }) {
   const { rows, chosen } = ranked(plan);
   const shown = plan.done ? rows.filter((c) => chosen.has(key(c))) : rows.slice(0, 8);
   if (!shown.length) return null;
+
   let maxDj = 1e-6, maxEst = 1e-9;
   for (const c of rows) {
     if (c.tested) maxDj = Math.max(maxDj, c.dj);
     maxEst = Math.max(maxEst, Math.abs(c.est || 0));
   }
+
   const inRecipe = new Map(plan.recipe.map((x) => [key(x), x]));
+
   return (
     <>
       <div className="pt-head"><span>Neuron</span><span>Pushes the model toward</span><span>Tune to</span><span>Effect</span></div>
@@ -78,6 +82,7 @@ function Table({ plan }: { plan: P }) {
         const w = c.tested ? Math.max(0, c.dj) / maxDj : Math.abs(c.est) / maxEst;
         const hurts = (r?.dfluency ?? c.dfluency ?? 0) > 0.35;
         const anchor = `pt:${key(c)}`;
+
         // a neuron's details stay open across live updates, under its row
         return [
           <div key={key(c)} className={`pt-row ${state}`} data-l={c.layer} data-n={c.neuron} onClick={() => openNeuron(c.layer, c.neuron, anchor)}>
@@ -113,18 +118,24 @@ function Foot({ plan }: { plan: P }) {
   const use = plan.recipe.length ? plan.recipe : bestTested && !plan.done ? [{ ...bestTested, dose: bestTested.dose! }] : [];
   const n = use.length;
   if (!n) return null;
+
   const nn = `${n} neuron${n > 1 ? "s" : ""}`;
+
   const apply = () => {
     if (plan.done) ((plan.applied = true), renderPlan(plan));
     replaceRecipe({ id: null, name: plan.goal.slice(0, 40), items: [], model: useApp.getState().info!.model });
     addItems(use.map((x) => ({ layer: x.layer, neuron: x.neuron, dose: x.dose, lens: x.lens })), true);
+
     const q = plan.proof.prompt || PROMPTS[0];
     // the search holds the model while it runs, so a reply can only be generated once it has finished
     if (!plan.done) return (setQuestion(q), useApp.getState().toastMsg("Turned on. Send a question once the search finishes, or press Stop."));
+
     send(q);
     requestAnimationFrame(() => document.querySelector("#view-steer .step:nth-of-type(2)")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
+
   if (!plan.done) return <button className="btn ghost plan-apply" onClick={apply}>Turn on the best so far · {nn}</button>;
+
   return (
     <div className={plan.applied ? "plan-done applied" : "plan-done"}><Html className="pd-mark" html={MARK} />
       <div className="pd-b"><b>{plan.applied ? `${nn} on` : `${nn} found`}</b>

@@ -23,6 +23,7 @@ export type Models = { presets: Preset[]; cached: string[]; local?: DriveModel[]
 
 /** GET/POST /api/models/copy */
 export type CopyJob = { src: string | null; name: string | null; done: number; total: number; status: string };
+
 /** GET/POST /api/abl/export and POST /api/steer/export */
 export type ExportJob = {
   kind: "abl" | "steer" | null;
@@ -41,6 +42,7 @@ type Lens = { up: string[]; down: string[] };
 export type NeuronRow = { layer: number; neuron: number; lens: string[]; score?: number; act?: number };
 /** GET /api/search */
 export type WordSearch = { results: (NeuronRow & { score: number })[]; partial: boolean; piece: string };
+
 /** GET /api/neuron */
 export type NeuronDetail = {
   layer: number;
@@ -48,6 +50,7 @@ export type NeuronDetail = {
   lens: Lens;
   trace?: { tokens: string[]; n_prompt: number; acts: number[] };
 };
+
 /** GET /api/trace/token */
 export type TokenDetail = {
   lens: { tok: string; p: number }[][];
@@ -79,6 +82,7 @@ export type Direction = {
   ready: boolean; // the vectors exist for the loaded model
   auc: number | null;
 };
+
 export type Directions = { directions: Direction[]; layers: number };
 
 /** GET /api/abl */
@@ -89,6 +93,7 @@ export type Abl = {
   current: { layer: number | null; coef: number; active: boolean; clean: boolean } | null;
   ready: boolean;
 };
+
 export type Probes = { harmful: string[]; harmless: string[] };
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };

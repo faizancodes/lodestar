@@ -8,6 +8,7 @@ import { exchanges, same, type Exchange } from "./recorded";
 function respond(x: Pick<Exchange, "status" | "events" | "response">, cut: number) {
   const ok = x.status < 400;
   if (!ok) return new Response(JSON.stringify(x.response ?? {}), { status: x.status });
+
   const bytes = new TextEncoder().encode((x.events || []).map((e) => `data: ${JSON.stringify(e.data)}\n\n`).join(""));
   return new Response(new ReadableStream({
     start(c) {
@@ -22,12 +23,15 @@ type Run = { events: unknown[]; toasts: [string, boolean][]; busy: boolean[]; ok
 async function runNow(x: Exchange, cut: number): Promise<Run> {
   const run: Run = { events: [], toasts: [], busy: [], ok: null };
   vi.stubGlobal("fetch", async () => respond(x, cut));
+
   const off = useApp.subscribe((s, prev) => {
     if (s.busy !== prev.busy) run.busy.push(s.busy);
     if (s.toast !== prev.toast && s.toast) run.toasts.push([s.toast.msg, s.toast.err]);
   });
+
   run.ok = await nowStream(x.path, x.body, (e) => run.events.push(e));
   off();
+
   return run;
 }
 
@@ -61,8 +65,10 @@ describe("stream() behaves as ui/app.js's did", () => {
     vi.stubGlobal("fetch", async () => respond(x, 64));
     const toasts: string[] = [];
     const off = useApp.subscribe((s, prev) => s.toast !== prev.toast && s.toast && toasts.push(s.toast.msg));
+
     const [a, b] = await Promise.all([nowStream(x.path, x.body, () => {}), nowStream(x.path, x.body, () => {})]);
     off();
+
     expect([a, b]).toEqual([true, false]);
     expect(toasts).toEqual(["Something is already running. Stop it first."]);
   });

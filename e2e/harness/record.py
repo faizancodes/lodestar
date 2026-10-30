@@ -42,12 +42,14 @@ class Recorder:
 
     async def _control(self, scope, send):
         q = parse_qs(scope["query_string"].decode())
+
         if scope["path"] == "/__fixture/start":
             self.name = q["name"][0]
             self.log = []
             self._save()
         elif scope["path"] == "/__fixture/stop":
             self.name = None
+
         body = json.dumps({"ok": True, "name": self.name}).encode()
         await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
         await send({"type": "http.response.body", "body": body})
@@ -68,6 +70,7 @@ class Recorder:
             chunks.append(msg.get("body", b""))
             if not msg.get("more_body"):
                 break
+
         raw = b"".join(chunks)
         sent = False
 
@@ -107,6 +110,7 @@ class Recorder:
                 entry["events"] = events
             else:
                 entry["response"] = _json_or_text(b"".join(out))
+
             entry["ms"] = round((time.monotonic() - t0) * 1000)
             self.log.append(entry)
             self._save()

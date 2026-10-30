@@ -5,6 +5,7 @@ export async function api<T = unknown>(path: string, body?: unknown, method?: st
     headers: body ? { "Content-Type": "application/json" } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
+
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || j.detail || r.statusText);
   return j as T;

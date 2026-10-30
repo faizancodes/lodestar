@@ -15,6 +15,7 @@ export function streamInto(s: Sink, delta: string) {
 }
 
 const refs = new WeakMap<Sink, (el: HTMLElement | null) => void>();
+
 /** A ref callback that attaches a box to its sink, filling in what arrived before it was drawn. */
 export function attach(s: Sink) {
   let ref = refs.get(s);
