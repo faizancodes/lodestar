@@ -1,0 +1,99 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > ablScene 1`] = `
+{
+  "length": 2940318,
+  "sha256": "3ff8475761085241d676911ad0223d484aa6caf0ae8cda3df9f19a7e0fd819a3",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > drawMarks 1`] = `
+{
+  "length": 61268,
+  "sha256": "69525e213c90ffad0a80cdb8d3ef6d609affccecb66f3ed96f75d73d9ab3dfde",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > home 1`] = `
+{
+  "length": 2936161,
+  "sha256": "4f2487d246b9a6a0ca03a57e516411abf66775fa22f5a0b14e6704dc26cacaf8",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > loader 1`] = `
+{
+  "length": 14339854,
+  "sha256": "2e1bca009fc335f9ee2d5cdd75655ba42ba5789b0f9944141640c9dac8c4e3d8",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > scan 1`] = `
+{
+  "length": 4641071,
+  "sha256": "66be70394d54ed67444535515a596072f11f5336a15d65891a6a988276e60129",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > sideArt 1`] = `
+{
+  "length": 51613,
+  "sha256": "70a21993cc2d4c75c0383ea0fd1413a256e82d57e54994f90f5dc8b406d5eddd",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: false) > spinner 1`] = `
+{
+  "length": 16627,
+  "sha256": "e2d011e38cb6bfe43d350049a6133f2df84e16b23751a665f3f3f7d6fa3457ba",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > ablScene 1`] = `
+{
+  "length": 172555,
+  "sha256": "a9fade8255f9b40c0b4029e95407387a379211d4b4729cd6a3d03b0b6ee4c713",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > drawMarks 1`] = `
+{
+  "length": 61268,
+  "sha256": "69525e213c90ffad0a80cdb8d3ef6d609affccecb66f3ed96f75d73d9ab3dfde",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > home 1`] = `
+{
+  "length": 473151,
+  "sha256": "3d19cd6bc5ddfada140ee7d5555776897ac9f2749d53f23612b17861b580596a",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > loader 1`] = `
+{
+  "length": 172327,
+  "sha256": "6befdc66bda99d0c1fec4e9356456101fcfcb077994855dc039dfed91ee5f7da",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > scan 1`] = `
+{
+  "length": 87159,
+  "sha256": "77f9f2c48a4f3f3105b75f71272ce141e7058ff9196da974b36eda59182d58f1",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > sideArt 1`] = `
+{
+  "length": 17234,
+  "sha256": "a91860d181a19f56facee56e526c7ee3a97ca28dc71195f80efa28833cd33720",
+}
+`;
+
+exports[`canvas art draws what ui/ drew (reduced motion: true) > spinner 1`] = `
+{
+  "length": 5342,
+  "sha256": "5ef6adebfcea2f01972b253d35fbd55bd5c8d24d13b7454b6908d149aa2a56c0",
+}
+`;

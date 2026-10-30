@@ -33,19 +33,6 @@ def squircle(size, inset):
     return m
 
 
-def ray(along, across, length, w):
-    return 0.0 if along < 0 or along > length else math.exp(-abs(across) / w) * (1 - along / length) ** 0.8
-
-
-def star(x, y, up, side, down, diag, w=0.6):
-    """The lodestar: a bright core, four rays with the north one longest, glints on the diagonals."""
-    r = math.hypot(x, y)
-    diags = [0.6 * ray((a * x + b * y) / math.sqrt(2), (a * x - b * y) / math.sqrt(2), diag, w * 0.8)
-             for a, b in ((1, 1), (1, -1), (-1, 1), (-1, -1))]
-    return max(1.0 if r < 1.2 else 0.0, 0.5 * math.exp(-r / 1.6), ray(-y, x, up, w), ray(y, x, down, w),
-               ray(x, y, side, w), ray(-x, y, side, w), *diags)
-
-
 def marks(draw, grid, n, cell, ox, oy):
     """Each cell as one of the app's marks by brightness: a dot, a plus, an ×, a block."""
     for j in range(n):
