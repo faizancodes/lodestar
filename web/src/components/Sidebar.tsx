@@ -91,8 +91,9 @@ function MemoryMeter() {
 
   return (
     <div id="mem" className={tight ? "mem tight" : "mem"} title={tip}>
-      <div className="mem-txt"><span>{label}</span><span className="mem-n">{ram(m.used)} of {ram(m.total)}</span></div>
+      <span className="mem-l">{label}</span>
       <div className="mem-bar"><i className="mem-app" style={{ width: pct(app) }} /><i className="mem-rest" style={{ width: pct(m.used - app) }} /></div>
+      <span className="mem-n">{ram(m.used).replace(" GB", "")} / {ram(m.total)}</span>
     </div>
   );
 }
@@ -127,13 +128,16 @@ export function Sidebar() {
       </div>
       <ChatList />
       <div className="side-fill" />
-      <div className="model-card">
-        <div className="eyebrow light">Model</div>
+      <div className={"model-card " + cls}>
         <button id="model-pick" className="model-pick" aria-haspopup="listbox" aria-expanded={menuOpen}
           onClick={(e) => (e.stopPropagation(), toggleModelMenu())}>
-          <span className="mp-name">{info?.loaded ? modelName(info.model) : "Choose a model"}</span><span className="mp-caret" aria-hidden="true" />
+          <span className="mp-dot" aria-hidden="true" />
+          <span className="mp-text">
+            <span className="mp-name">{info?.loaded ? modelName(info.model) : "Choose a model"}</span>
+            <span id="model-status" className="model-status"><span className="txt">{msg}</span></span>
+          </span>
+          <span className="mp-caret" aria-hidden="true" />
         </button>
-        <div id="model-status" className={"model-status " + cls}><span className="dot" /><span className="txt">{msg}</span></div>
         <MemoryMeter />
       </div>
     </aside>
