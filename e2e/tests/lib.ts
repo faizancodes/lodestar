@@ -11,7 +11,7 @@ export const MODEL = "Qwen/Qwen3-0.6B";
 const STILL = `
   canvas { visibility: hidden !important; }
   .toast { display: none !important; }
-  .plan-clock, #start-status { visibility: hidden !important; }
+  .plan-clock, #start-status, .msg-rate { visibility: hidden !important; }
 `;
 
 /** Start recording a scenario (record mode) or load its recording into the mock (replay). */

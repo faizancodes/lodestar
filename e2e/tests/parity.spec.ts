@@ -431,3 +431,66 @@ test("chat: compare replies side by side", async ({ page }) => {
   await page.keyboard.press("Meta+3");
   await expect(page.locator("#chat-compare")).toHaveAttribute("aria-checked", "true");
 });
+
+// Assembled by hand: a Mac that's swapping, with another Python process holding a model (the machine isn't part of
+// what the recordings capture), so it's replayed only
+test("memory: the meter, a model that won't fit, unload", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "memory");
+  await page.goto("/");
+  await expect(page.locator("#mem")).toHaveClass(/\btight\b/);
+  await expect(page.locator("#mem .mem-txt")).toContainText("Swapping");
+  await expect(page.locator("#mem .mem-n")).toHaveText("31 GB of 32 GB");
+
+  await page.locator("#model-pick").click();
+  await page.locator('#model-menu .mm-row[data-id="Qwen/Qwen3-1.7B"] .mm-item').click();
+  await expect(page.locator("#fit-warn")).toBeVisible();
+  await expect(page.locator("#fit-warn h3")).toHaveText("Qwen3-1.7B won’t fit in memory");
+  await expect(page.locator("#fit-warn .fit-proc")).toHaveText(/Python \(repl\.py\)\s*19 GB/);
+  await snap(page, "memory-fit");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#fit-warn")).toHaveCount(0);
+
+  await page.locator("#model-pick").click();
+  await page.locator('#model-menu .mm-row .mact[data-act="unload"]').click();
+  await expect(page.locator("#model-status .txt")).toHaveText("No model loaded");
+  await expect(page.locator("#start")).toBeVisible();
+});
+
+// Saving and reopening go through the mock's stand-in for saved chats; the reply is chat's haiku
+test("chat: saved chats, reopened", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "chats");
+  await page.goto("/");
+  await page.keyboard.press("Meta+3");
+  await expect(page.locator("#chat-list")).toHaveCount(0);
+
+  await page.locator('#chat-mods .mod[data-mod="abl"]').click();
+  await page.locator("#chat-opts summary").click();
+  await page.locator("#chat-temp").fill("0");
+  await page.locator("#chat-max").fill("192");
+  await page.locator("#chat-model").click();
+
+  await page.locator("#chat-starters .starter", { hasText: "Write a haiku about Mondays" }).click();
+  await idle(page);
+  await expect(page.locator("#chat-list .saved-item")).toHaveCount(1);
+  await expect(page.locator("#chat-list .saved-item.on .nm")).toHaveText("Write a haiku about Mondays");
+
+  await page.keyboard.press("Meta+k");
+  await expect(page.locator("#chat-log .msg")).toHaveCount(0);
+  await expect(page.locator("#chat-list .saved-item.on")).toHaveCount(0);
+
+  // reopened as it ran: the reply, and the settings it had
+  await page.locator("#chat-list .saved-item").click();
+  await expect(page.locator("#chat-log .msg.bot .md")).toContainText("Mondays are quiet");
+  await expect(page.locator("#chat-list .saved-item.on")).toHaveCount(1);
+  await expect(page.locator("#chat-temp-v")).toHaveText("0.00");
+  await expect(page.locator("#chat-max-v")).toHaveText("192");
+  await snap(page, "chat-saved");
+
+  await page.locator("#chat-list .saved-item .del").click({ force: true });
+  await expect(page.locator("#chat-list")).toHaveCount(0);
+});

@@ -15,6 +15,21 @@ export type Status = {
   last?: string | null; // the model to open again at launch
 };
 
+/** A process holding memory, for the meter and the fit check. */
+export type MemProc = { pid: number; name: string; bytes: number };
+/** GET /api/memory */
+export type Memory = {
+  total: number;
+  used: number; // what the Mac has in use, of total
+  app: number; // Lodestar's own footprint, the model included
+  others: MemProc[];
+  swap: number;
+  pressure: "normal" | "warn" | "critical";
+  swapping: boolean; // pages went out to swap in the last few seconds
+};
+/** POST /api/memory/fit: whether a model fits beside the heavy processes already running */
+export type Fit = { known: boolean; fits: boolean; need?: number; free?: number; total?: number; used?: number; others?: MemProc[] };
+
 type Preset = { id: string; size: string; note: string };
 type DriveModel = { path: string; name: string; drive: string; size: number; copied: boolean };
 type ModelCopy = { path: string; name: string; size: number };
@@ -97,6 +112,8 @@ export type Abl = {
 export type Probes = { harmful: string[]; harmless: string[] };
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
+/** GET /api/chats: a saved conversation, as the sidebar lists it */
+export type ChatSummary = { id: string; title: string; model: string | null; updated: number; turns: number };
 
 /** One event of a stream. `error`, `cancelled` and `end` never reach a handler (see stream.ts). The streams that
  * carry text send deltas; the planning and analysis streams send richer events, typed where their views use them. */
