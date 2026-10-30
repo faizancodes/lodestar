@@ -22,10 +22,14 @@ const n3 = { "--n": 3 } as CSSProperties;
 // the status panel: how many neurons are on, under which recipe
 function StatusCard() {
   const panel = useRef<HTMLDivElement>(null), art = useRef<HTMLCanvasElement>(null);
-  const { items, name } = useApp((s) => s.recipe);
-  const tab = useApp((s) => s.tab), loaded = useApp((s) => !!s.info?.loaded);
+  const items = useApp((s) => s.recipe.items), name = useApp((s) => s.recipe.name);
+  const shown = useApp((s) => s.tab === "steer" && !!s.info?.loaded);
   const n = items.length, nd = items.filter(isDir).length;
-  useEffect(() => { requestAnimationFrame(() => drawHomeArt(art.current!, "steer", panel.current)); }, [items, name, tab, loaded]);
+  useEffect(() => {
+    if (!shown) return;
+    const raf = requestAnimationFrame(() => drawHomeArt(art.current!, "steer", panel.current));
+    return () => cancelAnimationFrame(raf);
+  }, [shown, n, nd, name]);
   // the recipe's name is the headline, so a long one wraps across the panel instead of squeezing the facts
   const title = n ? name || "Unsaved recipe" : "No recipe on";
   const facts: [string, ReactNode][] = [...(n - nd ? [["Neurons on", n - nd] as [string, number]] : []), ...(nd ? [["Directions on", nd] as [string, number]] : []),
@@ -72,9 +76,6 @@ function DirChips() {
 
 function NewDirection() {
   const d = useSteer((s) => s.dn);
-  const name = useRef<HTMLInputElement>(null), path = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (d.focus && d.open) name.current!.focus(); }, [d.focus]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (d.focusPath) path.current!.focus(); }, [d.focusPath]);
   const hint = d.kind === "persona" ? "one system prompt per line" : "one prompt per line";
   return (
     <div id="dn" className="dn" hidden={!d.open}>
@@ -84,14 +85,14 @@ function NewDirection() {
           <button data-k="topic" className={d.kind === "topic" ? "on" : undefined} onClick={() => setDn({ kind: "topic" })}>Prompts</button>
         </div>
         <button id="dn-ex" className="btn ghost sm" onClick={dnExample}>Example</button><button id="dn-close" className="x" aria-label="Close" onClick={() => setDn({ open: false })}>×</button></div>
-      <label className="field">Name<input ref={name} id="dn-name" placeholder="e.g. Nationalist" spellCheck="false" value={d.name} onChange={(e) => setDn({ name: e.target.value })} /></label>
+      <label className="field">Name<input id="dn-name" placeholder="e.g. Nationalist" spellCheck="false" value={d.name} onChange={(e) => setDn({ name: e.target.value })} /></label>
       <div className="dn-poles">
         <label className="field">Toward <span className="opt" id="dn-pos-opt">{hint}</span><textarea id="dn-pos" rows={4} spellCheck="false" value={d.pos} onChange={(e) => setDn({ pos: e.target.value })} /></label>
         <label className="field">Away from <span className="opt" id="dn-neg-opt">{hint}</span><textarea id="dn-neg" rows={4} spellCheck="false" value={d.neg} onChange={(e) => setDn({ neg: e.target.value })} /></label>
       </div>
       <div className="row tight"><button id="dn-go" className="btn" onClick={findDirection}>Find direction</button><button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>
         <span className="grow" />
-        <input ref={path} id="dn-path" className="dn-path" placeholder="or import a .npz path" spellCheck="false" value={d.path} onChange={(e) => setDn({ path: e.target.value })} />
+        <input id="dn-path" className="dn-path" placeholder="or import a .npz path" spellCheck="false" value={d.path} onChange={(e) => setDn({ path: e.target.value })} />
         <button id="dn-import" className="btn ghost sm" onClick={importDirs}>Import</button></div>
       <LiveLine id="dn-status" className="status-line" live={d.live} />
       <div id="dn-result" hidden={!d.result}>

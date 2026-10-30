@@ -28,7 +28,13 @@ export async function deleteDir(d: Direction) {
   refreshDirs();
 }
 
-export const toggleDn = () => setDn(dn().open ? { open: false } : { open: true, focus: dn().focus + 1 });
+const focus = (id: string) => document.getElementById(id)?.focus();
+
+export function toggleDn() {
+  if (dn().open) return setDn({ open: false });
+  flushSync(() => setDn({ open: true })); // shown before it can take focus
+  focus("dn-name");
+}
 
 export async function dnExample() {
   let ex: { name: string; pos: string[]; neg: string[] };
@@ -41,7 +47,7 @@ const say = (text: string, running: boolean) => setDn({ live: { text, running } 
 export async function findDirection() {
   if (app().busy) return;
   const d = dn(), pos = lines(d.pos), neg = lines(d.neg), name = d.name.trim();
-  if (!name) return setDn({ focus: d.focus + 1 });
+  if (!name) return focus("dn-name");
   if (pos.length < 2 || neg.length < 2) return toast("Give each side at least two lines.", true);
   setDn({ result: null, made: null });
   let label = "", tries: ReturnType<typeof sink>[] = [];
@@ -75,7 +81,7 @@ export function turnOnMade() {
 
 export async function importDirs() {
   const path = dn().path.trim();
-  if (!path || app().busy) return setDn({ focusPath: dn().focusPath + 1 });
+  if (!path || app().busy) return focus("dn-path");
   say("Importing…", true);
   try {
     const r = await api<{ added: { name: string }[] }>("/api/directions/import", { path });

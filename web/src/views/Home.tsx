@@ -15,17 +15,16 @@ const CARDS: { go: HomeArt; title: string; text: string; key: string }[] = [
 export function Home({ hidden }: { hidden: boolean }) {
   const s = useApp((s) => s.info);
   const cur = useApp((s) => s.abl?.current);
-  const saved = useApp((s) => s.saved);
+  const mine = useApp((s) => (s.saved || []).filter((r) => modelName(r.model) === modelName(s.info?.model)).length);
   const shown = !hidden && !!s?.loaded;
   useEffect(() => {
     if (!shown) return;
     const raf = requestAnimationFrame(() => document.querySelectorAll<HTMLCanvasElement>(".home-art")
       .forEach((c) => drawHomeArt(c, c.dataset.art as HomeArt, c.closest<HTMLElement>(".home-card"))));
     return () => cancelAnimationFrame(raf);
-  }, [shown, s, cur, saved]);
+  }, [shown, s?.model, cur, mine]);
   const dev = s?.device && ({ mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device);
   const specs: [string, unknown][] = [["Parameters", s?.params && `${(s.params / 1e9).toFixed(1)}B`], ["Layers", s?.layers], ["Runs on", dev], ["Precision", s?.dtype]];
-  const mine = (saved || []).filter((r) => modelName(r.model) === modelName(s?.model)).length;
   const status: Record<HomeArt, JSX.Element | string> = {
     abliterate: cur?.active ? <><i className="hc-on" />Refusals erased at layer {cur.layer}</> : cur ? "Direction saved, switched off" : "",
     steer: mine ? `${mine} saved` : "",

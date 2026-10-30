@@ -13,13 +13,13 @@ const cancel = () => api("/api/cancel", {});
 
 // the switches for what shapes replies: the erased refusal direction, and the recipe that's on
 function Mods() {
-  const abl = useApp((s) => s.abl), items = useApp((s) => s.recipe.items), on = useApp(ablActive);
+  const found = useApp((s) => !!s.abl?.ready && !!s.abl.current), items = useApp((s) => s.recipe.items), on = useApp(ablActive);
   const steer = useChat((s) => s.steer);
   const n = items.length, nd = items.filter(isDir).length, nn = n - nd;
   const what = [nn && `${nn} neuron${nn > 1 ? "s" : ""}`, nd && `${nd} direction${nd > 1 ? "s" : ""}`].filter(Boolean).join(", ");
   return (
     <div className="chat-mods" id="chat-mods">
-      {abl?.ready && abl.current && <button className={on ? "mod on" : "mod"} data-mod="abl" title="Erase the refusal direction in replies"
+      {found && <button className={on ? "mod on" : "mod"} data-mod="abl" title="Erase the refusal direction in replies"
         onClick={() => setAblActive(!on)}>Refusals erased</button>}
       {!!n && <button className={steer ? "mod on" : "mod"} data-mod="steer" title={items.map(labelOf).join(", ")}
         onClick={toggleSteer}>Steered · {what}</button>}
@@ -116,7 +116,6 @@ function Composer() {
 export function Chat({ hidden }: { hidden: boolean }) {
   const model = useApp((s) => (s.info?.loaded ? modelName(s.info.model) ?? "" : ""));
   const started = useChat((s) => s.messages.length > 0);
-  useChat((s) => s.v);
   return (
     <section id="view-chat" className="view chat" data-view="chat" hidden={hidden}>
       <header className="chat-h">

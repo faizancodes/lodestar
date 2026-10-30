@@ -5,6 +5,7 @@
 import { createElement, Fragment, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { fmt, isDir, labelOf, pushes } from "../lib/format";
+import { save } from "../lib/storage";
 import { stream } from "../lib/stream";
 import type { DirItem, Item, NeuronItem, NeuronRow } from "../lib/types";
 import { ablActive, useApp } from "../store/app";
@@ -34,7 +35,7 @@ export function nOn(items: Item[]) {
 }
 
 export function setCompare(on: boolean) {
-  try { localStorage.setItem("tl-compare", on ? "1" : "0"); } catch { /* the choice just isn't remembered */ }
+  save("tl-compare", on ? "1" : "0");
   set({ compare: on });
 }
 

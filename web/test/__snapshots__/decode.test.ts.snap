@@ -2,14 +2,14 @@
 
 exports[`decoder leaves the DOM ui/decode.js did (reduced motion: false) > on every recorded stream 1`] = `
 {
-  "length": 11128564,
-  "sha256": "9798d5dc951b38c7979957073262d88430c224534cf984eef5450ac01d3908df",
+  "length": 5678526,
+  "sha256": "f5566dbb9218952163b163823fb82bcc10846c26c18fc1b7bb72d9b0682d89f7",
 }
 `;
 
 exports[`decoder leaves the DOM ui/decode.js did (reduced motion: true) > on every recorded stream 1`] = `
 {
-  "length": 2078094,
-  "sha256": "a5a55c9f4a9ca1b5af98eb002de736312bb66174f992a798bfa61078daa963a0",
+  "length": 797261,
+  "sha256": "7e15e6e6a48b65e3227b757a851525926ec2c4a457326af45a0ceffc22c2b860",
 }
 `;

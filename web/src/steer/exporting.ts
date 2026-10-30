@@ -29,7 +29,7 @@ export async function pollExport(p: "abl" | "st") {
           setExp({ saved: { ...exp().saved, [p]: { name: s.name!, dst: s.dst! } } });
           toast(`Saved ${s.name}.`);
           await refreshModels();
-        } else if (/^error/.test(s.status)) toast(s.status.replace(/^error: /, "Couldn’t save: "), true);
+        } else if (s.status.startsWith("error")) toast(s.status.replace(/^error: /, "Couldn’t save: "), true);
         break;
       }
       await sleep(800);

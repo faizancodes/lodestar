@@ -16,15 +16,23 @@ const cancel = () => api("/api/cancel", {});
 const xs = (c: number | null) => (c == null ? "" : `${(+c).toFixed(2)}×`);
 const STEPS = ["Read", "Compare", "Try layers", "Check"];
 
+const act = (label: string, onClick: () => void, cls = "") => <button className={"tl-act" + cls} onClick={onClick}>{label}</button>;
+const verdict = (ref: boolean | null, worse = false) => ref == null ? null
+  : <span className={ref ? "tl-n bad" : "tl-n"}>{ref ? "Refused" : "Answered"}{worse ? " · writing got worse" : ""}</span>;
+
 const useReady = () => useApp((s) => !!s.abl?.ready && !!s.abl.current);
 
 // the status panel: where the direction is, how strongly it's erased, and the switch for it
 function StatusCard() {
   const panel = useRef<HTMLDivElement>(null), art = useRef<HTMLCanvasElement>(null);
-  const abl = useApp((s) => s.abl), tab = useApp((s) => s.tab), loaded = useApp((s) => !!s.info?.loaded);
+  const c = useApp((s) => (s.abl?.ready ? s.abl.current : null));
+  const shown = useApp((s) => s.tab === "abliterate" && !!s.info?.loaded);
   const on = useApp(ablActive), ready = useReady();
-  const c = abl?.ready ? abl.current : null;
-  useEffect(() => { requestAnimationFrame(() => drawHomeArt(art.current!, "abliterate", panel.current)); }, [abl, tab, loaded]);
+  useEffect(() => {
+    if (!shown) return;
+    const raf = requestAnimationFrame(() => drawHomeArt(art.current!, "abliterate", panel.current));
+    return () => cancelAnimationFrame(raf);
+  }, [shown, c?.active, c?.layer, c?.coef]);
   return (
     <div className={c?.active ? "status-panel on" : "status-panel"} id="abl-status" ref={panel}>
       <canvas id="abl-status-art" aria-hidden="true" ref={art} />
@@ -107,9 +115,6 @@ function Thread() {
 }
 
 function Answer({ e, i, last, cmp, cur, busy }: { e: Entry; i: number; last: boolean; cmp: boolean; cur: number; busy: boolean }) {
-  const act = (label: string, onClick: () => void, cls = "") => <button className={"tl-act" + cls} onClick={onClick}>{label}</button>;
-  const verdict = (ref: boolean | null, worse = false) => ref == null ? null
-    : <span className={ref ? "tl-n bad" : "tl-n"}>{ref ? "Refused" : "Answered"}{worse ? " · writing got worse" : ""}</span>;
   const acts = last
     ? <>{act("Compare with normal", () => setCompare(!cmp), cmp ? " on" : "")}{act("Stronger", () => nudge(1), e.refused ? " hint" : "")}
         {act("Weaker", () => nudge(-1), e.worse ? " hint" : "")}{e.change && act("Undo", undoNudge)}</>

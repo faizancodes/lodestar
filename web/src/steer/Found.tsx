@@ -49,7 +49,8 @@ function NeuronBody({ d, on }: { d: NeuronDetail; on: boolean }) {
   let fires = null;
   if (d.trace && inspected) {
     const a = d.trace.acts, s = d.trace.n_prompt;
-    const mx = Math.max(...a.slice(s).map(Math.abs), 1e-6);
+    let mx = 1e-6;
+    for (let i = s; i < a.length; i++) mx = Math.max(mx, Math.abs(a[i]));
     fires = (
       <>
         <h4>In the reply you inspected</h4>
