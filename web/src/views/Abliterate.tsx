@@ -53,19 +53,25 @@ function StatusCard() {
   );
 }
 
-function Rank() {
-  const r = useAbl((s) => s.rank), n = useAbl((s) => s.rankN);
-  if (!r) return <div id="abl-rank" />;
-  const top = Math.max(r.top_score, 1e-9);
+// What the search did: of the new bad requests, how many the model refused before and how many it refuses now
+function Result() {
+  const r = useAbl((s) => s.rank), done = useAbl((s) => s.plan.done);
+  if (!r || !done) return null;
+
+  const row = (label: string, refused: number) => (
+    <div className="abl-res-row" data-row={label.toLowerCase()}>
+      <span className="abl-res-l">{label}</span>
+      <span className="abl-dots" aria-hidden="true">{Array.from({ length: r.tried }, (_, i) => <i key={i} className={i < refused ? "no" : undefined} />)}</span>
+      <span className="abl-res-n"><b>{refused}</b> refused</span>
+    </div>
+  );
 
   return (
-    <div id="abl-rank"><details className="adv" key={n}><summary>Match by layer</summary>{r.ranking.map((x) => (
-      <div key={x.layer} className={x.layer === r.layer ? "rank-row sel" : "rank-row"}>
-        <span className="nid">L{x.layer}</span><span className="pt-bar"><i style={{ width: `${Math.round((x.score / top) * 100)}%` }} /></span>
-        <span className="rk-v">{Math.round(x.score * 100)}%</span>
-        <span className="rk-tag">{x.tried ? `${x.refused} of ${x.tried} refused` : "not tried"}{x.layer === r.layer ? " · chosen" : ""}</span>
-      </div>
-    ))}</details></div>
+    <div className="abl-res" id="abl-result">
+      <p className="abl-res-h">{r.tried} new requests it should refuse</p>
+      {r.refused_before != null && row("Before", r.refused_before)}
+      {row("Now", r.refused_left)}
+    </div>
   );
 }
 
@@ -88,7 +94,7 @@ function Step1() {
               {editing ? "Done" : "Edit"}
             </button>
           </div>
-          <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>
+          {plan.running && <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>}
           <button id="abl-go" className={ready ? "btn ghost" : "btn"} disabled={plan.running} onClick={analyze}>{ready ? "Find it again" : "Find it"}</button>
         </div>
 
@@ -114,8 +120,8 @@ function Step1() {
           ))}</ol>
           <div className="abl-scene" id="abl-scene" hidden={!plan.scene}><canvas aria-hidden="true" /></div>
           <LiveLine className="plan-now status-line" live={plan.live} />
+          <Result />
         </div>
-        <Rank />
       </div>
     </div>
   );
