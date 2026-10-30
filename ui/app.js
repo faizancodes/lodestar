@@ -477,9 +477,13 @@ function renderSteerStatus() {
   const n = state.recipe.items.length;
   $("#steer-status").classList.toggle("on", n > 0);
   $("#st-s1").classList.toggle("done", n > 0);
-  const facts = [["Neurons on", n], ["Recipe", n ? state.recipe.name || "Unsaved" : "None"],
-    ["Status", n ? `<i class="hc-on"></i>Steering every reply` : "Nothing on"]];
-  $("#steer-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd${v === "None" || v === "Nothing on" ? ' class="dim"' : ""}>${typeof v === "string" && !v.startsWith("<") ? esc(v) : v}</dd></div>`).join("");
+  // the recipe's name is the headline, so a long one wraps across the panel instead of squeezing the facts
+  const title = $("#steer-title");
+  title.textContent = n ? state.recipe.name || "Unsaved recipe" : "No recipe on";
+  title.title = title.textContent;
+  title.classList.toggle("dim", !n || !state.recipe.name);
+  const facts = [["Neurons on", n], ["Status", n ? `<i class="hc-on"></i>Steering every reply` : "Off"]];
+  $("#steer-facts").innerHTML = facts.map(([k, v]) => `<div><dt>${k}</dt><dd${v === "Off" ? ' class="dim"' : ""}>${v}</dd></div>`).join("");
   requestAnimationFrame(() => drawHomeArt($("#steer-status-art"), "steer", $("#steer-status")));
 }
 
