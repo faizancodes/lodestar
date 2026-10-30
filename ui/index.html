@@ -240,16 +240,17 @@
 
       <div class="step" id="st-s2">
         <div class="step-h"><span class="num">02</span><div><h3>Try it and refine</h3>
-          <p class="step-sub">Ask it something. If the answer isn’t right, say what should change: the neurons are retuned and it answers again.</p></div></div>
-        <div class="card try">
-          <div class="ask">
-            <input id="t-prompt" value="Describe the way you look." spellcheck="false" autocomplete="off">
-            <button class="btn ghost" data-cancel>Stop</button>
-            <button id="t-go" class="btn">Ask</button>
-          </div>
-          <div class="chips" id="t-chips"></div>
-        </div>
+          <p class="step-sub">Ask it something. If the answer isn’t right, say what should change and it tries again.</p></div></div>
         <div id="tl" class="tl" hidden></div>
+        <form id="tl-form" class="tl-comp" autocomplete="off">
+          <div class="composer">
+            <input id="t-prompt" spellcheck="false" placeholder="Ask it something">
+            <button type="button" class="tl-newq" id="tl-newq" hidden>New question</button>
+            <button type="button" class="send stop" id="tl-stop" aria-label="Stop"><i></i></button>
+            <button type="submit" class="send" id="t-go" aria-label="Send"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4m0 0L5 9m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="tl-sugg" id="t-chips"></div>
+        </form>
       </div>
 
       <div class="step locked" id="st-s3">
