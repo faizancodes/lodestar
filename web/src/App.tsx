@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { boot, setTab, toggleModelMenu } from "./shell/engine";
 import { TABS, useApp } from "./store/app";
+import { Abliterate } from "./views/Abliterate";
 import { Home } from "./views/Home";
 import { Start } from "./views/Start";
 import { Steer } from "./views/Steer";
@@ -44,14 +45,8 @@ export function App() {
       <main id="main" className={loaded && tab === "chat" ? "is-chat" : undefined}>
         <Start />
         <Home hidden={hidden("home")} />
-        {/* TODO(Phases 5–6): the rest of these pages; only their headers so far */}
-        <section id="view-abliterate" className="view page" data-view="abliterate" hidden={hidden("abliterate")}>
-          <header className="page-h">
-            <h2>Abliterate</h2>
-            <p>Erase the model’s refusal direction, check the result, then save it as a new model{" "}
-              (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>).</p>
-          </header>
-        </section>
+        {/* TODO(Phase 6): the rest of Chat; only its header so far */}
+        <Abliterate hidden={hidden("abliterate")} />
         <Steer hidden={hidden("steer")} />
         <section id="view-chat" className="view chat" data-view="chat" hidden={hidden("chat")}>
           <header className="chat-h">
