@@ -265,6 +265,7 @@ export async function deleteSaved(id: string) {
 export function openSaved(r: Recipe) {
   set({ recipe: JSON.parse(JSON.stringify(r)) });
   refreshSaved();
+  if (get().tab !== "chat") setTab("steer"); // in Chat it steers the replies, so stay
 }
 
 export async function refreshAbl() {
