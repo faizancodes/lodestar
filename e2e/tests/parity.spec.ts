@@ -559,18 +559,17 @@ test("chat: neurons pushed by hand", async ({ page }) => {
   await expect(page.locator(".nr-pin")).toHaveCount(1);
   await expect(page.locator('#chat-mods .mod[data-mod="steer"]')).toHaveText("Steered · 1 neuron");
 
-  // or picked off a map of the neurons behind a word
+  // or switched on from the neurons behind a word
   await page.locator('#chat-pick-by [data-by="map"]').click();
   await expect(page.locator("#chat-find")).toBeFocused();
   await page.locator("#chat-find").fill("evil");
   await page.locator("#chat-find").press("Enter");
-  await expect(page.locator("#chat-map .nr-dot")).toHaveCount(14);
-  const dot = page.locator('#chat-map [data-dot="18:2207"]');
-  await dot.hover();
-  await expect(page.locator("#chat-map-info")).toContainText("L18N2207Turn up");
-  await expect(page.locator("#chat-map-info .nr-lens")).toHaveText("villain · evil · wicked");
-  await dot.click();
-  await expect(dot).toHaveClass(/\bin\b/);
+  await expect(page.locator("#chat-found .nr-card")).toHaveCount(14);
+  const card = page.locator('#chat-found [data-card="18:2207"]');
+  await expect(card).toContainText("L18N2207up");
+  await expect(card.locator(".nr-lens")).toHaveText("villain · evil · wicked");
+  await card.click();
+  await expect(card).toHaveAttribute("aria-checked", "true");
   await expect(page.locator('.nr-pin[data-pin="18:2207"] input')).toHaveValue("+0.36");
   await snap(page.locator("#chat-neurons"), "chat-neuron-map");
 
