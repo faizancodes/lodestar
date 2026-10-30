@@ -24,6 +24,7 @@ over overshoots past zero, which sometimes finishes off leftover refusal-inducin
 import re
 import sys
 import threading
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -381,15 +382,123 @@ def _orth_in(W, v, coef):
         W.copy_(Wf.to(W.dtype))
 
 
-def bake(eng, vec, coef, dst, progress, cancel=None):
-    """Load a fresh copy of the current model's weights on the CPU, orthogonalize every matrix that writes to the
-    residual stream (o_proj + down_proj of layers 1..L, the embedding, and the unembedding — which also finishes
-    off the small component the final norm can smuggle back into the logits), and save to `dst` with the
-    tokenizer. progress(done,total) for the edit phase; raises on cancel between phases."""
+def steer_biases(eng, items):
+    """A recipe's add-pushes as the constant each one adds to the residual stream, summed per layer: {layer: [hidden]}.
+    Pushing neuron n by dose adds dose·unit to its activation at every position, so down_proj adds that times its
+    column n."""
+    out = {}
+    for it in items:
+        l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
+        col = eng.layers[l].mlp.down_proj.weight[:, n].detach().float().cpu()
+        out[l] = out.get(l, 0) + dose * float(eng.unit[l, n]) * col
+    return out
+
+
+def fit_steer_biases(eng, items, prompts, progress, cancel=None, abl=False):
+    """The portable form of a recipe for models without an MLP bias: one bias on the next layer's o_proj per pushed
+    layer. Placed there as is, it misses the one attention block between, which loses up to half a mid-layer
+    push's effect; so each bias is fitted (Adam on KL) to make the copy's next-token distributions match live
+    steering over the model's own steered replies to `prompts`. On Qwen3-0.6B this cut held-out KL 3-5x.
+    Returns {layer: bias} on the CPU."""
+    from .engine import Push
+
+    exact = steer_biases(eng, items)
+    pushes = [Push.of(i) for i in items]
+    steps = 60 if eng.n_params < 2.5e9 else 30
+
+    def run(ids, keep, push=None, extra=None):
+        eng._push_state = eng._make_push_state([push], 1) if push else None
+        if abl:
+            eng._abl_mask, eng._abl_any = torch.tensor([True], device=eng.dev), True
+        hs = [eng.layers[l + 1].self_attn.o_proj.register_forward_hook(lambda m, i, o, b=b: o + b.to(o.dtype))
+              for l, b in (extra or {}).items()]
+        try:
+            return eng.model(input_ids=ids, use_cache=False, logits_to_keep=keep).logits[0].float().log_softmax(-1)
+        finally:
+            for h in hs:
+                h.remove()
+            eng._push_state = None
+            eng._abl_mask, eng._abl_any = None, False
+
+    with eng.lock:
+        progress(0, steps, "Writing replies to match…")
+        _, gen = eng.generate_text([(eng.chat_ids(p), pushes) for p in prompts], max_new=40, cancel=cancel,
+                                   abl=abl or None)
+        seqs = [(torch.tensor([eng.chat_ids(p) + g], device=eng.dev), len(g) + 1) for p, g in zip(prompts, gen)]
+        with torch.no_grad():
+            targets = [run(ids, k, push=pushes) for ids, k in seqs]
+        bs = {l: b.to(eng.dev).clone().requires_grad_(True) for l, b in exact.items()}
+        opt = torch.optim.Adam([{"params": [bs[l]], "lr": float(exact[l].norm()) * 0.003} for l in bs])
+        with torch.enable_grad():
+            for step in range(steps):
+                if cancel is not None and cancel.is_set():
+                    raise Cancelled()
+                opt.zero_grad()
+                for t, (ids, k) in zip(targets, seqs):  # one sequence at a time keeps the activations small
+                    q = run(ids, k, extra=bs)
+                    ((t.exp() * (t - q)).sum(-1).mean() / len(seqs)).backward()
+                opt.step()
+                progress(step + 1, steps, "Matching the steering in the weights…")
+    if eng.dev == "mps":
+        torch.mps.empty_cache()
+    return {l: b.detach().float().cpu() for l, b in bs.items()}
+
+
+def _zero_bias(mod):
+    if mod is not None and mod.bias is None:
+        mod.bias = torch.nn.Parameter(torch.zeros(mod.out_features, dtype=mod.weight.dtype))
+
+
+def _build_in_steering(model, layers, biases, v=None, coef=1.0, fitted=None):
+    """Give the model the biases that hold a recipe. A constant push needs a bias somewhere; most of these models
+    ship without one, so this switches one on in the config (zeros everywhere but where the push goes):
+      mlp_bias (Llama-style)        down_proj of the pushed layer: exactly what steering does
+      attention_bias (Qwen3, ...)   o_proj of the next layer, which is the same push one attention block later;
+                                    `fitted` (from fit_steer_biases) makes up for that block. Returns the exact
+                                    biases for the app to put back in place of these (see Engine.load).
+    With the refusal direction erased too, the push loses its part along that direction, as it does live."""
+    cfg = model.config
+    proj = (lambda b: b - coef * (b @ v) * v) if v is not None else (lambda b: b)
+    biases = {l: proj(b) for l, b in biases.items()}
+    if getattr(cfg, "mlp_bias", None) is not None:
+        cfg.mlp_bias = True
+        for layer in layers:
+            for name in ("gate_proj", "up_proj", "down_proj"):
+                _zero_bias(getattr(layer.mlp, name, None))
+        for l, b in biases.items():
+            layers[l].mlp.down_proj.bias.data += b.to(layers[l].mlp.down_proj.bias.dtype)
+        return
+    if getattr(cfg, "attention_bias", None) is None:
+        raise ValueError("This kind of model has no bias to hold steering, so it can't be saved with it built in.")
+    if any(l + 1 >= len(layers) or getattr(getattr(layers[l + 1], "self_attn", None), "o_proj", None) is None
+           for l in biases):
+        raise ValueError("A neuron in this recipe is in a layer whose push can't be built into the weights.")
+    cfg.attention_bias = True
+    for layer in layers:
+        attn = getattr(layer, "self_attn", None)
+        for name in ("q_proj", "k_proj", "v_proj", "o_proj"):
+            _zero_bias(getattr(attn, name, None))
+    for l, b in biases.items():
+        o = layers[l + 1].self_attn.o_proj
+        o.bias.data += proj(fitted[l] if fitted else b).to(o.bias.dtype)
+    return biases
+
+
+def bake(eng, dst, progress, cancel=None, abl=None, steer=None, fit_prompts=None, recipe=None):
+    """Load a fresh copy of the current model's weights on the CPU, edit them, and save to `dst` with the tokenizer.
+    abl=(vec, coef): orthogonalize every matrix that writes to the residual stream (o_proj + down_proj of layers
+    1..L, the embedding, and the unembedding, which also finishes off the small component the final norm can
+    smuggle back into the logits). steer=[{layer, neuron, dose}]: build a recipe's pushes in as biases, fitted on
+    `fit_prompts` where they can't go in exactly, keeping the exact ones beside the weights for this app.
+    progress(done,total,msg) for the edit phase; raises on cancel between phases."""
     from transformers import AutoModelForCausalLM
 
     from .engine import Engine
 
+    biases = steer_biases(eng, steer) if steer else None  # from the live weights the recipe was tuned on
+    fitted = None
+    if biases and getattr(eng.model.config, "mlp_bias", None) is None and fit_prompts:
+        fitted = fit_steer_biases(eng, steer, fit_prompts, progress, cancel, abl=bool(abl))
     progress(0, 0, "Reading the weights from disk…")
     model = AutoModelForCausalLM.from_pretrained(eng.model_id, dtype=torch.bfloat16, device_map="cpu",
                                                  low_cpu_mem_usage=True)
@@ -397,32 +506,45 @@ def bake(eng, vec, coef, dst, progress, cancel=None):
         del model
         raise Cancelled()
     layers = Engine._find_layers(model)
-    embed = model.get_input_embeddings()
-    head = model.get_output_embeddings()
-    tied = head is not None and head.weight is embed.weight
-    v = torch.tensor([float(x) for x in vec]).float()
-    mats = []
-    for i, layer in enumerate(layers[1:], 1):  # layer 0 only ever passes the embedding through
-        mats += [("attention write", layer, getattr(getattr(layer, "self_attn", None), "o_proj", None)),
-                 ("mlp write", layer, getattr(layer, "mlp", None).down_proj)]
-    total = len(mats) + 1 + (0 if tied else 1)
-    progress(0, total, "Erasing the direction from the weights…")
-    done = 0
-    for _, layer, mod in mats:
-        if cancel is not None and cancel.is_set():
-            raise Cancelled()
-        if mod is None:
-            continue
-        _orth_out(mod.weight, v, coef)
+    v = coef = None
+    total = 1 if biases else 0
+    if abl:
+        vec, coef = abl
+        embed = model.get_input_embeddings()
+        head = model.get_output_embeddings()
+        tied = head is not None and head.weight is embed.weight
+        v = torch.tensor([float(x) for x in vec]).float()
+        mats = []
+        for i, layer in enumerate(layers[1:], 1):  # layer 0 only ever passes the embedding through
+            mats += [("attention write", layer, getattr(getattr(layer, "self_attn", None), "o_proj", None)),
+                     ("mlp write", layer, getattr(layer, "mlp", None).down_proj)]
+        total += len(mats) + 1 + (0 if tied else 1)
+        progress(0, total, "Erasing the direction from the weights…")
+        done = 0
+        for _, layer, mod in mats:
+            if cancel is not None and cancel.is_set():
+                raise Cancelled()
+            if mod is None:
+                continue
+            _orth_out(mod.weight, v, coef)
+            done += 1
+            progress(done, total, "Erasing the direction from the weights…")
+        _orth_in(embed.weight, v, coef)
         done += 1
         progress(done, total, "Erasing the direction from the weights…")
-    _orth_in(embed.weight, v, coef)
-    done += 1
-    progress(done, total, "Erasing the direction from the weights…")
-    if head is not None and not tied:
-        _orth_in(head.weight, v, coef)
-        done += 1
-        progress(done, total, "Erasing the direction from the weights…")
+        if head is not None and not tied:
+            _orth_in(head.weight, v, coef)
+            done += 1
+            progress(done, total, "Erasing the direction from the weights…")
+    if biases:
+        progress(total - 1, total, "Building the steering into the weights…")
+        exact = _build_in_steering(model, layers, biases, v, coef or 1.0, fitted)
+        if exact:
+            from safetensors.torch import save_file
+
+            save_file({f"layer.{l}": b.contiguous() for l, b in exact.items()}, str(Path(dst) / "lodestar_steering.safetensors"))
+            model.config.lodestar_steering = {"file": "lodestar_steering.safetensors", "layers": sorted(exact),
+                                              "recipe": recipe or ""}
     progress(total, total, "Saving the edited model…")
     model.save_pretrained(dst, safe_serialization=True, max_shard_size="4GB")
     eng.tok.save_pretrained(dst)

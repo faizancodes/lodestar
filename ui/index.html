@@ -254,6 +254,29 @@
         </div>
         <div id="runs" class="runs"></div>
       </div>
+
+      <div class="step locked" id="st-s3">
+        <div class="step-h"><span class="num">03</span><div><h3>Save it as a new model</h3>
+          <p class="step-sub">Writes a copy with these neurons built into its weights. It steers exactly when loaded here, and very nearly the same in other apps.</p></div></div>
+        <div class="card">
+          <div class="save-row">
+            <label class="field grow">Name
+              <input id="st-name" spellcheck="false" autocomplete="off">
+            </label>
+            <button id="st-bake" class="btn">Save model</button>
+            <button id="st-export-stop" class="btn ghost" hidden>Stop</button>
+          </div>
+          <label class="check" id="st-abl-row" hidden><input id="st-abl" type="checkbox" checked> Keep its refusals erased too</label>
+          <div id="st-export" class="export" hidden>
+            <div class="export-bar"><i></i></div>
+            <div class="export-line status-line"></div>
+          </div>
+          <div id="st-saved" class="saved-model" hidden>
+            <div><b></b><span>On this Mac</span></div>
+            <button class="btn" id="st-load">Load it</button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
