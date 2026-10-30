@@ -13,6 +13,7 @@ push adds dose / len(layers) times the direction's contrast size to the output o
 the stream by one average difference between the concept's two poles; `erase` clamps the stream's component along it
 to where ordinary prompts sit, at every layer.
 """
+import os
 import re
 import threading
 import time
@@ -22,6 +23,10 @@ import numpy as np
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
+
+# transformers 5 moves weights onto the device from a pool of threads, and on Apple GPUs concurrent copies race in
+# torch's Metal kernel cache and abort the process (malloc corruption in MetalShaderLibrary). One thread is safe.
+os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
 LAYER_RE = re.compile(r"\blayers\.(\d+)\.")  # a decoder layer's weights, by name ("model.layers.13.mlp.down_proj.weight")
 
