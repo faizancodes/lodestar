@@ -1554,6 +1554,13 @@ async function openNeuron(l, n, anchor) {
   };
 }
 
+// At launch, open the model that was loaded last time, if it's still on this Mac or a plugged-in drive.
+function resumeLastModel() {
+  const s = state.info, c = modelChoices();
+  if (s.loaded || s.status !== "idle" || !s.last) return;
+  if ([...c.here, ...c.drives].some((x) => x.id === s.last)) loadModel(s.last);
+}
+
 // ------------------------------------------------------------------ boot
 (async function boot() {
   setTab(tab);
@@ -1563,6 +1570,7 @@ async function openNeuron(l, n, anchor) {
     await refreshModels();
     await refreshAbl();
     renderStatus(await api("/api/status"));
+    resumeLastModel();
     if ((await api("/api/models/copy")).status === "copying") pollCopy();
     if ((await api("/api/abl/export")).status === "working") pollAblExport();
     if (!state.info.loaded && state.info.status !== "idle") pollStatus();
