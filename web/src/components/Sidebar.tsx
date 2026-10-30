@@ -71,7 +71,7 @@ export function Sidebar() {
         <TabButton tab="steer" label="Steer"><i className="tab-count" id="tab-steer-count" hidden={!steerCount}>{steerCount || null}</i></TabButton>
         <TabButton tab="chat" label="Chat" />
       </nav>
-      <div className="saved" data-for="steer">
+      <div className="saved">
         <div className="side-h"><span className="eyebrow light">Saved</span></div>
         <SavedList />
       </div>
