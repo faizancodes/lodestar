@@ -34,4 +34,6 @@ mkdir -p "\$HOME/Library/Logs"
 exec "$UV" run --project "$ROOT" python -m interp.app >> "\$HOME/Library/Logs/Lodestar.log" 2>&1
 SH
 chmod +x "$APP/Contents/MacOS/Lodestar"
+# macOS caches icons by bundle path, so a rebuilt icon only shows once the bundle is registered again
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" || true
 echo "built: $APP"
