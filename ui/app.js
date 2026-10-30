@@ -1216,7 +1216,7 @@ async function send() {
   const desc = up.length ? state.recipe.items.map(labelOf).slice(0, 3).join(" + ")
     : withAb ? "refusal direction erased" : "nothing changed";
   run.innerHTML = `<div class="run-q">${esc(prompt)}<span>${desc}</span></div><div class="cols" style="--n:${cols.length}">${cols
-    .map((c) => `<div class="out ${c === "up" || c === "abl" ? "steered" : ""}" data-c="${c}"><div class="out-h">${names[c]}<button class="insp" hidden>Inspect</button></div><div class="out-b typing"></div></div>`)
+    .map((c) => `<div class="out ${c === "up" || c === "abl" ? "steered" : ""}" data-c="${c}"><div class="out-h">${names[c]}<button class="insp" hidden>Inspect</button>${c === "up" ? `<button class="insp fix-b" hidden>Fix this</button>` : ""}</div><div class="out-b typing"></div></div>`)
     .join("")}</div>`;
   $("#runs").prepend(run);
   const outs = Object.fromEntries(cols.map((c) => [c, $(`[data-c=${c}] .out-b`, run)]));
@@ -1229,6 +1229,84 @@ async function send() {
     b.onclick = () => inspect($(".cols", run), prompt, outs[c].textContent, c === "up" ? up : c === "down" ? down : [],
       names[c], c === "abl" || (c === "up" && withAb));
   }
+  const fb = $(".fix-b", run);
+  if (fb && outs.up.textContent) ((fb.hidden = false), (fb.onclick = () => openFix(run, prompt, outs.up.textContent)));
+}
+
+// ------------------------------------------------------------------ fix a steered reply
+// Say what's wrong with a Changed reply: the model writes the answer it should have given, the neurons that are on
+// are retuned toward it (turned up, down or off, or new ones added), and the question runs again. Undo puts the
+// neurons back.
+const FIX_CHIPS = ["It repeats itself", "It's too strong", "It's too weak", "It went off topic"];
+
+function openFix(run, prompt, bad) {
+  let box = $(".fix", run);
+  if (box) return box.hidden ? ((box.hidden = false), $("input", box).focus()) : (box.hidden = true);
+  box = document.createElement("div");
+  box.className = "fix";
+  box.innerHTML = `<b class="fix-h">What’s wrong with it?</b>
+    <div class="ask"><input spellcheck="false" autocomplete="off" placeholder="e.g. It repeats itself. It should sound like a devout Muslim, not quote the Bible.">
+      <button class="btn">Fix</button></div>
+    <div class="chips">${FIX_CHIPS.map((c) => `<button class="chip">${c}</button>`).join("")}</div>
+    <div class="plan-now status-line fix-now"></div>
+    <div class="fix-aim" hidden><span class="eyebrow">Aiming for</span><div class="fix-aim-b"></div></div>
+    <div class="fix-done" hidden></div>`;
+  $(".cols", run).after(box);
+  const input = $("input", box);
+  $$(".chip", box).forEach((c) => (c.onclick = () => {
+    const v = input.value.trim();
+    input.value = v ? `${v.replace(/[.\s]*$/, "")}. ${c.textContent}.` : `${c.textContent}.`;
+    input.focus();
+  }));
+  const go = () => runFix(box, prompt, bad, input.value.trim());
+  $(".btn", box).onclick = go;
+  input.onkeydown = (e) => e.key === "Enter" && go();
+  input.focus();
+}
+
+async function runFix(box, prompt, bad, feedback) {
+  if (!feedback) return $("input", box).focus();
+  if (!state.recipe.items.length) return toast("Turn on some neurons first.", true);
+  const prev = state.recipe.items.map((i) => ({ ...i }));
+  const live = $(".fix-now", box), aim = $(".fix-aim", box), aimB = $(".fix-aim-b", box), done = $(".fix-done", box);
+  aim.hidden = done.hidden = true;
+  aimB.textContent = "";
+  aimB._dec = null;
+  $(".btn", box).disabled = true;
+  let label = "", result = null;
+  setLive(live, "Starting…", true);
+  const prompts = $("#d-prompts").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  const ok = await stream("/api/tune/refine", { recipe: prev, feedback, prompt, bad, behavior: state.recipe.name || "", prompts }, (ev) => {
+    if (ev.type === "stage") setLive(live, (label = ev.label) + "…", true);
+    else if (ev.type === "progress") setLive(live, `${label} · ${ev.done} of ${ev.total}`, true);
+    else if (ev.type === "aim") ((aim.hidden = false), streamInto(aimB, ev.delta));
+    else if (ev.type === "result") result = ev;
+  });
+  $(".btn", box).disabled = false;
+  if (!ok || !result) return setLive(live, "Stopped. Nothing was changed.", false);
+  if (!result.improved) return setLive(live, result.note, false);
+
+  // what changed, neuron by neuron, from before the fix to after it
+  const key = (i) => `${i.layer}:${i.neuron}`;
+  const known = new Map(prev.map((i) => [key(i), i])), after = new Map(result.recipe.map((r) => [key(r), r]));
+  const lines = [];
+  for (const i of prev) {
+    const a = after.get(key(i)), nm = `<b>${esc(labelOf(i))}</b>`;
+    if (!a) lines.push(`Turned off ${nm}`);
+    else if (Math.abs(a.dose - i.dose) > 0.005) lines.push(`${Math.abs(a.dose) < Math.abs(i.dose) ? "Turned down" : "Turned up"} ${nm} from ${fmt(i.dose)} to ${fmt(a.dose)}`);
+  }
+  for (const r of result.recipe) if (!known.has(key(r))) lines.push(`Added <b>${esc(labelOf(r))}</b> at ${fmt(r.dose)}`);
+  addItems(result.recipe.map((r) => ({ ...(known.get(`${r.layer}:${r.neuron}`) || { lens: r.lens }), layer: r.layer, neuron: r.neuron, dose: r.dose })), true);
+  setLive(live, "Fixed. The same question runs again above, with the new neurons.", false);
+  done.hidden = false;
+  done.innerHTML = `<ul>${lines.map((l) => `<li>${l}</li>`).join("")}</ul><button class="btn ghost sm">Undo</button>`;
+  $(".btn", done).onclick = () => {
+    addItems(prev, true);
+    done.innerHTML = `<span class="status-line">Undone: the neurons are back as they were.</span>`;
+  };
+  $("#t-prompt").value = prompt;
+  await send();
+  $("#runs .run")?.scrollIntoView({ behavior: still() ? "auto" : "smooth", block: "start" });
 }
 
 // ------------------------------------------------------------------ chat
