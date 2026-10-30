@@ -25,19 +25,23 @@ def serve(port):
 
 def main():
     preferred = int(os.environ.get("AUTO_INTERP_PORT", 8792))
+
     # the window can live on any port; headless mode keeps the one asked for so bookmarks and tools find it
     port = preferred if "--server" in sys.argv else free_port(preferred)
     threading.Thread(target=serve, args=(port,), daemon=True).start()
     url = f"http://127.0.0.1:{port}/"
+
     for _ in range(200):  # wait for the server before showing the window
         try:
             socket.create_connection(("127.0.0.1", port), timeout=0.1).close()
             break
         except OSError:
             time.sleep(0.05)
+
     if "--server" in sys.argv:  # headless: just the API and UI on localhost
         print(url, flush=True)
         threading.Event().wait()
+
     import webview
     window = webview.create_window("Lodestar", url, width=1440, height=920, min_size=(1100, 700),
                                    background_color="#0A0A0A", text_select=True)
@@ -58,6 +62,7 @@ def _style_titlebar(window):
         win = getattr(window, "native", None)
         if win is None:
             return
+
         dark = AppKit.NSAppearance.appearanceNamed_(AppKit.NSAppearanceNameDarkAqua)
         win.setAppearance_(dark)
         win.setTitlebarAppearsTransparent_(True)

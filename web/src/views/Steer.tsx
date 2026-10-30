@@ -25,15 +25,18 @@ function StatusCard() {
   const items = useApp((s) => s.recipe.items), name = useApp((s) => s.recipe.name);
   const shown = useApp((s) => s.tab === "steer" && !!s.info?.loaded);
   const n = items.length, nd = items.filter(isDir).length;
+
   useEffect(() => {
     if (!shown) return;
     const raf = requestAnimationFrame(() => drawHomeArt(art.current!, "steer", panel.current));
     return () => cancelAnimationFrame(raf);
   }, [shown, n, nd, name]);
+
   // the recipe's name is the headline, so a long one wraps across the panel instead of squeezing the facts
   const title = n ? name || "Unsaved recipe" : "No recipe on";
   const facts: [string, ReactNode][] = [...(n - nd ? [["Neurons on", n - nd] as [string, number]] : []), ...(nd ? [["Directions on", nd] as [string, number]] : []),
     ...(n ? [] : [["Neurons on", 0] as [string, number]]), ["Status", n ? <><i className="hc-on" />Steering every reply</> : "Off"]];
+
   return (
     <div className={n > 0 ? "status-panel on" : "status-panel"} id="steer-status" ref={panel}>
       <canvas id="steer-status-art" aria-hidden="true" ref={art} />
@@ -49,6 +52,7 @@ function StatusCard() {
 // examples: one click sets the changes and runs the example question
 function Examples() {
   const ex = useApp((s) => s.examples);
+
   return (
     <div className="ex-line" id="ex-line" hidden={!ex.length}><span>Or try</span><div id="ex-chips" className="chips">{ex.map((e, i) => (
       <button key={i} className="chip ex-chip" data-i={i} title={e.note} onClick={() => {
@@ -62,6 +66,7 @@ function Examples() {
 
 function DirChips() {
   const dirs = useApp((s) => s.dirs), loaded = useApp((s) => !!s.info?.loaded);
+
   return (
     <div className="ex-line" id="dir-line" hidden={dirs === null || !loaded}><span>Directions</span><div id="dir-chips" className="chips">{dirs && <>
       {dirs.map((d) => (
@@ -77,6 +82,7 @@ function DirChips() {
 function NewDirection() {
   const d = useSteer((s) => s.dn);
   const hint = d.kind === "persona" ? "one system prompt per line" : "one prompt per line";
+
   return (
     <div id="dn" className="dn" hidden={!d.open}>
       <div className="dn-h"><b>New direction</b><span className="grow" />
@@ -110,6 +116,7 @@ function NewDirection() {
 function Results() {
   const r = useSteer((s) => s.results);
   if (!r) return <div id="c-results" />;
+
   return (
     <div id="c-results" key={r.n}>
       {r.word && <div className="found">{r.word.map((x, i) => <FoundRow key={i} x={x} scope="c" />)}</div>}
@@ -121,6 +128,7 @@ function Results() {
 function Step1() {
   const input = useSteer((s) => s.input), note = useSteer((s) => s.note), prompts = useSteer((s) => s.prompts);
   const done = useApp((s) => s.recipe.items.length > 0);
+
   return (
     <div className={done ? "step done" : "step"} id="st-s1">
       <div className="step-h"><span className="num">01</span><div><h3>Change how it acts</h3>
@@ -162,13 +170,16 @@ function Step2() {
   const input = useSteer((s) => s.tInput), tl = useSteer((s) => s.tl);
   useSteer((s) => s.v);
   const fix = tlMode(tl) === "fix", box = useRef<HTMLInputElement>(null);
+
   // a fix chip adds to what's written; a question chip asks it
   const chip = (c: string) => {
     if (!fix) return send(c);
+
     const t = input.trim();
     useSteer.setState({ tInput: t ? `${t.replace(/[.\s]*$/, "")}. ${c}.` : `${c}.` });
     box.current!.focus();
   };
+
   return (
     <div className="step" id="st-s2">
       <div className="step-h"><span className="num">02</span><div><h3>Try it and refine</h3>
@@ -192,6 +203,7 @@ function Step3() {
   const n = useApp((s) => s.recipe.items.length), model = useApp((s) => s.info?.model), name = useApp((s) => s.recipe.name);
   const ablRow = useApp((s) => !!s.abl?.current?.active);
   const exp = useSteer((s) => s.exp), saved = exp.saved.st;
+
   return (
     <div className={n ? "step" : "step locked"} id="st-s3">
       <div className="step-h"><span className="num">03</span><div><h3>Save it as a new model</h3>

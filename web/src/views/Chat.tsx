@@ -17,6 +17,7 @@ function Mods() {
   const steer = useChat((s) => s.steer);
   const n = items.length, nd = items.filter(isDir).length, nn = n - nd;
   const what = [nn && `${nn} neuron${nn > 1 ? "s" : ""}`, nd && `${nd} direction${nd > 1 ? "s" : ""}`].filter(Boolean).join(", ");
+
   return (
     <div className="chat-mods" id="chat-mods">
       {found && <button className={on ? "mod on" : "mod"} data-mod="abl" title="Erase the refusal direction in replies"
@@ -37,20 +38,25 @@ function Md({ m }: { m: Msg }) {
 function Copy({ m }: { m: Msg }) {
   const [copied, setCopied] = useState(false);
   const toast = useApp((s) => s.toastMsg);
+
   const copy = async () => {
     try { await copyReply(m); setCopied(true); setTimeout(() => setCopied(false), 1400); }
     catch { toast("Couldn’t copy.", true); }
   };
+
   return <button data-a="copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button>;
 }
 
 function Log() {
   const messages = useChat((s) => s.messages), streaming = useChat((s) => s.streaming);
   useChat((s) => s.v);
+
   return (
     <div className="chat-log" id="chat-log">{messages.map((m, i) => {
       if (m.role === "user") return <div key={i} className="msg user" data-i={i}><div className="bubble">{m.content}</div></div>;
+
       const last = i === messages.length - 1, typing = last && streaming;
+
       return (
         <div key={i} className={typing ? "msg bot typing" : "msg bot"} data-i={i}>
           <Md m={m} />
@@ -67,12 +73,14 @@ function Log() {
 function Settings() {
   const system = useChat((s) => s.system), temp = useChat((s) => s.temp), max = useChat((s) => s.max), set = useChat((s) => s.set);
   const box = useRef<HTMLDetailsElement>(null);
+
   // a click anywhere else closes the settings
   useEffect(() => {
     const close = (e: MouseEvent) => !(e.target as Element).closest("#chat-opts") && box.current!.removeAttribute("open");
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, []);
+
   return (
     <details className="chat-opts" id="chat-opts" ref={box}>
       <summary>Settings</summary>
@@ -93,6 +101,7 @@ function Settings() {
 
 function Composer() {
   const input = useChat((s) => s.input), streaming = useChat((s) => s.streaming), jump = useChat((s) => s.jump), set = useChat((s) => s.set);
+
   return (
     <div className="composer-wrap">
       <button className="jump" id="chat-jump" aria-label="Scroll to the latest message" hidden={!jump} onClick={jumpDown}>↓</button>
@@ -116,6 +125,7 @@ function Composer() {
 export function Chat({ hidden }: { hidden: boolean }) {
   const model = useApp((s) => (s.info?.loaded ? modelName(s.info.model) ?? "" : ""));
   const started = useChat((s) => s.messages.length > 0);
+
   return (
     <section id="view-chat" className="view chat" data-view="chat" hidden={hidden}>
       <header className="chat-h">

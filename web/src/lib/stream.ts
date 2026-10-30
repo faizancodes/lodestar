@@ -7,17 +7,22 @@ import type { StreamEvent } from "./types";
 export async function stream(path: string, body: unknown, on: (ev: StreamEvent) => void): Promise<boolean> {
   const { busy, setBusy, toastMsg: toast } = useApp.getState();
   if (busy) { toast("Something is already running. Stop it first.", true); return false; }
+
   setBusy(true);
   let ok = true;
+
   try {
     const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+
     const rd = r.body!.getReader(), dec = new TextDecoder();
     let buf = "";
+
     for (;;) {
       const { value, done } = await rd.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
+
       let i;
       while ((i = buf.indexOf("\n\n")) >= 0) {
         const line = buf.slice(0, i);
@@ -35,5 +40,6 @@ export async function stream(path: string, body: unknown, on: (ev: StreamEvent) 
   } finally {
     setBusy(false);
   }
+
   return ok;
 }

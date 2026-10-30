@@ -44,6 +44,7 @@ export function submit() {
   const text = get().tInput.trim();
   if (!text) return;
   if (app().busy) return toast("Something is already running. Stop it first.", true);
+
   if (tlMode(get().tl) === "fix") runFix(text);
   else send(text);
 }
@@ -71,27 +72,33 @@ export async function send(prompt: string) {
   prompt = prompt.trim();
   if (!prompt) return;
   if (app().busy) return toast("Something is already running. Stop it first.", true);
+
   const items = snapshot();
   const { recipe, dirs } = app();
+
   // with no recipe on there's nothing to refine: a one-off answer (normal, or with refusals erased)
   let tl = get().tl;
   const fresh = !tl || tl.prompt !== prompt || !items.length || !tl.versions.length;
   if (fresh || !tl) tl = { id: ++ids, prompt, normal: sink(), other: sink(), abl: ablActive(app()), versions: [], asking: false, fixing: null, fixLive: null, streaming: new Set() };
   tl.asking = false;
+
   const v: Version = { items, out: sink(), fix: null, note: fresh ? "" : "Asked again with the recipe on now", open: false };
   if (items.length) tl.versions.push(v);
   const cols = items.length ? (fresh ? ["base", "up"] : ["up"]) : tl.abl ? ["abl"] : ["base"];
   cols.forEach((c) => tl!.streaming.add(c === "base" && items.length ? "normal" : "main"));
+
   const t = tl;
   flushSync(() => set({ tl: t, tInput: "" })); // drawn before the first words stream into it
   touch();
   scrollToLatest();
+
   await stream("/api/steer", { prompt, max_new: 160, columns: cols, pushes: pushes(recipe.items, dirs, 1) }, (ev) => {
     if (ev.type !== "delta") return;
     const d = ev.delta as string;
     if (ev.col === "base" && items.length) streamInto(t.normal, d);
     else streamInto(items.length ? v.out : t.other, d);
   });
+
   t.streaming.clear();
   touch();
 }
@@ -106,6 +113,7 @@ export function undo() {
 export function goBack(i: number) {
   const tl = get().tl!, v = tl.versions[i];
   addItems(v.items.map((x) => ({ ...x })), true);
+
   const out = sink();
   out.text = v.out.text;
   tl.versions.push({ items: v.items.map((x) => ({ ...x })), out, fix: null, note: `Went back to v${i + 1}`, open: false });
@@ -125,20 +133,24 @@ async function runFix(feedback: string) {
   const tl = get().tl!, v = tl.versions.at(-1)!;
   const prev = v.items.filter((i): i is NeuronItem => !isDir(i)).map((i) => ({ ...i }));
   if (!prev.length) return toast("Fixing retunes neurons, and none are on. Change a direction's strength instead.", true);
+
   const dirsOn = v.items.filter(isDir) as DirItem[];
   type Refined = { improved: boolean; note: string; recipe: (NeuronRow & { dose: number })[] };
   let label = "", result = null as Refined | null;
   const say = (text: string, running: boolean) => ((tl.fixLive = { text, running }), touch());
+
   set({ tInput: "" });
   tl.fixing = feedback;
   say("Starting…", true);
   requestAnimationFrame(() => document.querySelector("#tl .tl-now")?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+
   const prompts = lines(get().prompts);
   const ok = await stream("/api/tune/refine", { recipe: prev, feedback, prompt: tl.prompt, bad: v.out.text, behavior: app().recipe.name || "", prompts }, (ev) => {
     if (ev.type === "stage") say((label = ev.label as string) + "…", true);
     else if (ev.type === "progress") say(`${label} · ${ev.done} of ${ev.total}`, true);
     else if (ev.type === "result") result = ev as unknown as Refined;
   });
+
   tl.fixing = null;
   tl.fixLive = null;
   const fail = !ok || !result ? "Stopped. Nothing was changed." : !result.improved ? result.note : "";
@@ -147,6 +159,7 @@ async function runFix(feedback: string) {
     touch();
     return toast(fail, !ok);
   }
+
   const r: Refined = result!;
 
   // what changed, neuron by neuron
@@ -155,22 +168,27 @@ async function runFix(feedback: string) {
   const b = (it: Item) => createElement("b", null, labelOf(it));
   const out: ReactNode[] = [];
   const line = (...parts: ReactNode[]) => out.push(createElement(Fragment, { key: out.length }, ...parts));
+
   for (const i of prev) {
     const a = after.get(k(i));
     if (!a) line(b(i), " off");
     else if (Math.abs(a.dose - i.dose) > 0.005) line(b(i), ` ${fmt(i.dose)} → ${fmt(a.dose)}`);
   }
   for (const x of r.recipe) if (!known.has(k(x))) line("added ", b(x as NeuronItem), ` ${fmt(x.dose)}`);
+
   addItems([...r.recipe.map((x) => ({ ...(known.get(k(x)) || { lens: x.lens }), layer: x.layer, neuron: x.neuron, dose: x.dose })), ...dirsOn], true);
+
   const nv: Version = { items: snapshot(), out: sink(), fix: { feedback, lines: out }, note: "", open: false };
   tl.versions.push(nv);
   tl.streaming.add("main");
   flushSync(touch);
   scrollToLatest();
+
   const { recipe, dirs } = app();
   await stream("/api/steer", { prompt: tl.prompt, max_new: 160, columns: ["up"], pushes: pushes(recipe.items, dirs, 1) }, (ev) => {
     if (ev.type === "delta") streamInto(nv.out, ev.delta as string);
   });
+
   tl.streaming.clear();
   touch();
 }

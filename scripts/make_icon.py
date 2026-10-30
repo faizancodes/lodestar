@@ -40,8 +40,10 @@ def marks(draw, grid, n, cell, ox, oy):
             b = min(1.0, grid[j][i])
             if b < 0.06:
                 continue
+
             cx, cy = ox + (i + 0.5) * cell, oy + (j + 0.5) * cell
             a, w = cell * 0.4, max(1, round(cell * 0.2))
+
             if b < 0.3:
                 h = cell * (0.16 + 0.5 * b) / 2
                 draw.rectangle([cx - h, cy - h, cx + h, cy + h], fill=INK + (int(255 * min(1, 0.45 + b)),))
@@ -71,6 +73,7 @@ def draw(px):
     for y in range(s):
         k = y / s
         sd.line([(0, y), (s, y)], fill=tuple(round(TOP[c] + (BOTTOM[c] - TOP[c]) * k) for c in range(3)))
+
     cx, cy = s / 2, s * 0.47
     halo = Image.new("L", (s, s), 0)
     ImageDraw.Draw(halo).ellipse([cx - tile * 0.42, cy - tile * 0.42, cx + tile * 0.42, cy + tile * 0.42], fill=255)
@@ -94,6 +97,7 @@ def draw(px):
             head = 0.3 + k * 1.05 + seg * math.pi  # heads spread evenly around, every trail turning the same way
             length = 1.5 if small else 1.25 + hash01(k, seg, 2) * 0.7
             peak = 0.5 if small else 0.34 + hash01(k, seg, 3) * 0.24  # dots and pluses: the star leads
+
             u = 0.0
             while u <= length:
                 put(c0 + math.cos(head - u) * r, r0 + math.sin(head - u) * r, peak * (1 - u / length) ** 1.3)
@@ -101,13 +105,16 @@ def draw(px):
 
     art = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     marks(ImageDraw.Draw(art), grid, n, cell, inset, inset)
+
     # the lodestar: a soft glow, then a crisp four-point star with fine diagonal glints
     gx, gy = inset + (c0 + 0.5) * cell, inset + (r0 + 0.5) * cell
     R = tile * (0.3 if small else 0.27)  # north ray length
+
     glow = Image.new("RGBA", (s, s), INK + (0,))
     gr = R * 0.55
     ImageDraw.Draw(glow).ellipse([gx - gr, gy - gr, gx + gr, gy + gr], fill=INK + (190,))
     glow = glow.filter(ImageFilter.GaussianBlur(gr * 0.7))
+
     sparkle = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     sp = ImageDraw.Draw(sparkle)
     tips = [(0, -R), (R * 0.62, 0), (0, R * 0.7), (-R * 0.62, 0)]  # north longest
@@ -123,11 +130,14 @@ def draw(px):
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
         m = math.hypot(*mid) or 1
         pts += quad(a, b, (mid[0] / m * waist, mid[1] / m * waist))
+
     if not small:
         for a in (math.pi / 4, 3 * math.pi / 4, 5 * math.pi / 4, 7 * math.pi / 4):  # glints between the rays
             L = R * 0.42
             sp.line([gx, gy, gx + math.cos(a) * L, gy + math.sin(a) * L], fill=INK + (190,), width=max(1, round(s / 400)))
+
     sp.polygon([(gx + x, gy + y) for x, y in pts], fill=(236, 240, 255, 255))
+
     core = Image.new("RGBA", (s, s), (255, 255, 255, 0))
     cr = R * 0.1
     ImageDraw.Draw(core).ellipse([gx - cr, gy - cr, gx + cr, gy + cr], fill=(255, 255, 255, 255))
@@ -138,6 +148,7 @@ def draw(px):
     out.alpha_composite(glow)
     out.alpha_composite(sparkle)
     out.alpha_composite(core)
+
     # a fine highlight along the tile's top edge, as on a lit glass rim
     mask = squircle(s, inset)
     rim = ImageChops.subtract(mask, squircle(s, inset + max(1, s // 400)))
@@ -145,6 +156,7 @@ def draw(px):
     fade = Image.linear_gradient("L").resize((s, s)).point(lambda v: int(70 * (1 - v / 255) ** 2))
     edge.putalpha(ImageChops.multiply(rim, fade))
     out.alpha_composite(edge)
+
     out.putalpha(mask)
     return out.resize((px, px), Image.Resampling.LANCZOS)
 
@@ -154,12 +166,14 @@ def main(out):
     with tempfile.TemporaryDirectory() as tmp:
         iconset = Path(tmp) / "icon.iconset"
         iconset.mkdir()
+
         for px in (16, 32, 64, 128, 256, 512, 1024):
             img = draw(px)
             if px <= 512:
                 img.save(iconset / f"icon_{px}x{px}.png")
             if px >= 32:
                 img.save(iconset / f"icon_{px // 2}x{px // 2}@2x.png")
+
         subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(out)], check=True)
 
 

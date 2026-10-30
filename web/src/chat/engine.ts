@@ -29,6 +29,7 @@ export function onScroll() {
   follow = nearBottom();
   set({ jump: !follow });
 }
+
 const toBottom = (smooth: boolean) => scroller().scrollTo({ top: scroller().scrollHeight, behavior: smooth && !still() ? "smooth" : "auto" });
 export const jumpDown = () => ((follow = true), toBottom(true));
 
@@ -41,6 +42,7 @@ function updateLastBot() {
     el.innerHTML = replyHtml(m);
     decoder?.update(el);
   }
+
   if (follow) toBottom(false);
 }
 
@@ -50,6 +52,7 @@ async function reply() {
   const sys = get().system.trim();
   const history = get().messages.slice(-24).map(({ role, content }) => ({ role, content }));
   const { recipe, dirs } = app();
+
   const body = {
     messages: (sys ? [{ role: "system", content: sys }] : []).concat(history),
     pushes: get().steer ? pushes(recipe.items, dirs, 1) : [],
@@ -57,6 +60,7 @@ async function reply() {
     temperature: +get().temp,
     max_new: +get().max,
   };
+
   const m: Msg = { role: "assistant", content: "" };
   get().messages.push(m);
   set({ streaming: true });
@@ -64,17 +68,20 @@ async function reply() {
   render();
   follow = true;
   toBottom(true);
+
   let raf = 0;
   const ok = await stream("/api/chat", body, (ev) => {
     if (ev.type !== "delta") return;
     m.content += ev.delta as string;
     if (!raf) raf = requestAnimationFrame(() => ((raf = 0), updateLastBot()));
   });
+
   cancelAnimationFrame(raf);
   set({ streaming: false });
   if (!m.content.trim()) get().messages.pop();
   else if (!ok) m.stopped = true;
   render();
+
   const el = lastMd();
   if (el) decoder?.update(el); // let the last few letters finish decoding
   decoder = null;
@@ -86,6 +93,7 @@ export function sendChat(text?: string) {
   text = (text ?? get().input).trim();
   if (!text || get().streaming) return;
   if (app().busy) return toast("Something is already running. Stop it first.", true);
+
   get().messages.push({ role: "user", content: text });
   flushSync(() => set({ input: "" }));
   growInput();

@@ -22,6 +22,7 @@ export const ICONS: Record<Exclude<Tab, "home">, JSX.Element> = {
 
 function TabButton({ tab, label, children }: { tab: Exclude<Tab, "home">; label: string; children?: JSX.Element }) {
   const on = useApp((s) => s.tab === tab);
+
   return (
     <button className={on ? "tab on" : "tab"} role="tab" data-tab={tab} aria-selected={on} onClick={() => setTab(tab)}>
       {ICONS[tab]}
@@ -35,8 +36,10 @@ function SavedList() {
   const saved = useApp((s) => s.saved);
   const cur = useApp((s) => s.info?.model);
   const on = useApp((s) => s.recipe.id);
+
   if (!saved) return <div id="saved-list" className="saved-list" />;
   const mine = saved.filter((r) => !cur || modelName(r.model) === modelName(cur)).reverse(); // by name, so a copy on this Mac keeps them
+
   return (
     <div id="saved-list" className="saved-list">
       {!mine.length ? <div className="saved-empty">Nothing saved yet.</div> : mine.map((r) => (
@@ -56,8 +59,10 @@ export function Sidebar() {
   const ablOn = useApp(ablActive);
   const menuOpen = useApp((s) => s.menu.open);
   const { cls, msg } = statusLine(info);
+
   useEffect(() => startSideArt(art.current!), []);
   const home = () => info?.loaded && setTab("home");
+
   return (
     <aside className="side">
       <canvas className="side-art" id="side-art" aria-hidden="true" ref={art} />
