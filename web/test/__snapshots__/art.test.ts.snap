@@ -23,8 +23,8 @@ exports[`canvas art draws what ui/ drew (reduced motion: false) > home 1`] = `
 
 exports[`canvas art draws what ui/ drew (reduced motion: false) > loader 1`] = `
 {
-  "length": 14339854,
-  "sha256": "2e1bca009fc335f9ee2d5cdd75655ba42ba5789b0f9944141640c9dac8c4e3d8",
+  "length": 20159077,
+  "sha256": "726a1a86f440b8279d5d5230c00c4f6182b311c73435dd1fd7589c5fdffcf488",
 }
 `;
 
@@ -72,8 +72,8 @@ exports[`canvas art draws what ui/ drew (reduced motion: true) > home 1`] = `
 
 exports[`canvas art draws what ui/ drew (reduced motion: true) > loader 1`] = `
 {
-  "length": 172327,
-  "sha256": "6befdc66bda99d0c1fec4e9356456101fcfcb077994855dc039dfed91ee5f7da",
+  "length": 154593,
+  "sha256": "59315a4e64a47e559b74c65e03bde8bdc41dbd1e23d6573a5ed5b13175f4a96f",
 }
 `;
 
