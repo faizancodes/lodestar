@@ -239,20 +239,17 @@
       </div>
 
       <div class="step" id="st-s2">
-        <div class="step-h"><span class="num">02</span><div><h3>Ask it something</h3>
-          <p class="step-sub">Compare its answer with the neurons on against the model as it normally is.</p></div></div>
+        <div class="step-h"><span class="num">02</span><div><h3>Try it and refine</h3>
+          <p class="step-sub">Ask it something. If the answer isn’t right, say what should change: the neurons are retuned and it answers again.</p></div></div>
         <div class="card try">
           <div class="ask">
             <input id="t-prompt" value="Describe the way you look." spellcheck="false" autocomplete="off">
             <button class="btn ghost" data-cancel>Stop</button>
-            <button id="t-go" class="btn">Send</button>
+            <button id="t-go" class="btn">Ask</button>
           </div>
-          <div class="row">
-            <div class="chips grow" id="t-chips"></div>
-            <label class="check"><input id="t-opposite" type="checkbox"> Also show the opposite</label>
-          </div>
+          <div class="chips" id="t-chips"></div>
         </div>
-        <div id="runs" class="runs"></div>
+        <div id="tl" class="tl" hidden></div>
       </div>
 
       <div class="step locked" id="st-s3">
