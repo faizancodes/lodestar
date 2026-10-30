@@ -4,8 +4,25 @@
     {
       "name": "auto-interp",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "interp.app", "--server"],
+      "runtimeArgs": [
+        "run",
+        "python",
+        "-m",
+        "interp.app",
+        "--server"
+      ],
       "port": 8792
+    },
+    {
+      "name": "design-8793",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "python",
+        "-c",
+        "from interp.app import serve; serve(8793)"
+      ],
+      "port": 8793
     }
   ]
 }
