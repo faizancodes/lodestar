@@ -410,17 +410,38 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .chip:hover { border-color: var(--accent); color: var(--accent); }
 .runs { display: flex; flex-direction: column; gap: 28px; }
 .run { animation: rise 0.2s ease-out; }
-.out-h .fix-b { margin-left: 4px; }
-.out-h .insp:not([hidden]) + .fix-b { margin-left: 4px; }
-.fix { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; padding: 18px 20px; border: 1px solid rgba(195, 207, 245, 0.22); border-radius: var(--radius); background: var(--panel); }
-.fix-h { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
-.fix .chips { margin-top: 0; }
-.fix-now:empty { display: none; }
-.fix-aim { padding: 14px 16px; border-radius: var(--r-sm); background: var(--panel-2); }
-.fix-aim-b { margin-top: 8px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--text-2); }
-.fix-done { display: flex; align-items: flex-start; gap: 16px; }
-.fix-done ul { flex: 1; margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.7; color: var(--text-2); }
-.fix-done b { color: var(--text); font-weight: 600; }
+/* try it and refine: one question, its answer in versions, and what should change under the latest */
+.tl { display: flex; flex-direction: column; gap: 14px; }
+.tl-h { display: flex; align-items: baseline; gap: 16px; }
+.tl-q { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
+.tl-vers { display: flex; flex-wrap: wrap; gap: 6px; }
+.tl-v { padding: 4px 11px; border: 1px solid var(--rule-2); border-radius: 999px; background: transparent; font: 500 12px var(--mono); color: var(--text-2); cursor: pointer; }
+.tl-v:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.25); }
+.tl-v.on { color: var(--bg); background: var(--ascii); border-color: var(--ascii); }
+.tl-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.tl-main.cmp { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.ans { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--panel); }
+.ans.steered { border-color: rgba(195, 207, 245, 0.28); }
+.ans-h { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--rule); font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.ans.steered .ans-h { color: var(--ascii); background: rgba(195, 207, 245, 0.06); border-color: rgba(195, 207, 245, 0.18); }
+.ans-n { font-weight: 500; color: var(--muted); }
+.ans-h .insp { margin-left: auto; padding: 2px 9px; border: 0; border-radius: var(--r-sm); background: transparent; font: inherit; color: inherit; cursor: pointer; opacity: 0.8; }
+.ans-h .insp:hover { opacity: 1; background: rgba(127, 127, 127, 0.15); }
+.ans-b { padding: 18px 20px; white-space: pre-wrap; font-size: 15px; line-height: 1.7; min-height: 64px; }
+.ans.normal .ans-b { font-size: 14px; color: var(--text-2); }
+.ans-b.typing::after { content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-left: 4px; vertical-align: 0.1em; background: var(--ascii); animation: pulse 0.9s infinite; }
+.tl-why { display: flex; align-items: flex-start; gap: 16px; padding: 2px 4px; font-size: 13.5px; color: var(--text-2); }
+.tl-why > div { flex: 1; min-width: 0; }
+.tl-said { color: var(--text); }
+.tl-why ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.7; }
+.tl-why b { color: var(--text); font-weight: 600; }
+.tl-old { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 1px dashed var(--rule-2); border-radius: var(--radius); font-size: 13.5px; color: var(--text-2); }
+.tl-old span { flex: 1; }
+.tl-fix { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--panel); }
+.tl-fix .chips { margin-top: 0; }
+.tl-now:empty { display: none; }
+.tl-aim { padding: 14px 16px; border-radius: var(--r-sm); background: var(--panel-2); }
+.tl-aim-b { margin-top: 8px; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--text-2); }
 .run-q { margin: 0 0 12px 2px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
 .run-q span { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 8px; }
 .cols { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 14px; }
