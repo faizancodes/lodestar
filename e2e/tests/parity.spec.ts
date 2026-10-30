@@ -393,3 +393,41 @@ test("chat: starters, markdown, switches, retry, settings, new chat", async ({ p
   await expect(page.locator("#chat-empty")).toBeVisible();
   if (!RECORD) await expect(page.locator("#chat-log")).toBeEmpty();
 });
+
+// The recording is assembled from chat's (the plain column is its haiku; erased at strength 1.5, the 0.6B model
+// answers with nothing), so it's replayed only
+test("chat: compare replies side by side", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "chat-compare");
+  await page.goto("/");
+  await page.keyboard.press("Meta+3");
+  await expect(page.locator("#chat-input")).toBeFocused();
+
+  const sw = page.locator("#chat-compare");
+  await expect(sw).toHaveAttribute("aria-checked", "false");
+  await sw.click();
+  await expect(sw).toHaveAttribute("aria-checked", "true");
+
+  await page.locator("#chat-opts summary").click();
+  await page.locator("#chat-temp").fill("0");
+  await page.locator("#chat-max").fill("192");
+  await page.locator("#chat-model").click();
+
+  await page.locator("#chat-starters .starter", { hasText: "Write a haiku about Mondays" }).click();
+  await idle(page);
+  await expect(page.locator("#chat-send")).toBeVisible();
+
+  const cols = page.locator("#chat-log .msg.bot.cmp .cmp-col");
+  await expect(cols).toHaveCount(2);
+  await expect(cols.nth(0).locator(".cmp-h")).toHaveText("Plain");
+  await expect(cols.nth(0).locator(".md")).toContainText("Mondays are quiet");
+  await expect(cols.nth(1).locator(".cmp-h")).toHaveText("Refusals erased");
+  await expect(cols.nth(1).locator(".msg-none")).toHaveText("No reply");
+  await snap(page, "chat-compare");
+
+  // the choice is remembered
+  await page.reload();
+  await page.keyboard.press("Meta+3");
+  await expect(page.locator("#chat-compare")).toHaveAttribute("aria-checked", "true");
+});
