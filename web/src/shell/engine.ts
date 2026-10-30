@@ -7,6 +7,7 @@ import { modelName, sleep } from "../lib/format";
 import type { Abl, CopyJob, Directions, Example, ExportJob, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
 import { useChat } from "../store/chat";
+import { resetAbl, syncAbl } from "../abl/engine";
 import { useSteer } from "../store/steer";
 import { pollExport } from "../steer/exporting";
 import { redrawn } from "../steer/recipe";
@@ -242,7 +243,7 @@ async function onModelReady() {
   set({ recipe: { ...get().recipe, model: info!.model } });
   useChat.getState().set({ messages: [] });
   redrawn();
-  // TODO(Phase 5): Abliterate's name, plan, examples, ranking and test rows reset here
+  resetAbl();
   // TODO(Phase 6): the chat's first render when it's the open tab
   refreshSaved();
   refreshAbl();
@@ -269,6 +270,7 @@ export async function refreshAbl() {
   let abl: Abl;
   try { abl = await api<Abl>("/api/abl"); } catch { return; }
   set({ abl, ablDefaults: abl.defaults });
+  syncAbl(abl);
 }
 
 export async function refreshDirs() {
