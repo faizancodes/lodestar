@@ -735,7 +735,11 @@ function planShell(plan) {
     <div class="plan-h"><span class="eyebrow">Steering plan</span><b>${esc(plan.goal)}</b><span class="plan-clock">0:00</span></div>
     <ol class="plan-steps"></ol>
     <div class="plan-now status-line"></div>
-    <div class="plan-ex" hidden><div class="lbl">How it reads your instruction</div><p class="q"></p><p class="a"></p></div>
+    <div class="plan-ex" hidden>
+      <div class="px-h"><span class="eyebrow">How it reads your instruction</span><span class="px-note">The model, told to act that way</span></div>
+      <div class="px-turn"><span class="px-who">Asked</span><p class="q"></p></div>
+      <div class="px-turn"><span class="px-who">Answers</span><p class="a"></p></div>
+    </div>
     <div class="plan-tbl"></div>
     <div class="plan-proof" hidden></div>
     <div class="plan-foot"></div>
@@ -765,7 +769,7 @@ function renderExample(box, plan) {
   const ex = $(".plan-ex", box);
   if (!ex) return;
   ex.hidden = !plan.example;
-  $(".q", ex).textContent = `“${plan.examplePrompt}”`;
+  $(".q", ex).textContent = plan.examplePrompt;
   const a = $(".a", ex);
   a.textContent = plan.example.trim().slice(0, 320) + (plan.example.length > 320 ? "…" : "");
   (plan.decoder ??= createDecoder()).update(a); // the example decodes in as it's written, like chat replies
@@ -799,8 +803,8 @@ function renderPlan(box, plan) {
     setLive($(".plan-now", box), `<b>This didn’t change how the model answers</b>, so there are no neurons to tune for it. ` +
       `With your instruction, the model still gives its ordinary reply (below). Steering can shift the model’s style or topic, not add a skill or make it answer things it declines.`, false, true);
     renderExample(box, plan);
-    const ex = $(".plan-ex .lbl", box);
-    if (ex) ex.textContent = "The model’s ordinary answer";
+    const ex = $(".plan-ex .px-h", box);
+    if (ex) ex.innerHTML = `<span class="eyebrow">The model’s ordinary answer</span>`;
     $(".plan-tbl", box).innerHTML = `<div class="plan-ideas"><span>Try a style or topic:</span>` +
       ["talk like a pirate", "be extremely cheerful", "answer in rhyme", "cooking"].map((g) =>
         `<button class="chip ex-chip" data-g="${esc(g)}">${esc(g)}</button>`).join("") + `</div>`;
@@ -863,11 +867,16 @@ function renderPlan(box, plan) {
   const bestTested = rows.filter((c) => c.tested && c.dj > 0).sort((a, b) => b.dj - a.dj)[0];
   const use = plan.recipe.length ? plan.recipe : bestTested && !plan.done ? [{ ...bestTested, dose: bestTested.dose }] : [];
   const n = use.length;
-  $(".plan-foot", box).innerHTML = n
-    ? `<button class="btn plan-apply">${plan.done ? "Apply" : "Turn on the best so far"} · ${n} neuron${n > 1 ? "s" : ""}</button>`
-    : "";
+  const nn = `${n} neuron${n > 1 ? "s" : ""}`;
+  $(".plan-foot", box).innerHTML = !n ? "" : plan.done
+    ? `<div class="plan-done${plan.applied ? " applied" : ""}"><span class="pd-mark">${markSVG(30, 15)}</span>
+        <div class="pd-b"><b>${plan.applied ? `${nn} on` : `${nn} found`}</b>
+          <span>${plan.applied ? "Steering every reply in Steer and Chat. Fine-tune each one under On now." : "Turn them on to steer every reply in Steer and Chat. You can fine-tune each one afterwards."}</span></div>
+        ${plan.applied ? `<span class="pd-on"><i class="hc-on"></i>On</span>` : `<button class="btn btn-lg plan-apply">Turn on ${nn}</button>`}</div>`
+    : `<button class="btn ghost plan-apply">Turn on the best so far · ${nn}</button>`;
   const apply = $(".plan-apply", box);
   if (apply) apply.onclick = () => {
+    if (plan.done) ((plan.applied = true), renderPlan(box, plan));
     state.recipe = { id: null, name: plan.goal.slice(0, 40), items: [], model: state.info.model };
     addItems(use.map((x) => ({ layer: x.layer, neuron: x.neuron, dose: x.dose, lens: x.lens })), true);
     if (plan.proof.prompt) $("#t-prompt").value = plan.proof.prompt;
