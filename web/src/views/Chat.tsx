@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { setAblActive } from "../abl/engine";
 import {
-  copyReply, growInput, jumpDown, newChat, onScroll, replyHtml, retry, sendChat, STARTERS, toggleSteer,
+  copyReply, growInput, jumpDown, newChat, onScroll, replyHtml, retry, sendChat, STARTERS, toggleCompare, toggleSteer,
 } from "../chat/engine";
 import { api } from "../lib/api";
 import { isDir, labelOf, modelName } from "../lib/format";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
-import { useChat, type Msg } from "../store/chat";
+import { useChat } from "../store/chat";
 
 const cancel = () => api("/api/cancel", {});
 
@@ -32,18 +32,33 @@ function Mods() {
 }
 
 /** A reply's markdown. Set as HTML, like the streamed updates that write into it, so the decoder can work on it. */
-function Md({ m }: { m: Msg }) {
+function Md({ m, done }: { m: { content: string }; done: boolean }) {
   const el = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { el.current!.innerHTML = replyHtml(m); });
+  useLayoutEffect(() => { el.current!.innerHTML = replyHtml(m, done); });
   return <div className="md" ref={el} />;
 }
 
-function Copy({ m }: { m: Msg }) {
+// Compare: on when there's something to put beside the plain model
+function CompareSwitch() {
+  const compare = useChat((s) => s.compare), steer = useChat((s) => s.steer);
+  const steered = useApp((s) => steer && s.recipe.items.length > 0), erased = useApp(ablActive);
+
+  if (!steered && !erased) return null;
+
+  return (
+    <button id="chat-compare" className="switch" role="switch" aria-checked={compare} onClick={toggleCompare}
+      title="Show each reply beside the plain model’s">
+      <i />Compare
+    </button>
+  );
+}
+
+function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const toast = useApp((s) => s.toastMsg);
 
   const copy = async () => {
-    try { await copyReply(m); setCopied(true); setTimeout(() => setCopied(false), 1400); }
+    try { await copyReply(text); setCopied(true); setTimeout(() => setCopied(false), 1400); }
     catch { toast("Couldn’t copy.", true); }
   };
 
@@ -53,18 +68,37 @@ function Copy({ m }: { m: Msg }) {
 function Log() {
   const messages = useChat((s) => s.messages), streaming = useChat((s) => s.streaming);
   useChat((s) => s.v);
+  const wide = messages.some((m) => m.cols);
 
   return (
-    <div className="chat-log" id="chat-log">{messages.map((m, i) => {
+    <div className={wide ? "chat-log wide" : "chat-log"} id="chat-log">{messages.map((m, i) => {
       if (m.role === "user") return <div key={i} className="msg user" data-i={i}><div className="bubble">{m.content}</div></div>;
 
       const last = i === messages.length - 1, typing = last && streaming;
 
+      if (m.cols) {
+        return (
+          <div key={i} className={typing ? "msg bot cmp typing" : "msg bot cmp"} data-i={i}>
+            <div className="cmp-cols">{m.cols.map((c) => (
+              <div key={c.key} className="cmp-col" data-col={c.key}>
+                <div className="cmp-h">{c.label}</div>
+                <Md m={c} done={!typing} />
+                <div className="msg-acts" hidden={typing || !c.content}><Copy text={c.content} /></div>
+              </div>
+            ))}</div>
+            <div className="msg-acts" hidden={typing || (!last && !m.stopped)}>
+              {last && <button data-a="retry" onClick={retry}>Retry</button>}
+              {m.stopped && <span className="msg-note">Stopped</span>}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div key={i} className={typing ? "msg bot typing" : "msg bot"} data-i={i}>
-          <Md m={m} />
+          <Md m={m} done={!typing} />
           <div className="msg-acts" hidden={typing}>
-            <Copy m={m} />{last && <button data-a="retry" onClick={retry}>Retry</button>}
+            <Copy text={m.content} />{last && <button data-a="retry" onClick={retry}>Retry</button>}
             {m.stopped && <span className="msg-note">Stopped</span>}
           </div>
         </div>
@@ -134,6 +168,7 @@ export function Chat({ hidden }: { hidden: boolean }) {
       <header className="chat-h">
         <div className="chat-title"><b id="chat-model">{model}</b></div>
         <Mods />
+        <CompareSwitch />
         <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
       </header>
       <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>
