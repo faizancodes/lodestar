@@ -7,6 +7,9 @@ import { modelName, sleep } from "../lib/format";
 import type { Abl, CopyJob, Directions, Example, ExportJob, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
 import { useChat } from "../store/chat";
+import { useSteer } from "../store/steer";
+import { pollExport } from "../steer/exporting";
+import { redrawn } from "../steer/recipe";
 
 const get = useApp.getState;
 const set = useApp.setState;
@@ -85,8 +88,8 @@ export function toggleModelMenu(open?: boolean) {
 
 // ------------------------------------------------------------------ tabs
 export function setTab(t: Tab) {
-  get().setTab(t);
-  // TODO(Phase 4, 6): Steer's status card and the chat's first render hook in here
+  get().setTab(t); // Steer's status card redraws its scene when it's shown
+  // TODO(Phase 6): the chat's first render hooks in here
 }
 
 // ------------------------------------------------------------------ loading
@@ -229,6 +232,7 @@ export async function pollStatus() {
 // ------------------------------------------------------------------ once a model is ready
 export function newRecipe() {
   set({ recipe: { id: null, name: "", items: [], model: get().info?.model } });
+  redrawn();
   refreshSaved();
 }
 
@@ -237,6 +241,7 @@ async function onModelReady() {
   if (recipe.items.length && recipe.model && modelName(recipe.model) !== modelName(info!.model)) newRecipe(); // neuron numbers are per model
   set({ recipe: { ...get().recipe, model: info!.model } });
   useChat.getState().set({ messages: [] });
+  redrawn();
   // TODO(Phase 5): Abliterate's name, plan, examples, ranking and test rows reset here
   // TODO(Phase 6): the chat's first render when it's the open tab
   refreshSaved();
@@ -271,6 +276,7 @@ export async function refreshDirs() {
     const r = await api<Directions>("/api/directions");
     set({ dirs: r.directions, dirLayers: r.layers });
   } catch { set({ dirs: [] }); }
+  redrawn();
 }
 
 // ------------------------------------------------------------------ launch
@@ -286,14 +292,14 @@ export async function boot() {
   if (booted) return; // StrictMode runs effects twice in development
   booted = true;
   try {
-    set({ tunePrompts: (await api<{ prompts: string[] }>("/api/tune/defaults")).prompts });
+    useSteer.setState({ prompts: (await api<{ prompts: string[] }>("/api/tune/defaults")).prompts.join("\n") });
     await refreshModels();
     await refreshAbl();
     applyStatus(await api<Status>("/api/status"));
     resumeLastModel();
     if ((await api<CopyJob>("/api/models/copy")).status === "copying") pollCopy();
     const ex = await api<ExportJob>("/api/abl/export");
-    set({ exportJob: ex }); // TODO(Phase 4, 5): pick up a running export's progress here
+    if (ex.status === "working") pollExport(ex.kind === "steer" ? "st" : "abl");
     if (!get().info!.loaded && get().info!.status !== "idle") pollStatus();
   } catch (e) {
     toast("Can’t reach the Lodestar engine: " + (e as Error).message, true);
