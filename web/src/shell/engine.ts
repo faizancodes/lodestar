@@ -307,7 +307,7 @@ async function onModelReady() {
   if (recipe.items.length && recipe.model && modelName(recipe.model) !== modelName(info!.model)) newRecipe(); // neuron numbers are per model
 
   set({ recipe: { ...get().recipe, model: info!.model } });
-  useChat.getState().set({ messages: [] });
+  useChat.getState().set({ messages: [], lens: {} }); // neuron numbers mean nothing in another model
   redrawn();
   resetAbl();
   if (get().tab === "chat") onChatShown();

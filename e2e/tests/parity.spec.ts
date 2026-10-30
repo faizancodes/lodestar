@@ -512,3 +512,73 @@ test("chat: saved chats, reopened", async ({ page }) => {
   await page.locator("#chat-list .saved-item .del").click({ force: true });
   await expect(page.locator("#chat-list")).toHaveCount(0);
 });
+
+// Assembled by hand from the chat recording, with made-up neurons (their words and replies aren't the model's), so
+// it's replayed only
+test("chat: neurons pushed by hand", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "neurons");
+  await page.goto("/");
+  await page.keyboard.press("Meta+3");
+  await page.locator("#chat-neurons-btn").click();
+  await expect(page.locator("#chat-add")).toBeFocused();
+
+  // one this model doesn't have, then two pasted the way they're shared
+  const add = page.locator("#chat-add");
+  await add.fill("L14 N8949 +1");
+  await add.press("Enter");
+  await expect(page.locator("#chat-add-err")).toHaveText("There’s no neuron 8949: each layer has neurons 0–3071.");
+
+  await add.fill("L14 N2949 +1 and L13 N1956 −1");
+  await add.press("Enter");
+  await expect(page.locator("#chat-add-err")).toBeHidden();
+  await expect(page.locator(".nr-pin")).toHaveCount(2);
+  await expect(page.locator('.nr-pin[data-pin="14:2949"] .nr-lens')).toHaveText("villain · sinister · cruel · wicked");
+  await expect(page.locator('.nr-pin[data-pin="13:1956"] .nr-lens')).toHaveText("deceit · scheme · malice · lie"); // pushed down
+  await expect(page.locator('#chat-mods .mod[data-mod="steer"]')).toHaveText("Steered · 2 neurons");
+  await expect(page.locator("#tab-steer-count")).toHaveText("2"); // they're the recipe that's on
+
+  await page.locator("#chat-compare").click();
+  await page.locator("#chat-starters .starter", { hasText: "free afternoon" }).click();
+  await idle(page);
+  await expect(page.locator("#chat-send")).toBeVisible();
+
+  const cols = page.locator("#chat-log .msg.bot.cmp .cmp-col");
+  await expect(cols.nth(0).locator(".cmp-h")).toHaveText("Plain");
+  await expect(cols.nth(0).locator(".md")).toContainText("long walk");
+  await expect(cols.nth(1).locator(".cmp-h")).toHaveText("Steered");
+  await expect(cols.nth(1).locator(".md")).toContainText("plotting");
+  await snap(page, "chat-neurons");
+
+  // a dose nudged, a neuron taken out
+  await page.locator('.nr-pin[data-pin="14:2949"] [aria-label="More"]').click();
+  await expect(page.locator('.nr-pin[data-pin="14:2949"] input')).toHaveValue("+1.25");
+  await page.locator('.nr-pin[data-pin="13:1956"]').hover();
+  await page.locator('.nr-pin[data-pin="13:1956"] .nr-del').click();
+  await expect(page.locator(".nr-pin")).toHaveCount(1);
+  await expect(page.locator('#chat-mods .mod[data-mod="steer"]')).toHaveText("Steered · 1 neuron");
+
+  // or picked off a map of the neurons behind a word
+  await page.locator('#chat-pick-by [data-by="map"]').click();
+  await expect(page.locator("#chat-find")).toBeFocused();
+  await page.locator("#chat-find").fill("evil");
+  await page.locator("#chat-find").press("Enter");
+  await expect(page.locator("#chat-map .nr-dot")).toHaveCount(14);
+  const dot = page.locator('#chat-map [data-dot="18:2207"]');
+  await dot.hover();
+  await expect(page.locator("#chat-map-info")).toContainText("L18N2207Turn up");
+  await expect(page.locator("#chat-map-info .nr-lens")).toHaveText("villain · evil · wicked");
+  await dot.click();
+  await expect(dot).toHaveClass(/\bin\b/);
+  await expect(page.locator('.nr-pin[data-pin="18:2207"] input')).toHaveValue("+0.36");
+  await snap(page.locator("#chat-neurons"), "chat-neuron-map");
+
+  // the panel stays open, on the way it was used last
+  await page.reload();
+  await page.keyboard.press("Meta+3");
+  await expect(page.locator("#chat-neurons")).toBeVisible();
+  await expect(page.locator('#chat-pick-by [data-by="map"]')).toHaveClass(/\bon\b/);
+  await page.locator("#chat-neurons .nr-x").click();
+  await expect(page.locator("#chat-neurons")).toHaveCount(0);
+});
