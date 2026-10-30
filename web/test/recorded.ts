@@ -1,31 +1,18 @@
-// Loads pieces of the current UI (ui/) so the tests can run the old code beside the port on the same inputs.
-import { parse } from "acorn";
+// The recorded /api sessions in ../e2e/fixtures, as inputs for the tests, and a digest for checking an output against
+// the one stored when the port was proven equal to the original UI.
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { expect } from "vitest";
 
-export const UI = join(__dirname, "../../ui");
 const FIXTURES = join(__dirname, "../../e2e/fixtures");
-const APP = readFileSync(join(UI, "app.js"), "utf8");
 
-const AST = parse(APP, { ecmaVersion: "latest", sourceType: "module" }) as unknown as {
-  body: { type: string; start: number; end: number; id?: { name: string }; declarations?: { id: { name: string } }[] }[];
-};
-
-/** The top-level declarations of ui/app.js with these names, evaluated together with `scope` in reach. */
-export function fromApp<T>(names: string[], scope: Record<string, unknown> = {}): T {
-  const ast = AST;
-  const src = names.map((name) => {
-    const node = ast.body.find((n) => n.id?.name === name || n.declarations?.some((d) => d.id.name === name));
-    if (!node) throw new Error(`ui/app.js has no top-level ${name}`);
-    return APP.slice(node.start, node.end);
-  });
-  return new Function(...Object.keys(scope), `${src.join("\n")}\nreturn { ${names.join(", ")} };`)(...Object.values(scope));
-}
-
-/** A snippet of ui/app.js, found by its text, so a test fails if the original changes. */
-export function appSnippet(text: string) {
-  if (!APP.includes(text)) throw new Error(`ui/app.js no longer contains: ${text}`);
-  return text;
+/** Checks a (large) output against its stored snapshot, by digest. `pnpm test -u` stores new ones after a deliberate
+ * change. The snapshots were taken while ui/ still existed and these tests ran it beside the port on the same inputs,
+ * with identical results. */
+export function same(value: unknown) {
+  const json = JSON.stringify(value);
+  expect({ length: json.length, sha256: createHash("sha256").update(json).digest("hex") }).toMatchSnapshot();
 }
 
 export type Exchange = {

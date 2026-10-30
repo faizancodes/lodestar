@@ -1,7 +1,7 @@
 """Replays recorded /api exchanges (e2e/fixtures/<scenario>.json) and serves a UI folder, so the parity suite runs
-without a model and both the current UI and its React port can be checked against the same recordings.
+without a model and the UI can be checked against them.
 
-    uv run python e2e/harness/mock.py 8796 [ui-dir]
+    uv run python e2e/harness/mock.py 8796 [ui-dir, default web/dist]
 
 Each method + path + query has a queue of recorded responses, served in order; the last one repeats once the queue
 runs out (a poll that runs longer). A request whose body differs from the recorded one is logged as a mismatch, and
@@ -22,7 +22,7 @@ from starlette.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "e2e" / "fixtures"
-UI = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else ROOT / "ui"
+UI = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else ROOT / "web" / "dist"
 GAP = float(os.environ.get("MOCK_GAP", "0.012"))  # seconds between streamed events, so text still streams in
 POLL_KEEP = 6  # a long poll (loading, exporting) replays as at most this many steps
 

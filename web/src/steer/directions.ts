@@ -1,6 +1,6 @@
 // Directions. A direction is the difference between how the model carries two sides of something (two personas, or
 // two kinds of prompt), read off its residual stream. Pushing along it over a band of middle layers moves the whole
-// behaviour. Carried over from ui/app.js.
+// behaviour.
 import { flushSync } from "react-dom";
 import { api } from "../lib/api";
 import { bandText, fmt } from "../lib/format";

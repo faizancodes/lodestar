@@ -1,10 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // MODE=record drives the real server (record.sh starts it) and writes fixtures; the default replays them through
-// the mock server and compares screenshots against goldens/. UI_DIR picks the UI the mock serves (default ../ui).
+// the mock server and compares screenshots against goldens/. UI_DIR picks the UI the mock serves (default ../web/dist).
 const RECORD = process.env.MODE === "record";
 const PORT = RECORD ? 8795 : 8796;
-const UI_DIR = process.env.UI_DIR || "../ui";
+const UI_DIR = process.env.UI_DIR || "../web/dist";
 
 export default defineConfig({
   testDir: "tests",

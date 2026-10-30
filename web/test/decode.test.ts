@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
-// The streaming-text decoder leaves the same DOM as the original after every token and every animation frame,
-// replaying recorded replies through the same markdown render the chat uses.
-import { pathToFileURL } from "node:url";
+// The streaming-text decoder leaves the same DOM as the original in ui/ did after every token and every animation
+// frame, replaying recorded replies through the same markdown render the chat uses.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanReply } from "../src/lib/format";
 import { md } from "../src/lib/markdown";
-import { exchanges, UI, type Exchange } from "./legacy";
+import { exchanges, same, type Exchange } from "./recorded";
 
 // each reply on its own: a steer run streams several columns, a test several probes
 const streams = exchanges.filter((x) => x.type === "sse").flatMap((x) => {
@@ -47,15 +46,12 @@ function replay(createDecoder: () => { update(root: HTMLElement | null): void },
 
 afterEach(() => (vi.unstubAllGlobals(), vi.restoreAllMocks()));
 
-describe.each([false, true])("decoder matches ui/decode.js (reduced motion: %s)", (still) => {
+describe.each([false, true])("decoder leaves the DOM ui/decode.js did (reduced motion: %s)", (still) => {
   it("on every recorded stream", async () => {
-    const old = (await import(/* @vite-ignore */ pathToFileURL(`${UI}/decode.js`).href)).createDecoder;
-    const now = (await import("../src/art/decode")).createDecoder;
+    const { createDecoder } = await import("../src/art/decode");
     expect(streams.length).toBeGreaterThan(10);
-    for (const s of streams) {
-      const a = replay(old, s, still), b = replay(now, s, still);
-      if (!still) expect(a.some((h) => h.includes('class="dc'))).toBe(true); // it really decoded
-      expect(b).toEqual(a);
-    }
+    const runs = streams.map((s) => replay(createDecoder, s, still));
+    if (!still) expect(runs.some((r) => r.some((h) => h.includes('class="dc')))).toBe(true); // it really decoded
+    same(runs);
   }, 60_000);
 });

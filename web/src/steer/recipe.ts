@@ -1,5 +1,5 @@
-// The recipe: what's on now. Carried over from ui/app.js; where it redrew the list (renderRecipe), any panel open
-// under a row went with it, so `redrawn` drops those too.
+// The recipe: what's on now. Whenever the list is redrawn as a whole, any panel open under a row goes with it, so
+// `redrawn` drops those too.
 import { api } from "../lib/api";
 import { isDir, itemKey, labelOf } from "../lib/format";
 import type { Item, Recipe } from "../lib/types";

@@ -92,7 +92,7 @@ function Scan() {
 type Trace = { tokens: string[]; n_prompt: number };
 
 /** Opens the inside of a reply under its run. `behindFix`: the run's fix box was made after the panel there, so
- * (as in ui/app.js, which looked at the element right after the replies) a new panel is made in front of it. */
+ * (the panel slot is the element right after the replies) a new panel is made in front of it. */
 export async function inspect(runId: number, prompt: string, reply: string, ps: Push[], which: string, abl: boolean, behindFix: boolean) {
   const anchor = `run:${runId}`;
   // the server keeps one trace at a time, so only one reply can be inspected at once

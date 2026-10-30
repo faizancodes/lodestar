@@ -1,5 +1,5 @@
 """Local HTTP API for the Lodestar window. Streams (server-sent events) for anything that generates text or runs a
-search; plain JSON for lookups. Serves the UI from ../ui."""
+search; plain JSON for lookups. Serves the UI built in ../web/dist."""
 import json
 import math
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import abl as abl_mod
@@ -21,10 +21,7 @@ from . import discover
 from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
-# The UI: the React build in web/dist (scripts/build_app.sh builds it), or the original plain-JS one in ui/ with
-# LODESTAR_UI=legacy, kept for one release so the two can be compared. Without a build, the original one is served.
-REACT_UI = ROOT / "web" / "dist"
-UI = ROOT / "ui" if os.environ.get("LODESTAR_UI") == "legacy" or not (REACT_UI / "index.html").exists() else REACT_UI
+UI = ROOT / "web" / "dist"  # the React build: `pnpm build` in web/ (scripts/build_app.sh does it)
 # the data folder keeps the app's first name, so models, recipes and directions saved before the rename stay put
 DATA = Path(os.environ.get("AUTO_INTERP_DATA", Path.home() / "Library" / "Application Support" / "Auto Interp"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -829,10 +826,12 @@ def delete_recipe(rid: str):
 # ------------------------------------------------------------------ ui
 @app.get("/")
 def index():
+    if not (UI / "index.html").exists():
+        return HTMLResponse("<p>The UI isn’t built yet: run <code>pnpm install && pnpm build</code> in web/, then reopen.</p>")
     return FileResponse(UI / "index.html", headers={"Cache-Control": "no-store"})
 
 
-app.mount("/", StaticFiles(directory=UI), name="ui")
+app.mount("/", StaticFiles(directory=UI, check_dir=False), name="ui")
 
 
 @app.exception_handler(HTTPException)

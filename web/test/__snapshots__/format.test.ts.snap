@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > markdown: every recorded reply and string 1`] = `
+{
+  "length": 106401,
+  "sha256": "767129b3542430cba2910f1a0820a3cebc69665487e6079b959afeaa808c2851",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > models: modelName, steerDefaultName, ablDefaultName 1`] = `
+{
+  "length": 1879,
+  "sha256": "58ee610b7f4556395d7437b3bea9e6c011d7093b30bafcdd159ec8ed1f1236a4",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > models: modelName, steerDefaultName, ablDefaultName 2`] = `
+{
+  "length": 11133,
+  "sha256": "be8966064b5d2a122ac793a2e1814d205e5adef64f0319d241777fb7faafde58",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > neurons: lensLabel, searchDose 1`] = `
+{
+  "length": 8981,
+  "sha256": "a5a419c359d2599f2d60c5dcab65f8a0d999e8612cdbff69c903aff99ae3b06b",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > neurons: lensLabel, searchDose 2`] = `
+{
+  "length": 22850,
+  "sha256": "aa65fe34227de968f4f8b6b78660e92f6683d0800994fe2fcb111064d233d480",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > numbers: fmt, gb, nid 1`] = `
+{
+  "length": 611443,
+  "sha256": "84ad72f62293411c004f481f9213009c129e49dbf33b08a0f2b471b4ddb84f8b",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > recipes: itemKey, labelOf, isDir, dirReady, bandText, pushes 1`] = `
+{
+  "length": 9448,
+  "sha256": "a149f9500b0072b0ce3c036ed5db313765e10e1b5c60918e33515c1f63b49a31",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > recipes: itemKey, labelOf, isDir, dirReady, bandText, pushes 2`] = `
+{
+  "length": 103,
+  "sha256": "4f137e8378c3765924c7373bb8f952caecd186c30270f1a60e9961f7ac86d5e9",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > recipes: itemKey, labelOf, isDir, dirReady, bandText, pushes 3`] = `
+{
+  "length": 24218,
+  "sha256": "d27bcc9339f7990f4c09965618cac6611dbfaa8c7079ff4b56fa8658705969ac",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > styleShift 1`] = `
+{
+  "length": 372,
+  "sha256": "b1c03c68d7fb83f39e48813e66d03c134378861ce0657da6182d4d5452722562",
+}
+`;
+
+exports[`helpers give the outputs ui/app.js gave on recorded inputs > text: esc, showTok, isWord, instruction, cleanReply 1`] = `
+{
+  "length": 300256,
+  "sha256": "944b8627a6fab70f0e94875b42da96032353e848a496e1b91d6598ec7faebb11",
+}
+`;

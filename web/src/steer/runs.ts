@@ -1,5 +1,5 @@
 // Ask it something: the reply with the recipe on beside the model as it normally is, and fixing a steered reply
-// by saying what's wrong with it. Carried over from ui/app.js.
+// by saying what's wrong with it.
 import { createElement, Fragment, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { fmt, isDir, labelOf, pushes } from "../lib/format";

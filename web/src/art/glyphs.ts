@@ -104,7 +104,7 @@ export function startSideArt(canvas: HTMLCanvasElement) {
   const onVisible = () => !document.hidden && run();
   addEventListener("resize", onResize);
   document.addEventListener("visibilitychange", onVisible);
-  // the one addition to the original: a way to stop, for when React unmounts the sidebar
+  // a way to stop, for when React unmounts the sidebar
   return () => {
     cancelAnimationFrame(raf);
     clearTimeout(resizeT);

@@ -1,4 +1,4 @@
-// Pure helpers carried over from ui/app.js unchanged; the parity tests run both versions on recorded data.
+// Pure helpers; the tests in ../../test check them on recorded data.
 import type { DirItem, Direction, Item, Push } from "./types";
 
 export const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);

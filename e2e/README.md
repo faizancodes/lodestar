@@ -1,10 +1,10 @@
 # UI parity suite
 
-Golden screenshots and request checks for every view and state of the UI. It exists so the UI can be rebuilt (in
-React + TypeScript) and proven to look and behave the same.
+Golden screenshots and request checks for every view and state of the UI. The goldens were recorded from the original
+plain-JS UI, and the React UI in ../web was ported until it matched them pixel for pixel; they now guard it.
 
 - `fixtures/`: every `/api` exchange from a real session with Qwen3-0.6B, one file per scenario.
-- `goldens/`: what the current UI looks like at each step, in WebKit (what the Mac app renders with).
+- `goldens/`: what the UI looks like at each step, in WebKit (what the Mac app renders with).
 - `harness/mock.py`: replays the fixtures, so the suite runs without a model in about a minute. It also fails a test
   if the UI sends a request that wasn't recorded or with a different body.
 - `harness/record.py`: the real server with recording turned on.
@@ -12,8 +12,7 @@ React + TypeScript) and proven to look and behave the same.
 ## Run
 
     npm install && npx playwright install webkit   # once
-    UI_DIR=../web/dist npx playwright test           # replay against the app's UI (`pnpm build` in ../web)
-    npx playwright test                              # replay against the original UI in ../ui
+    npx playwright test                              # replay against the UI (`pnpm build` in ../web first)
 
 `tests/parity.spec.ts` walks every view the way a person would; `tests/rules.spec.ts` checks what that walk doesn't
 reach (one stream at a time, the Stop buttons, a narrow window) and runs on replay only.

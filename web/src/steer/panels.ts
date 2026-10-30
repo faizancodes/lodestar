@@ -1,5 +1,5 @@
 // Inline panels: inspect a reply, or a neuron. A panel opens right under the thing that was clicked (a reply, a
-// neuron row), named by an anchor key, and clicking it again closes it. Carried over from ui/app.js.
+// neuron row), named by an anchor key, and clicking it again closes it.
 import type { ReactNode } from "react";
 import { useSteer, type Panel } from "../store/steer";
 
