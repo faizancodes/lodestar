@@ -477,6 +477,9 @@ function renderSteerStatus() {
   const n = state.recipe.items.length;
   $("#steer-status").classList.toggle("on", n > 0);
   $("#st-s1").classList.toggle("done", n > 0);
+  $("#st-s3").classList.toggle("locked", !n);
+  $("#st-name").placeholder = steerDefaultName();
+  $("#st-abl-row").hidden = !state.abl?.current?.active;
   // the recipe's name is the headline, so a long one wraps across the panel instead of squeezing the facts
   const title = $("#steer-title");
   title.textContent = n ? state.recipe.name || "Unsaved recipe" : "No recipe on";
@@ -1129,16 +1132,17 @@ $("#abl-test-go").onclick = async () => {
   $("#abl-test-summary").innerHTML = `<b>Refused ${rb} of ${n} before, ${ra} of ${n} after.</b>${note}`;
 };
 
-// ------------------------------------------------------------------ save the abliterated weights
-let ablExportPolling = false;
-async function pollAblExport() {
-  if (ablExportPolling) return;
-  ablExportPolling = true;
-  const box = $("#abl-export"), line = $(".export-line", box), bar = $(".export-bar i", box);
+// ------------------------------------------------------------------ save edited weights as a new model
+// One copy is written at a time; `p` is the page doing it: "abl" (refusals erased) or "st" (steering built in).
+let exportPolling = false;
+async function pollExport(p) {
+  if (exportPolling) return;
+  exportPolling = true;
+  const box = $(`#${p}-export`), line = $(".export-line", box), bar = $(".export-bar i", box);
   box.hidden = false;
-  $("#abl-saved").hidden = true;
-  $("#abl-bake").disabled = true;
-  $("#abl-export-stop").hidden = false;
+  $(`#${p}-saved`).hidden = true;
+  $$("#abl-bake, #st-bake").forEach((b) => (b.disabled = true));
+  $(`#${p}-export-stop`).hidden = false;
   try {
     for (;;) {
       let s;
@@ -1150,10 +1154,10 @@ async function pollAblExport() {
         box.hidden = true;
         bar.style.width = "0%";
         if (s.status === "done") {
-          const saved = $("#abl-saved");
+          const saved = $(`#${p}-saved`);
           saved.hidden = false;
           $("b", saved).textContent = s.name;
-          $("#abl-load").onclick = () => loadModel(s.dst);
+          $(`#${p}-load`).onclick = () => loadModel(s.dst);
           toast(`Saved ${s.name}.`);
           await refreshModels();
         } else if (/^error/.test(s.status)) toast(s.status.replace(/^error: /, "Couldn’t save: "), true);
@@ -1162,19 +1166,33 @@ async function pollAblExport() {
       await sleep(800);
     }
   } finally {
-    ablExportPolling = false;
-    $("#abl-bake").disabled = false;
-    $("#abl-export-stop").hidden = true;
+    exportPolling = false;
+    $$("#abl-bake, #st-bake").forEach((b) => (b.disabled = false));
+    $(`#${p}-export-stop`).hidden = true;
   }
 }
 
-$("#abl-export-stop").onclick = () => api("/api/abl/export/cancel", {});
+$$("#abl-export-stop, #st-export-stop").forEach((b) => (b.onclick = () => api("/api/abl/export/cancel", {})));
 
 $("#abl-bake").onclick = async () => {
   if (busy) { toast("Something is already running. Stop it first.", true); return; }
   const name = $("#abl-name").value.trim() || ablDefaultName();
   try { await api("/api/abl/export", { coef: ablCoef(), name }); } catch (e) { return toast(e.message, true); }
-  pollAblExport();
+  pollExport("abl");
+};
+
+const steerDefaultName = () => {
+  const base = modelName(state.info?.model || "model").replace(/[^A-Za-z0-9._ -]+/g, "");
+  const what = (state.recipe.name || "steered").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  return `${base}-${what || "steered"}`;
+};
+
+$("#st-bake").onclick = async () => {
+  if (busy) { toast("Something is already running. Stop it first.", true); return; }
+  const name = $("#st-name").value.trim() || steerDefaultName();
+  const abl = !$("#st-abl-row").hidden && $("#st-abl").checked;
+  try { await api("/api/steer/export", { items: state.recipe.items, name, abl, recipe: state.recipe.name }); } catch (e) { return toast(e.message, true); }
+  pollExport("st");
 };
 
 // ------------------------------------------------------------------ try it
@@ -1572,7 +1590,8 @@ function resumeLastModel() {
     renderStatus(await api("/api/status"));
     resumeLastModel();
     if ((await api("/api/models/copy")).status === "copying") pollCopy();
-    if ((await api("/api/abl/export")).status === "working") pollAblExport();
+    const ex = await api("/api/abl/export");
+    if (ex.status === "working") pollExport(ex.kind === "steer" ? "st" : "abl");
     if (!state.info.loaded && state.info.status !== "idle") pollStatus();
   } catch (e) {
     toast("Can’t reach the Lodestar engine: " + e.message, true);

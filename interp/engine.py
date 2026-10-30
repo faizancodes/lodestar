@@ -112,6 +112,7 @@ class Engine:
                 o = getattr(attn, "o_proj", None) if attn is not None else None
                 if o is not None:
                     self._handles.append(o.register_forward_hook(self._attn_out_hook(i)))
+            self._use_builtin_steering(model_id)
             t1 = time.perf_counter()
             with torch.no_grad():
                 self.dnorm = torch.stack([l.mlp.down_proj.weight.float().norm(dim=0) for l in self.layers])  # [L, N]
@@ -154,6 +155,26 @@ class Engine:
                 return bar.__exit__(*a)
 
         return Watched()
+
+    def _use_builtin_steering(self, model_id):
+        """A copy saved from Steer carries its recipe twice: as biases fitted to run in any app, and exactly, in
+        lodestar_steering.safetensors. Here the exact one replaces the fitted one, so the copy steers in this app
+        just as the recipe did live."""
+        spec = getattr(self.model.config, "lodestar_steering", None)
+        if not spec:
+            return
+        from pathlib import Path
+
+        from huggingface_hub import hf_hub_download
+        from safetensors.torch import load_file
+
+        local = Path(model_id) / spec["file"]
+        exact = load_file(str(local if local.exists() else hf_hub_download(model_id, spec["file"])))
+        with torch.no_grad():
+            for l in spec["layers"]:
+                self.layers[l + 1].self_attn.o_proj.bias.zero_()
+                b = exact[f"layer.{l}"].to(self.dev, self.model.dtype)
+                self._handles.append(self.layers[l].mlp.down_proj.register_forward_hook(lambda m, i, o, b=b: o + b))
 
     def unload(self):
         for h in self._handles:

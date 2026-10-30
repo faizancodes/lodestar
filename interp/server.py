@@ -533,33 +533,20 @@ async def abl_test(req: Request):
     return sse(gen())
 
 
-# saved copies of abliterated weights, made from the currently loaded model
-export_job = {"name": None, "dst": None, "status": "idle", "done": 0, "total": 0, "msg": "", "cancel": False}
+# saved copies of edited weights (refusals erased, steering built in), made from the currently loaded model
+export_job = {"kind": None, "name": None, "dst": None, "status": "idle", "done": 0, "total": 0, "msg": "",
+              "cancel": False}
 
 
-@app.get("/api/abl/export")
-def abl_export_status():
-    return {k: v for k, v in export_job.items() if k != "cancel"}
+def _clean_name(raw):
+    return re.sub(r"[^A-Za-z0-9._ -]+", "", str(raw or "")).strip(" .")
 
 
-@app.post("/api/abl/export")
-async def abl_export(req: Request):
-    need_model()
-    if eng.abl_vec is None:
-        raise HTTPException(409, "Analyse the model first: there is no direction to bake in yet.")
+def _start_export(kind, name, **edits):
+    """Write an edited copy of the loaded model into COPIES/name on a background thread; see abl_mod.bake."""
     if export_job["status"] == "working":
         raise HTTPException(409, f"Already writing {export_job['name']}.")
-    entry = abl_now()
-    if not entry or not entry.get("vec"):
-        raise HTTPException(409, "No saved direction for this model: analyse first.")
-    body = await req.json()
-    coef = max(0.1, min(2.0, float(body.get("coef", entry.get("coef", 1.0)))))
-    base = eng.model_id.rstrip("/").split("/")[-1]
-    name = f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
-    custom = re.sub(r"[^A-Za-z0-9._ -]+", "", str(body.get("name") or "")).strip(" .")
-    name = custom or name
-    vec = [float(x) for x in (body.get("vec") or entry["vec"])]
-    export_job.update(name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
+    export_job.update(kind=kind, name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
 
     def work():
         tmp, dst = COPIES / (name + ".partial"), COPIES / name
@@ -574,7 +561,7 @@ async def abl_export(req: Request):
                     raise Cancelled()
                 export_job.update(done=done, total=total, msg=msg)
 
-            abl_mod.bake(eng, vec, coef, tmp, prog, cancel)
+            abl_mod.bake(eng, tmp, prog, cancel, **edits)
             if export_job["cancel"]:
                 raise Cancelled()
             tmp.rename(dst)
@@ -589,6 +576,44 @@ async def abl_export(req: Request):
 
     threading.Thread(target=work, daemon=True).start()
     return abl_export_status()
+
+
+@app.get("/api/abl/export")
+def abl_export_status():
+    return {k: v for k, v in export_job.items() if k != "cancel"}
+
+
+@app.post("/api/abl/export")
+async def abl_export(req: Request):
+    need_model()
+    if eng.abl_vec is None:
+        raise HTTPException(409, "Analyse the model first: there is no direction to bake in yet.")
+    entry = abl_now()
+    if not entry or not entry.get("vec"):
+        raise HTTPException(409, "No saved direction for this model: analyse first.")
+    body = await req.json()
+    coef = max(0.1, min(2.0, float(body.get("coef", entry.get("coef", 1.0)))))
+    base = eng.model_id.rstrip("/").split("/")[-1]
+    name = _clean_name(body.get("name")) or f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
+    vec = [float(x) for x in (body.get("vec") or entry["vec"])]
+    return _start_export("abl", name, abl=(vec, coef))
+
+
+@app.post("/api/steer/export")
+async def steer_export(req: Request):
+    """Save the model with a recipe built into its weights, and its refusals erased too if that's switched on."""
+    need_model()
+    body = await req.json()
+    items = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"])}
+             for i in body.get("items") or [] if i.get("neuron") is not None and i.get("mode", "add") == "add"]
+    if not items:
+        raise HTTPException(409, "Turn on some neurons first: there is nothing to build in yet.")
+    entry = abl_now()
+    abl = (entry["vec"], float(entry.get("coef", 1.0))) if body.get("abl") and entry.get("active") and entry.get("vec") else None
+    base = eng.model_id.rstrip("/").split("/")[-1]
+    name = _clean_name(body.get("name")) or f"{base}-steered"
+    return _start_export("steer", name, steer=items, abl=abl, fit_prompts=discover.DEFAULT_PROMPTS[:6],
+                         recipe=str(body.get("recipe") or ""))
 
 
 @app.post("/api/abl/export/cancel")
