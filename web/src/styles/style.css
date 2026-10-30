@@ -803,12 +803,18 @@ main.is-chat { padding: 0; overflow: hidden; }
 
 .chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 32px; animation: rise 0.3s ease-out; }
 .chat-empty h2 { margin: 0 0 26px; font-size: 32px; line-height: 1.1; font-family: var(--sans); font-weight: 600; letter-spacing: -0.035em; color: var(--text); }
-.chat-starters { display: grid; grid-template-columns: repeat(2, minmax(0, 260px)); gap: 12px; }
+.chat-starters { display: grid; grid-template-columns: repeat(2, minmax(0, 320px)); grid-auto-rows: 1fr; gap: 10px; }
 .starter {
-  padding: 16px 18px; border: 1px solid var(--rule-2); border-radius: var(--radius); background: var(--panel);
-  font-size: 13.5px; font-weight: 600; color: var(--text-2); text-align: left; cursor: pointer; transition: border-color 0.15s, transform 0.1s, color 0.15s;
+  position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 20px; min-height: 100px;
+  padding: 16px 18px 15px; border: 1px solid var(--rule); border-radius: 10px; background: var(--panel);
+  color: var(--text-2); text-align: left; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
-.starter:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.starter-mark { font-family: var(--mono); font-size: 15px; line-height: 1; letter-spacing: 0.22em; color: var(--ascii); opacity: 0.75; transition: opacity 0.15s; }
+.starter-go { position: absolute; top: 13px; right: 15px; font-size: 14px; line-height: 1; color: var(--text); opacity: 0; transform: translate(-3px, 3px); transition: opacity 0.15s, transform 0.15s; }
+.starter:hover, .starter:focus-visible { border-color: var(--rule-2); background: var(--panel-2); color: var(--text); }
+.starter:hover .starter-mark, .starter:focus-visible .starter-mark { opacity: 1; }
+.starter:hover .starter-go, .starter:focus-visible .starter-go { opacity: 0.8; transform: none; }
+@media (max-width: 640px) { .chat-starters { grid-template-columns: minmax(0, 1fr); width: 100%; } }
 
 .composer-wrap { position: relative; padding: 0 28px 22px; }
 .composer {
@@ -866,7 +872,7 @@ h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weig
 .chip, .seg button, .mod, .mact, .msg-acts button, .chat-opts summary { font-size: 12.5px; font-weight: 500; }
 .out-h, .lbl, .panel-b h4, .pt-head { text-transform: none; letter-spacing: 0; }
 .msg-acts button { font-size: 12px; }
-.starter { font-size: 13.5px; font-weight: 500; line-height: 1.5; }
+.starter { font-size: 14px; font-weight: 500; line-height: 1.45; letter-spacing: -0.005em; }
 .msg.user .bubble { font-size: 14.5px; line-height: 1.55; }
 textarea, input:not([type]) { font-size: 14px; }
 .start-model b { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
