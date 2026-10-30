@@ -662,6 +662,16 @@ body.busy .tl-comp .send.stop { display: grid; }
 
 /* what Find it reads, the questions in two counts with Edit beside them, and the button */
 .abl-find { display: flex; align-items: center; gap: 10px; }
+.abl-res { display: flex; flex-direction: column; gap: 10px; animation: rise 0.25s ease-out; }
+.abl-res-h { margin: 0 0 2px; font-size: 13.5px; color: var(--text-2); }
+.abl-res-row { display: grid; grid-template-columns: 56px auto 1fr; align-items: center; gap: 14px; }
+.abl-res-l { font-size: 12.5px; color: var(--muted); }
+.abl-dots { display: flex; gap: 4px; }
+.abl-dots i { width: 12px; height: 12px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); }
+.abl-dots i.no { background: var(--bad); }
+.abl-res-n { font-size: 13px; color: var(--text-2); }
+.abl-res-n b { margin-right: 3px; font-family: var(--mono); font-weight: 500; color: var(--text); }
+.abl-res-row[data-row="now"] .abl-res-l { color: var(--text); }
 .abl-q { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--text-2); }
 .abl-q b { margin-right: 2px; font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
 .link { padding: 0; border: 0; background: none; font-size: 13px; font-weight: 500; color: var(--text); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; cursor: pointer; }
@@ -674,7 +684,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .abl-probes textarea { width: 100%; font-size: 13px; }
 .abl-probes-acts { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 @media (max-width: 760px) { .abl-probes { grid-template-columns: 1fr; gap: 14px; } }
-#abl-rank .adv { margin-top: 20px; }
 .slider-row { display: flex; align-items: center; gap: 16px; max-width: 420px; }
 .slider-row input[type="range"] { flex: 1; }
 .save-row { display: flex; align-items: flex-end; gap: 12px; }
@@ -705,16 +714,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .switch[aria-checked="true"] { color: var(--accent); }
 .switch[aria-checked="true"] i { background: var(--good); box-shadow: 0 0 14px -2px rgba(61, 220, 132, 0.55); }
 .switch[aria-checked="true"] i::after { transform: translateX(14px); }
-#abl-rank h4 { margin: 18px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
-.rank-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 46px 150px; gap: 12px; align-items: center; padding: 7px 10px; border-radius: 4px; }
-.rank-row:hover { background: var(--wash); }
-.rank-row.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--accent); }
-.rank-row .pt-bar { display: block; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
-.rank-row .pt-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
-.rank-row.sel .pt-bar i { background: var(--accent-hi); }
-.rank-row .rk-v { font-family: var(--mono); font-size: 12px; text-align: right; }
-.rank-row .rk-tag { font-size: 10.5px; color: var(--muted); text-align: right; }
-.rank-row.sel .rk-tag { color: var(--accent); font-weight: 700; }
 
 /* the status panel: the cut-beam scene beside where the refusal direction stands, and its switch */
 .status-panel {

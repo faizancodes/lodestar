@@ -377,6 +377,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
 
     yield _ev("result", vec=vec, layer=selected, coef=coef, ranking=rank_rows, clean=clean,
               top_score=round(float(cos[selected]), 4), refused_left=refused_left, tried=len(TRIAL_PROMPTS),
+              refused_before=int(sum(base_refused)),
               examples=examples)
 
 

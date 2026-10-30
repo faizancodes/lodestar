@@ -142,11 +142,7 @@ export async function analyze() {
     }));
     setPlan({ done: true });
 
-    const left = r.refused_left, n = r.tried;
-    const strength = r.coef === 1 ? "" : ` at strength ${r.coef}`;
-    say(!left
-      ? `Layer ${r.layer}${strength} stopped the refusals on all ${n} new test requests, and it’s on now.`
-      : `Even the best setting, layer ${r.layer}${strength}, still refused ${left} of ${n} new test requests. It’s on now.`, false);
+    setPlan({ live: null }); // the result shows what it did
 
     await refreshAbl();
   } finally {
