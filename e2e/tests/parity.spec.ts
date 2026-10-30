@@ -321,8 +321,10 @@ test("abliterate: find the refusal direction, switch it, try it, save", async ({
   await expect(page.locator("#tab-abl-dot")).toBeVisible();
   await snap(page.locator("#abl-s1"), "abl-found");
 
-  await page.locator("#abl-rank summary").click();
-  await snap(page.locator("#abl-rank"), "abl-rank");
+  await expect(page.locator("#abl-result")).toContainText("16 new requests it should refuse");
+  await expect(page.locator('#abl-result [data-row="before"] .abl-res-n')).toHaveText("14 refused");
+  await expect(page.locator('#abl-result [data-row="now"] .abl-res-n')).toHaveText("0 refused");
+  await expect(page.locator("#abl-s1 [data-cancel]")).toHaveCount(0);
   await snap(page.locator("#abl-status"), "abl-status-on");
 
   await page.locator("#abl-toggle").click();

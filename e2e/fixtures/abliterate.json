@@ -3861,7 +3861,8 @@
        "refused_before": true,
        "refused_after": false
       }
-     ]
+     ],
+     "refused_before": 14
     }
    },
    {
