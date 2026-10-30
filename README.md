@@ -12,13 +12,15 @@ whose hook placement and dose units this app reuses.
 ## Run it
 
     uv sync
-    ./scripts/build_app.sh          # makes dist/Lodestar.app; drag it to /Applications or the Dock
+    ./scripts/build_app.sh          # builds the UI and makes dist/Lodestar.app; drag it to /Applications or the Dock
     open "dist/Lodestar.app"
 
 or without the bundle:
 
     uv run python -m interp.app            # native window
     uv run python -m interp.app --server   # headless, http://127.0.0.1:8792
+
+The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`; `build_app.sh` does this).
 
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
 The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise
@@ -74,8 +76,7 @@ norm, so dose 1.0 moves the residual stream about one typical residual's length 
    with the extra loss on a neutral passage. First-order estimates often fail at real doses, so this step decides.
 5. **Combination.** Verified neurons are stacked greedily, each kept only if it adds to J, then the recipe's overall
    strength is tuned.
-6. **Proof.** The recipe runs on the held-out prompts with no system prompt, beside the untouched model, and the
-   held-out score is reported.
+6. **Proof.** The recipe runs on the held-out prompts with no system prompt, beside the untouched model.
 
 What to expect: small models spread most personas over many neurons, so a 0.6B recipe shifts tone and likelihood more
 than it produces a full character. The neuron-zoo results used a 4B model. Raise `max neurons`, loosen the fluency
@@ -88,5 +89,6 @@ budget, or load Qwen3-1.7B/4B for stronger single-neuron levers.
     interp/abl.py        abliteration: probe lists, direction analysis, weight baking
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
-    ui/                  the interface: Plus Jakarta Sans, cobalt and cream
+    web/                 the interface (React + TypeScript, Vite)
+    e2e/                 the parity suite: recorded API sessions, mock replay, golden screenshots
     scripts/             app bundle and icon builders

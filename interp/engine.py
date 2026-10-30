@@ -7,6 +7,11 @@ layers expose `mlp.down_proj`.
 Doses for `add` pushes are in units of the layer's median residual norm, divided by the neuron's down-column norm, so
 dose 1.0 on any neuron moves the residual stream by about one typical residual's length. `mul` pushes multiply the
 activation (0 = ablate).
+
+A "direction" is a vector in the residual stream (a concept's difference in means, see interp/directions.py). A `dir`
+push adds dose / len(layers) times the direction's contrast size to the output of each of its layers, so dose 1 moves
+the stream by one average difference between the concept's two poles; `erase` clamps the stream's component along it
+to where ordinary prompts sit, at every layer.
 """
 import threading
 import time
@@ -27,13 +32,18 @@ REFERENCE_TEXT = (
 
 @dataclass
 class Push:
-    layer: int
+    layer: int | None  # None for a direction push, which carries its own layers
     neuron: int | None  # None = every neuron in the layer's MLP (mul only)
     dose: float
-    mode: str = "add"  # "add" | "mul"
+    mode: str = "add"  # "add" | "mul" | "dir" | "erase"
+    dir_id: str | None = None
+    layers: tuple = ()  # dir: the layers the dose is spread over; erase: the layer the direction is taken from
 
     @staticmethod
     def of(d):
+        if d.get("kind") == "dir":
+            op = "erase" if d.get("op") == "erase" else "dir"
+            return Push(None, None, float(d["dose"]), op, str(d["dir"]), tuple(int(l) for l in d.get("layers") or ()))
         return Push(int(d["layer"]), None if d.get("neuron") is None else int(d["neuron"]), float(d["dose"]),
                     d.get("mode", "add"))
 
@@ -50,7 +60,9 @@ class Engine:
         self.status = "idle"
         self.progress = None  # 0..1 while a model loads, else None
         self.trace = None
-        self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None)}
+        self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None), "dir": {layer: [B, H]}, "erase": [...]}
+        self.dirs = {}  # direction id -> {"unit": [L, H] float32 on device, "mag": [L] list, "band": [layers],
+        #                                "neutral": [L, H] float32 on device | None}
         self.abl_vec = None  # [H] refusal direction to erase from every layer's residual stream, unit norm
         self.abl_coef = 1.0  # how much of the projection to remove (1.0 = fully)
         self.abl_layer = None  # the layer the direction was extracted from, for the UI
@@ -59,8 +71,6 @@ class Engine:
         self._deltas = None  # per-layer [N] tensors requiring grad, for attribution
         self._cap_acts = None  # {layer: [T, N] cpu} during a trace
         self._cap_resid = None  # {layer: [T, H]} during a trace or norm measurement
-        self._cap_mlp_norm = None
-        self._cap_attn_norm = None
         self._handles = []
 
     # ---------------------------------------------------------------- loading
@@ -106,12 +116,7 @@ class Engine:
             self.backbone = getattr(model, model.base_model_prefix)  # the transformer without the vocabulary head
             for i, layer in enumerate(self.layers):
                 self._handles.append(layer.mlp.down_proj.register_forward_pre_hook(self._mlp_hook(i)))
-                self._handles.append(layer.mlp.down_proj.register_forward_hook(self._mlp_out_hook(i)))
                 self._handles.append(layer.register_forward_hook(self._resid_hook(i)))
-                attn = getattr(layer, "self_attn", None)
-                o = getattr(attn, "o_proj", None) if attn is not None else None
-                if o is not None:
-                    self._handles.append(o.register_forward_hook(self._attn_out_hook(i)))
             self._use_builtin_steering(model_id)
             t1 = time.perf_counter()
             with torch.no_grad():
@@ -183,6 +188,7 @@ class Engine:
         self.model = self.tok = None
         self.model_id = None
         self.trace = None
+        self.dirs = {}
         self.abl_vec = self._abl_mask = None
         self._abl_any = False
         if torch.backends.mps.is_available():
@@ -307,27 +313,26 @@ class Engine:
             return (h,) if changed else None
         return hook
 
-    def _mlp_out_hook(self, i):
-        def hook(mod, inp, out):
-            if self._cap_mlp_norm is not None:
-                self._cap_mlp_norm[i] = out[0].detach().float().norm(dim=-1).cpu()
-        return hook
-
-    def _attn_out_hook(self, i):
-        def hook(mod, inp, out):
-            if self._cap_attn_norm is not None:
-                self._cap_attn_norm[i] = out[0].detach().float().norm(dim=-1).cpu()
-        return hook
-
     def _resid_hook(self, i):
         def hook(mod, inp, out):
             h = out[0] if isinstance(out, tuple) else out
             changed = False
+            st = self._push_state
+            off = st["dir"].get(i) if st and "dir" in st else None
+            if off is not None:
+                h = h + off[:, None, :]
+                changed = True
             if self._abl_any and self.abl_vec is not None:
                 mask = self._abl_mask.to(h.dtype)[:, None, None]
                 v = self.abl_vec
                 proj = (h @ v)[:, :, None] * v  # the component of each position along the refusal direction
                 h = h - mask * self.abl_coef * proj
+                changed = True
+            for coef, v, ref in (st.get("erase") or ()) if st else ():
+                # clamp to where ordinary prompts sit along v, not to 0: zeroing a direction that ordinary text sits
+                # far from would push every reply toward its other pole
+                p = h @ v - ref[i]
+                h = h - coef[:, None, None] * p[:, :, None] * v
                 changed = True
             if self._cap_resid is not None:
                 self._cap_resid[i] = h.detach()[0]
@@ -347,11 +352,35 @@ class Engine:
             self._cap_resid = None
 
     def _make_push_state(self, row_pushes, B):
-        """row_pushes: list (len B) of lists of Push. Returns {layer: (add [B,N], mul [B,N])}."""
+        """row_pushes: list (len B) of lists of Push. Returns {layer: (add [B,N], mul [B,N])}, plus "dir":
+        {layer: [B, H]} for direction pushes and "erase": [(coef [B], unit [H], ref [L])] for erased directions."""
         N = self.dnorm.shape[1]
         st = {}
+        dirs, erase = {}, {}
         for r, pushes in enumerate(row_pushes):
             for p in pushes or []:
+                if p.mode in ("dir", "erase"):
+                    d = self.dirs.get(p.dir_id)
+                    if d is None:
+                        raise ValueError(f"No direction called {p.dir_id!r} for this model.")
+                    if p.mode == "dir":
+                        for l in p.layers:
+                            off = dirs.get(l)
+                            if off is None:
+                                off = dirs[l] = torch.zeros(B, d["unit"].shape[1], device=self.dev, dtype=torch.float32)
+                            off[r] += (p.dose / len(p.layers) * d["mag"][l]) * d["unit"][l]
+                    else:
+                        src = p.layers[0] if p.layers else d["band"][len(d["band"]) // 2]
+                        key = (p.dir_id, src)
+                        if key not in erase:
+                            v = d["unit"][src]
+                            # where ordinary prompts sit along v at each layer (0 when the direction has no neutral means)
+                            ref = d["neutral"] @ v if d.get("neutral") is not None \
+                                else torch.zeros(len(self.layers), device=self.dev)
+                            dt = self.model.dtype
+                            erase[key] = [torch.zeros(B, device=self.dev), v.to(dt), ref.to(dt)]
+                        erase[key][0][r] += p.dose
+                    continue
                 add, mul = st.get(p.layer, (None, None))
                 if p.mode == "mul":
                     if mul is None:
@@ -367,14 +396,17 @@ class Engine:
                         add = torch.zeros(B, N, device=self.dev)
                     add[r, p.neuron] += p.dose * self.unit[p.layer, p.neuron]
                 st[p.layer] = (add, mul)
+        if dirs:
+            st["dir"] = {l: off.to(self.model.dtype) for l, off in dirs.items()}
+        if erase:
+            st["erase"] = [(c.to(self.model.dtype), v, ref) for c, v, ref in erase.values()]
         return st or None
 
     # ---------------------------------------------------------------- tokens
-    def chat_ids(self, prompt, system=None, history=None):
+    def chat_ids(self, prompt, system=None):
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})
-        msgs += history or []
         msgs.append({"role": "user", "content": prompt})
         return self.messages_ids(msgs)
 
@@ -474,23 +506,20 @@ class Engine:
 
     # ---------------------------------------------------------------- tracing
     def run_trace(self, prompt_ids, response_ids, pushes=None, topk_lens=5, abl=False):
-        """One forward pass over prompt + response, capturing every neuron at every token, MLP/attention write norms,
-        and the logit lens at every layer. Stored on self.trace for later queries."""
+        """One forward pass over prompt + response, capturing every neuron at every token and the logit lens at every
+        layer. Stored on self.trace for later queries."""
         with self.lock:
             ids = list(prompt_ids) + list(response_ids)
             L = len(self.layers)
-            self._cap_acts, self._cap_resid, self._cap_mlp_norm, self._cap_attn_norm = {}, {}, {}, {}
+            self._cap_acts, self._cap_resid = {}, {}
             self._push_state = self._make_push_state([pushes or []], 1)
             if abl:
                 self._abl_mask = torch.ones(1, dtype=torch.bool, device=self.dev)
                 self._abl_any = True
             try:
                 with torch.inference_mode():
-                    out = self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False)
-                    final_lp = torch.log_softmax(out.logits[0].float(), -1)
-                    # logprob the model gave each actual next token
-                    nxt = torch.tensor(ids[1:], device=self.dev)
-                    tok_lp = final_lp[:-1].gather(-1, nxt[:, None])[:, 0].cpu().numpy()
+                    # the hooks capture what's needed; the model's own logits aren't
+                    self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)
                     lens_ids, lens_p = [], []
                     for l in range(L):
                         r = self._cap_resid[l]
@@ -501,21 +530,15 @@ class Engine:
                         lens_p.append(top.values.cpu().numpy())
                         del lg, p
                 acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
-                resid_norm = np.stack([self._cap_resid[l].float().norm(dim=-1).cpu().numpy() for l in range(L)])
-                mlp_norm = np.stack([self._cap_mlp_norm[l].numpy() for l in range(L)])
-                attn_norm = (np.stack([self._cap_attn_norm[l].numpy() for l in range(L)])
-                             if len(self._cap_attn_norm) == L else None)
             finally:
-                self._cap_acts = self._cap_resid = self._cap_mlp_norm = self._cap_attn_norm = None
+                self._cap_acts = self._cap_resid = None
                 self._push_state = None
                 self._abl_mask = None
                 self._abl_any = False
             impact_scale = (self.dnorm / self.resid_p50[:, None]).cpu().numpy().astype(np.float32)  # [L, N]
             self.trace = {
                 "ids": ids, "n_prompt": len(prompt_ids), "tokens": self.token_strs(ids), "acts": acts,
-                "impact_scale": impact_scale, "resid_norm": resid_norm, "mlp_norm": mlp_norm,
-                "attn_norm": attn_norm, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
-                "tok_lp": tok_lp,
+                "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
             }
             return self.trace
 
@@ -558,20 +581,6 @@ class Engine:
             up = logits[0].topk(k).indices.tolist()
             down = logits[1].topk(k).indices.tolist()
         return {"up": [self.tok.decode([t]) for t in up], "down": [self.tok.decode([t]) for t in down]}
-
-    def read(self, layer, n, ids, pushes=None):
-        """Per-token activation of neuron (layer, n) on token ids."""
-        with self.lock:
-            self._cap_acts = {}
-            self._push_state = self._make_push_state([pushes or []], 1)
-            try:
-                with torch.inference_mode():
-                    # only layers up to `layer` matter; the full pass is still cheap at these sizes
-                    self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)
-                return self._cap_acts[layer][:, n].numpy()
-            finally:
-                self._cap_acts = None
-                self._push_state = None
 
     # ---------------------------------------------------------------- scoring
     def _batches(self, rows, budget=6144):
