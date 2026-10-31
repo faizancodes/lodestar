@@ -491,15 +491,22 @@ async def chat(req: Request):
         flags.append(bool(spec.get("abl")) and eng.abl_vec is not None)
 
     max_new = int(body.get("max_new", 512))
+    read = [str(d) for d in body.get("read") or [] if str(d) in eng.dirs]  # gauges: directions to read as it writes
 
     def gen():
         for r, x in eng.generate(rows, max_new=max_new, temperature=float(body.get("temperature", 0.7)),
-                                 cancel=cancel, seed=int(time.time()), abl=flags):
+                                 cancel=cancel, seed=int(time.time()), abl=flags, read=read or None):
             if r is None:
                 cut = [len(ids) >= max_new for ids in x]  # wrote to the limit without reaching its end
                 yield {"type": "done", "cut": cut if multi else cut[0]}
                 break
-            yield {"type": "delta", "row": r, "delta": x} if multi else {"type": "delta", "delta": x}
+
+            ev = {"type": "delta", "row": r} if multi else {"type": "delta"}
+            if read:
+                ev |= {"delta": x[0], "read": x[1]}  # per token in the delta, one reading per gauged direction
+            else:
+                ev["delta"] = x
+            yield ev
 
     return sse(gen())
 

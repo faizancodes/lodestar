@@ -3,7 +3,11 @@ import { load } from "../lib/storage";
 import type { ChatMessage, ChatSummary, WordSearch } from "../lib/types";
 
 // The conversation. As on Steer, the reply being streamed is a mutable message, redrawn when `v` changes.
-export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number; cut?: boolean; mods?: Mods }; // cut: wrote to the length limit
+export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number; cut?: boolean; read?: Reading; mods?: Mods }; // cut: wrote to the length limit
+
+// Gauges: directions read off the residual stream as a reply is written. For each piece of text as it arrived, each
+// direction's reading, from where ordinary prompts sit (0), in units of the gap between its two poles.
+export type Reading = { ids: string[]; names: string[]; toks: { t: string; v: number[] }[] };
 
 // What shaped a reply: the neurons and directions pushed, each with its dose, and whether refusals were erased
 export type Pushed = { label: string; dose: number; erase?: boolean };
@@ -12,10 +16,12 @@ export type Mods = { steer?: Pushed[]; abl?: boolean };
 // Compare's side-by-side replies: the plain model, and each switch that was on, alone. Each column carries on its
 // own thread, so a later turn's history takes that column's earlier replies.
 export type ColKey = "plain" | "steer" | "abl";
-export type Col = { key: ColKey; label: string; content: string; wps?: number; cut?: boolean }; // wps: words a second, once done
+export type Col = { key: ColKey; label: string; content: string; wps?: number; cut?: boolean; read?: Reading }; // wps: words a second, once done
 
 type Chat = {
   v: number;
+  gv: number; // the gauges being written redraw on this, without the rest of the log
+  gauges: string[]; // the directions read as replies are written
   id: string | null; // the saved conversation this is, once its first reply is in
   list: ChatSummary[] | null; // every saved conversation, newest first
   messages: Msg[];
@@ -40,6 +46,8 @@ type Chat = {
 
 export const useChat = create<Chat>((set) => ({
   v: 0,
+  gv: 0,
+  gauges: (() => { try { return JSON.parse(load("chat-gauges") || "[]"); } catch { return []; } })(),
   id: null,
   list: null,
   messages: [],

@@ -12,7 +12,7 @@ import { ablActive, useApp } from "../store/app";
 import type { ChatSummary, NeuronItem, WordSearch } from "../lib/types";
 import { addItems, removeAt } from "../steer/recipe";
 import { parsePins } from "./parse";
-import { touchChat, useChat, type Col, type ColKey, type Mods, type Msg } from "../store/chat";
+import { touchChat, useChat, type Col, type ColKey, type Mods, type Msg, type Reading } from "../store/chat";
 
 const app = useApp.getState;
 const get = useChat.getState;
@@ -67,7 +67,7 @@ export const jumpDown = () => ((follow = true), toBottom(true));
 let decoders: ReturnType<typeof createDecoder>[] = []; // the replies being written decode in, mark by mark
 
 // the parts of a reply that stream: the message itself, or its columns side by side
-const parts = (m: Msg): { content: string; wps?: number; cut?: boolean }[] => m.cols ?? [m];
+const parts = (m: Msg): { content: string; wps?: number; cut?: boolean; read?: Reading }[] => m.cols ?? [m];
 
 function updateLastBot() {
   const m = get().messages[get().messages.length - 1];
@@ -85,6 +85,7 @@ function updateLastBot() {
     if (part) el.textContent = rateText(rateOf(part));
   });
 
+  set({ gv: get().gv + 1 });
   if (follow) toBottom(false);
 }
 
@@ -114,6 +115,24 @@ function history(key: ColKey) {
 
   return (sys ? [{ role: "system", content: sys }] : []).concat(turns);
 }
+
+/** The gauges that can be read now: the ones picked whose direction exists for the loaded model. */
+export const gaugeDirs = () => {
+  const dirs = app().dirs ?? [];
+  return get().gauges.flatMap((id) => dirs.filter((d) => d.id === id && d.ready));
+};
+
+export function toggleGauge(id: string) {
+  const g = get().gauges, next = g.includes(id) ? g.filter((x) => x !== id) : [...g, id];
+  save("chat-gauges", JSON.stringify(next));
+  set({ gauges: next });
+}
+
+// what a continued reply's gauges read
+const live0 = (going: ReturnType<typeof parts> | null) => {
+  const r = going?.[0]?.read;
+  return r ? r.ids.map((id, i) => ({ id, name: r.names[i] })) : [];
+};
 
 /** What the switches put on a reply now: the recipe's neurons and ready directions as they're dosed, and the erasure. */
 function modsNow(): Mods {
@@ -159,7 +178,13 @@ async function reply(more = false) {
     get().messages.push(m);
   }
 
+  // a continued reply goes on reading what it read; a new one, the gauges that are on
+  const reads = more ? live0(going) : gaugeDirs().map((d) => ({ id: d.id, name: d.name }));
+  const read = reads.map((d) => d.id);
+  if (read.length) Object.assign(body, { read });
+
   const live = going ?? parts(m); // row i streams into live[i]
+  if (!more) live.forEach((p) => (p.read = read.length ? { ids: read, names: reads.map((d) => d.name), toks: [] } : undefined));
   live.forEach((p) => ((p.cut = false), delete p.wps, timing.delete(p))); // its speed is the new stretch's
   m.stopped = false;
   m.mods = modsNow();
@@ -181,6 +206,8 @@ async function reply(more = false) {
 
     const part = live[many ? (ev.row as number) : 0];
     part.content += ev.delta as string;
+    const rs = ev.read as number[][] | undefined;
+    if (rs?.length && part.read) part.read.toks.push({ t: ev.delta as string, v: part.read.ids.map((_, d) => rs.reduce((a, r) => a + r[d], 0) / rs.length) });
     arrived(part);
     if (!raf) raf = requestAnimationFrame(() => ((raf = 0), updateLastBot()));
   });
