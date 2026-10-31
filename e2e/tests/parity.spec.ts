@@ -122,13 +122,14 @@ test("steer: search by word, turn neurons on, try it, inspect, fix, save", async
   await snap(page.locator("#st-s1"), "steer-recipe");
   await snap(page.locator("#steer-status"), "steer-status-on");
 
-  // ask it something: the answer with the neurons on is v1, and the box now takes a fix
+  // ask it something: the reply comes with the neurons on, and the box takes the next message
   const answers = page.locator("#tl .tl-a"), cur = page.locator("#tl .tl-a.cur");
   await page.locator("#t-chips .chip", { hasText: "Describe the way you look." }).click();
   await expect(answers).toHaveCount(1);
   await idle(page);
   await expect(cur.locator(".tl-a-b").first()).not.toBeEmpty();
-  await expect(page.locator("#t-prompt")).toHaveAttribute("placeholder", "What should change?");
+  await expect(page.locator("#t-prompt")).toHaveAttribute("placeholder", "Reply");
+  await expect(page.locator("#tl-fix")).toBeVisible();
   await snap(page.locator("#st-s2"), "steer-answer");
 
   await cur.locator(".tl-act", { hasText: "Compare with normal" }).click();
@@ -160,25 +161,27 @@ test("steer: search by word, turn neurons on, try it, inspect, fix, save", async
   await page.keyboard.press("Escape");
   await expect(page.locator(".panel")).toHaveCount(0);
 
-  // say what should change: a fix retunes the neurons and answers again as v2, which Undo takes back
-  await page.locator("#t-chips .chip", { hasText: "It's too strong" }).click();
-  await expect(page.locator("#t-prompt")).toHaveValue("It's too strong.");
-  await page.locator("#t-go").click();
+  // say what's wrong under the reply: the neurons are retuned and it's written again as a second version
+  await page.locator("#tl-fix .chip", { hasText: "It's too strong" }).click();
   await expect(page.locator("#tl .tl-now")).toBeVisible();
   await expect(page.locator("#tl .tl-now")).toHaveCount(0, { timeout: T });
   await expect(page.locator("#tl .typing")).toHaveCount(0, { timeout: T });
   await idle(page);
+  await expect(answers).toHaveCount(1);
   await snap(page.locator("#st-s2"), "fix-result");
 
-  if ((await answers.count()) === 2) {
-    await cur.locator(".tl-act", { hasText: "Undo" }).click();
-    await expect(answers).toHaveCount(1);
+  // the arrows go back to the first version, and its neurons
+  if (await cur.locator(".tl-ver").isVisible()) {
+    await expect(cur.locator(".tl-ver")).toContainText("2 of 2");
+    await cur.locator('[aria-label="Previous version"]').click();
+    await expect(cur.locator(".tl-ver")).toContainText("1 of 2");
     await expect(rows).toHaveCount(2);
   }
 
-  await page.locator("#tl-newq").click();
+  // New chat starts over
+  await page.locator("#tl-new").click();
+  await expect(page.locator("#tl")).toBeHidden();
   await expect(page.locator("#t-prompt")).toHaveAttribute("placeholder", "Ask it something");
-  await expect(page.locator("#tl-newq")).toHaveText("Cancel");
 
   // save, clear, and bring it back from the sidebar
   await page.locator("#rc-save").click();

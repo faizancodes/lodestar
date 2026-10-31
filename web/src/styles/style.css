@@ -477,8 +477,19 @@ body.busy .btn[data-cancel] { display: inline-flex; }
   background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--rule); font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
   animation: rise 0.22s ease-out;
 }
-.tl-chg { align-self: flex-end; max-width: 78%; margin-top: -8px; font: 500 11.5px/1.6 var(--mono); color: var(--muted); text-align: right; }
+.tl-chg { margin: 0 0 6px; font: 500 11.5px/1.6 var(--mono); color: var(--muted); }
+.tl-chg span { font-family: var(--sans); font-size: 12px; color: var(--text-2); }
 .tl-chg b { font-weight: 600; color: var(--ascii); }
+.tl-ver { display: inline-flex; align-items: center; gap: 2px; font: 500 11.5px var(--mono); color: var(--muted); }
+.tl-ver button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: var(--r-sm); background: none; font-size: 15px; line-height: 1; color: var(--text-2); cursor: pointer; }
+.tl-ver button:hover:not(:disabled) { background: var(--wash); color: var(--accent); }
+.tl-ver button:disabled { opacity: 0.3; cursor: default; }
+.tl-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.tl-fix-l { margin-right: 4px; font-size: 12px; color: var(--muted); }
+.tl-fix .chip.on { border-color: var(--accent); color: var(--accent); }
+.tl-fix-other { display: flex; gap: 6px; flex-basis: 100%; margin-top: 2px; animation: rise 0.15s ease-out; }
+.tl-fix-other input { flex: 1; min-width: 0; padding: 7px 11px; font-size: 13.5px; }
+.tl-fixing { margin-top: 14px; }
 .tl-note { align-self: center; font-size: 12px; color: var(--muted); }
 .tl-a { position: relative; animation: rise 0.22s ease-out; }
 .tl-a-h { display: flex; align-items: center; gap: 8px; min-height: 24px; margin-bottom: 4px; }
