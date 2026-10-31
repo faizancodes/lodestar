@@ -134,8 +134,11 @@ p { margin: 0; }
 .rail a.on i { background: var(--ascii); border-color: var(--ascii); box-shadow: 0 0 0 4px rgba(195, 207, 245, 0.12); }
 
 /* get it: framed like the hero, the commands in a terminal panel */
-.get { position: relative; display: grid; align-content: center; min-height: 100vh; min-height: 100svh; padding: clamp(80px, 12svh, 160px) var(--gut); }
+.get { position: relative; z-index: 1; display: grid; align-content: center; min-height: 100vh; min-height: 100svh; padding: clamp(80px, 12svh, 160px) var(--gut); }
 .get .hud { inset: clamp(16px, 3vw, 32px) clamp(16px, 3vw, 32px); }
+.get .hud::before { /* the frame stays open at the bottom, where the foot rises into it */
+  -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 92%); mask-image: linear-gradient(to bottom, #000 60%, transparent 92%);
+}
 .get-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: clamp(32px, 5vw, 72px); max-width: var(--w); margin: 0 auto; }
 #get-art { width: 100%; height: clamp(460px, 68svh, 820px); }
 .get-side { display: flex; flex-direction: column; gap: 40px; }
@@ -158,8 +161,14 @@ p { margin: 0; }
 .cp:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
 .cp.done { color: var(--ascii); }
 
-.foot { position: relative; border-top: 1px solid var(--rule); }
-#foot-art { width: 100%; height: clamp(300px, 54vw, 680px); }
+/* the foot rises out of the section above: no rule between them, and its sky fades in from nothing as the page
+   ends, its top reaching up behind the last of Get Lodestar */
+.foot { position: relative; margin-top: calc(-1 * clamp(80px, 18svh, 220px)); }
+#foot-art {
+  width: 100%; height: clamp(380px, 62vw, 820px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.35) 18%, #000 42%);
+  mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.35) 18%, #000 42%);
+}
 
 /* things arrive as they come into view */
 .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
@@ -173,6 +182,7 @@ p { margin: 0; }
 @media (max-width: 900px) {
   .get-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   #get-art { height: min(100vw, 480px); }
+  .foot { margin-top: -32px; }
   .hero { height: auto; min-height: 100svh; padding-top: min(84vw, 560px); }
   .hero #hero-art { bottom: auto; height: min(96vw, 640px); }
   .hero-copy { position: relative; left: auto; top: auto; transform: none; padding: 40px var(--gut) 56px; }
