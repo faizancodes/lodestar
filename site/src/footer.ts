@@ -56,13 +56,38 @@ export function startFooter(canvas: HTMLCanvasElement) {
     if (b > grid[i]) grid[i] = b;
   };
 
+  // the cursor, in cells, eased; on: how present it is
+  let mx = 0, my = 0, tmx = 0, tmy = 0, on = 0, here = false;
+  canvas.addEventListener("pointermove", (e) => {
+    const r = canvas.getBoundingClientRect();
+    tmx = (e.clientX - r.left) / CELL;
+    tmy = (e.clientY - r.top) / CELL;
+    if (!here) ((mx = tmx), (my = tmy), (here = true));
+  });
+  canvas.addEventListener("pointerleave", () => (here = false));
+
   const draw = (t: number) => {
     grid.fill(0);
+    mx += (tmx - mx) * 0.2;
+    my += (tmy - my) * 0.2;
+    on += ((here ? 1 : 0) - on) * 0.12;
+    // round the cursor, a lens: what is near it is pushed out and lit
+    const L = Math.max(18, rowsAll * 0.24);
+    const near = (x: number, y: number) => (on < 0.01 ? 0 : clamp(1 - Math.hypot(x - mx, y - my) / L) ** 2 * on);
+    const lens: Put = (x, y, b) => {
+      const k = near(x, y);
+      if (k > 0) {
+        const d = Math.hypot(x - mx, y - my) || 1;
+        x += ((x - mx) / d) * k * L * 0.3;
+        y += ((y - my) / d) * k * L * 0.3;
+      }
+      put(x, y, b * (1 + k * 1.6));
+    };
     const rows = Math.round(rowsAll * 0.58); // the sky's share; the name stands below it
     const cx = cols / 2, cy = rows * 0.78, R = Math.max(cols * 0.55, rows);
     // things fade toward the page's edges and below the horizon
     const fall = (x: number, y: number) => clamp(1.25 - Math.hypot((x - cx) / (cols * 0.55), (y - cy) / (rows * 0.95))) * (y > cy ? clamp(1 - (y - cy) / (rows * 0.2)) : 1);
-    const at = (x: number, y: number, b: number) => put(x, y, b * fall(x, y));
+    const at = (x: number, y: number, b: number) => lens(x, y, b * fall(x, y));
 
     // the sky, wheeling slowly about the star
     const sky: [number, number][] = [];
@@ -92,9 +117,12 @@ export function startFooter(canvas: HTMLCanvasElement) {
     }
 
     // meridians, fanning out from the star across the sky
+    // and the one the cursor lies along lights up
+    const toward = Math.atan2((my - cy) / 0.9, (mx - cx) / 1.4), aim = my < cy ? on : 0;
     for (let k = 0; k <= 24; k++) {
       const a = Math.PI + (k / 24) * Math.PI, major = k % 6 === 0;
-      for (let r = 20; r < R * 1.3; r += major ? 1.5 : 3) at(cx + Math.cos(a) * r * 1.4, cy + Math.sin(a) * r * 0.9, major ? 0.24 : 0.12);
+      const lit = aim * Math.exp(-((((a - toward + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) ** 2) / 0.004);
+      for (let r = 20; r < R * 1.3; r += major || lit > 0.1 ? 1.5 : 3) at(cx + Math.cos(a) * r * 1.4, cy + Math.sin(a) * r * 0.9, (major ? 0.24 : 0.12) + lit * 0.5);
     }
 
     // the astrolabe's rings, each ticked and turning at its own rate
@@ -115,7 +143,10 @@ export function startFooter(canvas: HTMLCanvasElement) {
     // the name, standing in the ground below the horizon, a slow light passing along it
     for (let y = 0; y < rowsAll; y++)
       for (let x = 0; x < cols; x++) {
-        const a = name[y * cols + x];
+        // magnified under the cursor: each cell reads the name from nearer the cursor's centre
+        const k = near(x, y), sx = Math.round(x - (x - mx) * k * 0.45), sy = Math.round(y - (y - my) * k * 0.45);
+        if (sx < 0 || sy < 0 || sx >= cols || sy >= rowsAll) continue;
+        const a = name[sy * cols + sx] * (1 + k * 1.4);
         if (a < 0.3) continue;
         const sweep = Math.exp(-(((x - ((t * 0.08) % 1.6 - 0.3) * cols) / (cols * 0.1)) ** 2));
         put(x, y, a * (0.34 + 0.16 * hash(x, y) + sweep * 0.5) * (1 - 0.4 * clamp((y - cy) / (rowsAll - cy))));
@@ -129,7 +160,7 @@ export function startFooter(canvas: HTMLCanvasElement) {
     for (let dy = -Math.ceil(star); dy <= star; dy++)
       for (let dx = -Math.ceil(star); dx <= star; dx++) {
         const b = compassStar(dx / S, dy / S);
-        if (b >= 0.06) put(cx + dx, cy - star * 0.35 + dy, b * pulse * (0.8 + 0.2 * Math.sin(Math.hypot(dx, dy) / S * 0.9 - t * 3.2)));
+        if (b >= 0.06) lens(cx + dx, cy - star * 0.35 + dy, b * pulse * (0.8 + 0.2 * Math.sin(Math.hypot(dx, dy) / S * 0.9 - t * 3.2)));
       }
 
     ctx.fillStyle = getComputedStyle(canvas).color;
