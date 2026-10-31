@@ -95,26 +95,37 @@ function Api() {
   const example = `from openai import OpenAI\n\nclient = OpenAI(base_url="${url}", api_key="lodestar")\nreply = client.chat.completions.create(\n    model="${first}",\n    messages=[{"role": "user", "content": "Hello!"}],\n)\nprint(reply.choices[0].message.content)`;
 
   return (
-    <section className="api" id="home-api">
-      <div className="api-h">
-        <span className="hc-t">API{!!s?.active && <i className="hc-on" title="Answering a request" />}</span>
-        <span className="hc-d">Any app that speaks the OpenAI API can use this model.</span>
+    <section className="step api" id="home-api">
+      <div className="step-h"><div><h3>Use it from other apps</h3>
+        <p className="step-sub">Any app that speaks the OpenAI API can reach this model at this address.</p></div></div>
+      <div className="card">
+        <div className="save-row">
+          <label className="field grow">Address
+            <input id="api-url" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+          </label>
+          <button className="btn" onClick={() => copy("url", url)}>{copied === "url" ? "Copied" : "Copy"}</button>
+        </div>
+        {!!s?.models.length && <div className="api-sec">
+          <div className="api-l">Models</div>
+          <dl className="api-models" id="api-models">{s.models.map((m, i) => (
+            <div key={m.id} data-model={m.id}>
+              <dt>{m.id}</dt>
+              <dd>{i ? m.about : <>{(steer && items.length > 0) || erased ? <i className="hc-on" /> : null}{m.about}: {asSet(items, steer, erased)}</>}</dd>
+            </div>
+          ))}</dl>
+        </div>}
+        <details className="adv api-ex">
+          <summary>Python example</summary>
+          <pre><code>{example}</code></pre>
+          <button className="btn ghost sm" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copied" : "Copy"}</button>
+        </details>
+        {!!s?.log.length && <div className="api-sec">
+          <div className="api-l">Recent requests{!!s.active && <i className="hc-on" title="Answering a request" />}</div>
+          <div className="api-log" id="api-log">{s.log.map((r) => (
+            <div key={r.at}><span>{clock(r.at)}</span><b>{r.model}</b><span>{r.prompt} → {r.tokens} tokens</span><span>{r.seconds} s</span></div>
+          ))}</div>
+        </div>}
       </div>
-      <div className="api-url">
-        <code id="api-url">{url}</code>
-        <button className="btn ghost sm" onClick={() => copy("url", url)}>{copied === "url" ? "Copied" : "Copy"}</button>
-      </div>
-      {!!s?.models.length && <dl className="api-models" id="api-models">{s.models.map((m, i) => (
-        <div key={m.id} data-model={m.id}><dt>{m.id}</dt><dd>{i ? m.about : `${m.about}: ${asSet(items, steer, erased)}`}</dd></div>
-      ))}</dl>}
-      <details className="api-ex">
-        <summary>Python example</summary>
-        <pre><code>{example}</code></pre>
-        <button className="btn ghost sm" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copied" : "Copy"}</button>
-      </details>
-      {!!s?.log.length && <div className="api-log" id="api-log">{s.log.map((r) => (
-        <div key={r.at}><span>{clock(r.at)}</span><b>{r.model}</b><span>{r.prompt} → {r.tokens} tokens</span><span>{r.seconds} s</span></div>
-      ))}</div>}
     </section>
   );
 }
