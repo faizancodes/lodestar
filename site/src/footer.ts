@@ -10,8 +10,29 @@ const STARS = 420;
 const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 
+// "Lodestar" in the page's face, as coverage per cell, filling the band below the horizon (which sits at 0.58 × 0.78)
+function spell(cols: number, rows: number) {
+  const c = document.createElement("canvas"), g = c.getContext("2d", { willReadFrequently: true })!;
+  c.width = cols;
+  c.height = rows;
+  const family = getComputedStyle(document.body).fontFamily, top = rows * 0.58 * 0.78 + rows * 0.09, room = rows - top - rows * 0.06;
+  g.font = `600 100px ${family}`;
+  const m = g.measureText("Lodestar"), cap = m.actualBoundingBoxAscent;
+  const px = Math.min((cols * 0.88) / m.width, room / cap) * 100;
+  g.font = `600 ${px}px ${family}`;
+  g.letterSpacing = `${-px * 0.03}px`;
+  g.textAlign = "center";
+  g.textBaseline = "alphabetic";
+  g.fillStyle = "#fff";
+  const h = g.measureText("Lodestar").actualBoundingBoxAscent;
+  g.fillText("Lodestar", cols / 2, top + (room - h) * 0.4 + h); // centred in its band, a little high
+  const d = g.getImageData(0, 0, cols, rows).data, out = new Float32Array(cols * rows);
+  for (let i = 0; i < out.length; i++) out[i] = d[i * 4 + 3] / 255;
+  return out;
+}
+
 export function startFooter(canvas: HTMLCanvasElement) {
-  let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
+  let cols = 0, rowsAll = 0, grid = new Float32Array(0), name = new Float32Array(0), ctx!: CanvasRenderingContext2D;
 
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
@@ -21,21 +42,23 @@ export function startFooter(canvas: HTMLCanvasElement) {
     ctx = canvas.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     cols = Math.ceil(w / CELL);
-    rows = Math.ceil(h / CELL);
-    grid = new Float32Array(cols * rows);
+    rowsAll = Math.ceil(h / CELL);
+    grid = new Float32Array(cols * rowsAll);
+    name = spell(cols, rowsAll);
     return true;
   };
 
   const put: Put = (x, y, b) => {
     x = Math.round(x);
     y = Math.round(y);
-    if (x < 0 || y < 0 || x >= cols || y >= rows || b <= 0.02) return;
+    if (x < 0 || y < 0 || x >= cols || y >= rowsAll || b <= 0.02) return;
     const i = y * cols + x;
     if (b > grid[i]) grid[i] = b;
   };
 
   const draw = (t: number) => {
     grid.fill(0);
+    const rows = Math.round(rowsAll * 0.58); // the sky's share; the name stands below it
     const cx = cols / 2, cy = rows * 0.78, R = Math.max(cols * 0.55, rows);
     // things fade toward the page's edges and below the horizon
     const fall = (x: number, y: number) => clamp(1.25 - Math.hypot((x - cx) / (cols * 0.55), (y - cy) / (rows * 0.95))) * (y > cy ? clamp(1 - (y - cy) / (rows * 0.2)) : 1);
@@ -89,11 +112,20 @@ export function startFooter(canvas: HTMLCanvasElement) {
       for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (Math.abs(i) + Math.abs(j) <= 2) at(cx + Math.cos(b) * r * 1.4 + i, cy + Math.sin(b) * r * 0.9 + j, 0.9 - (Math.abs(i) + Math.abs(j)) * 0.2);
     });
 
+    // the name, standing in the ground below the horizon, a slow light passing along it
+    for (let y = 0; y < rowsAll; y++)
+      for (let x = 0; x < cols; x++) {
+        const a = name[y * cols + x];
+        if (a < 0.3) continue;
+        const sweep = Math.exp(-(((x - ((t * 0.08) % 1.6 - 0.3) * cols) / (cols * 0.1)) ** 2));
+        put(x, y, a * (0.34 + 0.16 * hash(x, y) + sweep * 0.5) * (1 - 0.4 * clamp((y - cy) / (rowsAll - cy))));
+      }
+
     // the horizon
     for (let x = 0; x < cols; x += 1) at(x, cy, 0.3 + 0.25 * Math.exp(-(((x - cx) / (cols * 0.12)) ** 2)));
 
     // and the lodestar, on it
-    const star = Math.min(rows * 0.3, cols * 0.12, 36), S = star / 15, pulse = 0.85 + 0.15 * Math.sin(t * 1.1);
+    const star = Math.min(rowsAll * 0.58 * 0.3, cols * 0.12, 36), S = star / 15, pulse = 0.85 + 0.15 * Math.sin(t * 1.1);
     for (let dy = -Math.ceil(star); dy <= star; dy++)
       for (let dx = -Math.ceil(star); dx <= star; dx++) {
         const b = compassStar(dx / S, dy / S);
@@ -101,7 +133,7 @@ export function startFooter(canvas: HTMLCanvasElement) {
       }
 
     ctx.fillStyle = getComputedStyle(canvas).color;
-    drawMarks(ctx, grid, cols, rows, CELL);
+    drawMarks(ctx, grid, cols, rowsAll, CELL);
   };
 
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches, t0 = performance.now();
@@ -117,6 +149,7 @@ export function startFooter(canvas: HTMLCanvasElement) {
   const run = () => (still ? draw(4) : raf || (raf = requestAnimationFrame(tick)));
 
   size();
+  document.fonts.ready.then(() => size() && draw((performance.now() - t0) / 1000));
   new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(canvas);
   document.addEventListener("visibilitychange", () => !document.hidden && run());
   let rt: ReturnType<typeof setTimeout> | undefined;
