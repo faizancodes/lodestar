@@ -74,7 +74,10 @@ function build(root: HTMLElement) {
 type Run = { on: boolean };
 const sleep = (ms: number, run: Run) => new Promise<void>((ok, stop) => setTimeout(() => (run.on ? ok() : stop(new Error("stopped"))), ms));
 
-export function startAppDemo(root: HTMLElement) {
+/** What the frame's corner readouts say as it plays, like the hero's layer and activation. */
+type Hud = { state: (t: string) => void; read: (t: string) => void };
+
+export function startAppDemo(root: HTMLElement, hud: Hud) {
   build(root);
   const stage = root.querySelector<HTMLElement>(".ad-stage")!;
   const q = (s: string) => stage.querySelector<HTMLElement>(s)!;
@@ -132,7 +135,9 @@ export function startAppDemo(root: HTMLElement) {
   };
   const picked = () => reply.children[PICK[0]].children[PICK[1]] as HTMLElement;
 
+  const signed = (v: number) => (v < 0 ? "−" : "+") + Math.abs(v).toFixed(3);
   const reset = () => {
+    hud.state("Qwen3-8B · ready"); hud.read("Cheerful +0.000");
     user.textContent = ""; user.classList.remove("in");
     reply.innerHTML = ""; cells.innerHTML = ""; read.textContent = "+0.00"; gauge.classList.remove("in");
     typed.textContent = ""; comp.classList.remove("typing");
@@ -146,6 +151,7 @@ export function startAppDemo(root: HTMLElement) {
     await sleep(700, run);
 
     comp.classList.add("typing");
+    hud.state("Qwen3-8B · prompt");
     for (let i = 1; i <= PROMPT.length; i++) { typed.textContent = PROMPT.slice(0, i); await sleep(34 + Math.random() * 40, run); }
     await sleep(350, run);
     typed.textContent = ""; comp.classList.remove("typing");
@@ -161,6 +167,7 @@ export function startAppDemo(root: HTMLElement) {
       cells.children[i].classList.add("in");
       const v = flat[i][1];
       read.textContent = (v < 0 ? "−" : "+") + Math.abs(v).toFixed(2);
+      hud.state(`Qwen3-8B · token ${i + 1} / ${words.length}`); hud.read(`Cheerful ${signed(v)}`);
       await sleep(i % 5 === 4 ? 210 : 120, run);
     }
     await sleep(900, run);
@@ -177,6 +184,7 @@ export function startAppDemo(root: HTMLElement) {
     await click(run);
     word.classList.add("picked");
     panel.classList.add("in"); stage.classList.add("open");
+    hud.state("“still” · logit lens · L0–27");
     await sleep(2600, run);
 
     // and flips the table to the J-lens
@@ -184,9 +192,12 @@ export function startAppDemo(root: HTMLElement) {
     await sleep(950, run);
     await click(run);
     rows("j");
+    hud.state("“still” · J-lens · L0–27");
     await sleep(900, run);
     point(body.children[5] as HTMLElement, 900, 0.22, 0.6);
-    await sleep(4400, run);
+    await sleep(900, run);
+    for (const [l, t, p] of JLENS) { hud.state(`“still” · J-lens · L${l} ${t.trim()}`); hud.read(`p ${p.toFixed(3)}`); await sleep(340, run); }
+    await sleep(800, run);
 
     panel.classList.remove("in"); stage.classList.remove("open"); ptr.classList.remove("in");
     word.classList.remove("picked");
@@ -201,6 +212,7 @@ export function startAppDemo(root: HTMLElement) {
     words.forEach((w) => w.classList.add("in")); [...cells.children].forEach((c) => c.classList.add("in"));
     picked().classList.add("picked");
     rows("j"); panel.classList.add("in"); stage.classList.add("open");
+    hud.state("“still” · J-lens · L0–27");
     return;
   }
   reset();
