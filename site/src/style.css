@@ -161,9 +161,8 @@ p { margin: 0; }
 .cp:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
 .cp.done { color: var(--ascii); }
 
-/* the foot rises out of the section above: no rule between them, and its sky fades in from nothing as the page
-   ends, its top reaching up behind the last of Get Lodestar */
-.foot { position: relative; margin-top: calc(-1 * clamp(80px, 18svh, 220px)); }
+/* no rule between the foot and the section above: its sky fades in from nothing below Get Lodestar */
+.foot { position: relative; margin-top: clamp(24px, 6svh, 80px); }
 #foot-art {
   width: 100%; height: clamp(380px, 62vw, 820px);
   -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.35) 18%, #000 42%);
@@ -182,7 +181,7 @@ p { margin: 0; }
 @media (max-width: 900px) {
   .get-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   #get-art { height: min(100vw, 480px); }
-  .foot { margin-top: -32px; }
+  .foot { margin-top: 40px; }
   .hero { height: auto; min-height: 100svh; padding-top: min(84vw, 560px); }
   .hero #hero-art { bottom: auto; height: min(96vw, 640px); }
   .hero-copy { position: relative; left: auto; top: auto; transform: none; padding: 40px var(--gut) 56px; }
