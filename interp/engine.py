@@ -85,6 +85,8 @@ class Engine:
         self._deltas = None  # per-layer [N] tensors requiring grad, for attribution
         self._cap_acts = None  # {layer: [T, N] cpu} during a trace
         self._cap_resid = None  # {layer: [T, H]} during a trace or norm measurement
+        self._read = None  # while generating with gauges: {layer: (units [D_l, H], ref [D_l], scale [D_l], cols [D_l])}
+        self._read_buf = None  # [B, D]: this pass's reading of each gauged direction at the newest position
         self._handles = []
 
     # ---------------------------------------------------------------- loading
@@ -415,6 +417,11 @@ class Engine:
             if self._cap_resid is not None:
                 self._cap_resid[i] = h.detach()[0]
 
+            rd = self._read.get(i) if self._read else None
+            if rd is not None:
+                units, ref, scale, cols = rd
+                self._read_buf[:, cols] += (h[:, -1].float() @ units.T - ref) * scale
+
             if changed:
                 return (h,) if isinstance(out, tuple) else h
 
@@ -535,10 +542,30 @@ class Engine:
         return out
 
     # ---------------------------------------------------------------- generation
-    def generate(self, rows, max_new=160, temperature=0.0, cancel=None, seed=0, abl=None):
+    def _read_plan(self, dir_ids):
+        """How to read directions as gauges: at each layer of a direction's band, the stream's position along it,
+        from where ordinary prompts sit, in units of the gap between its two poles, averaged over the band."""
+        by_layer = {}
+        for c, did in enumerate(dir_ids):
+            d = self.dirs.get(did)
+            if d is None:
+                raise ValueError(f"No direction called {did!r} for this model.")
+
+            band = d["band"] or list(range(len(self.layers) // 3, 2 * len(self.layers) // 3))
+            for l in band:
+                v = d["unit"][l]
+                ref = float(d["neutral"][l] @ v) if d.get("neutral") is not None else 0.0
+                by_layer.setdefault(l, []).append((v, ref, 1 / (d["mag"][l] * len(band)), c))
+
+        return {l: (torch.stack([x[0] for x in xs]), torch.tensor([x[1] for x in xs], device=self.dev),
+                    torch.tensor([x[2] for x in xs], device=self.dev), torch.tensor([x[3] for x in xs], device=self.dev))
+                for l, xs in by_layer.items()}
+
+    def generate(self, rows, max_new=160, temperature=0.0, cancel=None, seed=0, abl=None, read=None):
         """rows: list of (prompt_ids, [Push]). Decodes all rows in one batch. `abl` erases the refusal direction
         from the residual stream of the rows it marks (True/False/bool list). Yields (row, text_delta) and finally
-        (None, [generated ids per row])."""
+        (None, [generated ids per row]). With `read` (direction ids), each delta comes as (row, (text, readings)):
+        for every token in it, each direction's gauge at the position that chose the token."""
         with self.lock:
             B = len(rows)
             flags, any_abl = self._abl_flags(abl, B)
@@ -551,17 +578,24 @@ class Engine:
             pos = (mask.cumsum(-1) - 1).clamp(min=0)
 
             done, out_ids, sent = [False] * B, [[] for _ in range(B)], [""] * B
+            held = [[] for _ in range(B)]  # readings of the tokens not yet sent as text
             gen = torch.Generator(device="cpu").manual_seed(seed)
 
             self._push_state = self._make_push_state([r[1] for r in rows], B)
             if any_abl:
                 self._abl_mask = torch.tensor(flags, device=self.dev)
                 self._abl_any = True
+            if read:
+                self._read = self._read_plan(read)
+
+            def step(**kw):
+                if read:
+                    self._read_buf = torch.zeros(B, len(read), device=self.dev)
+                return self.model(**kw)
 
             try:
                 with torch.inference_mode():
-                    out = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=True,
-                                     logits_to_keep=1)
+                    out = step(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=True, logits_to_keep=1)
 
                     for _ in range(max_new):
                         if cancel is not None and cancel.is_set():
@@ -574,6 +608,7 @@ class Engine:
                         else:
                             nxt = logits.argmax(-1)
 
+                        vals = self._read_buf.cpu().tolist() if read else None
                         for r in range(B):
                             if done[r]:
                                 continue
@@ -584,19 +619,23 @@ class Engine:
                                 continue
 
                             out_ids[r].append(t)
+                            if read:
+                                held[r].append([round(x, 3) for x in vals[r]])
+
                             text = self.tok.decode(out_ids[r], skip_special_tokens=True)
                             if not text.endswith("\ufffd"):
-                                yield r, text[len(sent[r]):]
-                                sent[r] = text
+                                yield r, (text[len(sent[r]):], held[r]) if read else text[len(sent[r]):]
+                                sent[r], held[r] = text, []
 
                         if all(done):
                             break
 
                         mask = torch.cat([mask, torch.ones_like(mask[:, :1])], -1)
                         pos = pos[:, -1:] + 1
-                        out = self.model(input_ids=nxt[:, None], attention_mask=mask, position_ids=pos,
-                                         past_key_values=out.past_key_values, use_cache=True, logits_to_keep=1)
+                        out = step(input_ids=nxt[:, None], attention_mask=mask, position_ids=pos,
+                                   past_key_values=out.past_key_values, use_cache=True, logits_to_keep=1)
             finally:
+                self._read = self._read_buf = None
                 self._push_state = None
                 self._abl_mask = None
                 self._abl_any = False

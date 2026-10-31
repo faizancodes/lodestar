@@ -18,6 +18,8 @@
   --bad: #f2777a;
   --bad-wash: rgba(242, 119, 122, 0.12);
   --warn: #f0b45a;          /* memory running short */
+  --g-pos: #f0b45a;         /* a gauge toward its direction's pole */
+  --g-neg: #7aa2f7;         /* and away from it */
   --rule: rgba(255, 255, 255, 0.08);
   --rule-2: rgba(255, 255, 255, 0.14);
   --wash: rgba(255, 255, 255, 0.05);
@@ -952,6 +954,25 @@ main.is-chat { padding: 0; overflow: hidden; }
 .msg-acts button { padding: 3px 8px; border: 0; border-radius: 7px; background: none; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
 .msg-acts button:hover { background: var(--wash); color: var(--accent); }
 .msg-acts button.hint { margin-right: 4px; color: var(--accent); box-shadow: inset 0 0 0 1px var(--rule-2); }
+/* Gauges: a strip per direction under a reply, a cell per piece of text */
+.gauges { position: relative; display: grid; gap: 4px; margin-top: 12px; }
+.gauge { display: grid; grid-template-columns: minmax(64px, max-content) 1fr 44px; align-items: center; gap: 10px; }
+.gauge-n { overflow: hidden; font-size: 11.5px; font-weight: 500; color: var(--text-2); white-space: nowrap; text-overflow: ellipsis; }
+.gauge-strip { display: flex; height: 14px; overflow: hidden; border-radius: 3px; background: var(--wash); }
+.gauge-strip i { flex: 1 1 0; min-width: 0; }
+.gauge-strip i.at { box-shadow: inset 0 0 0 1px var(--text); }
+.gauge-v { font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+.gauge-tip { position: absolute; bottom: calc(100% + 4px); transform: translateX(-50%); max-width: 320px; padding: 3px 7px; border-radius: 5px; background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--rule-2); font-family: var(--mono); font-size: 11px; color: var(--text); white-space: pre; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.gauge-tip span { color: var(--muted); }
+.gauge-tip b { font-weight: 500; color: var(--text); background: var(--wash); border-radius: 2px; }
+.gauges-pick { position: relative; }
+.gauges-pick > summary { list-style: none; cursor: pointer; white-space: nowrap; }
+.chat-h .mod, .chat-h .btn { white-space: nowrap; }
+.gauges-pick > summary::-webkit-details-marker { display: none; }
+.gauges-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: grid; gap: 2px; min-width: 200px; padding: 6px; border-radius: 8px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--rule-2), 0 12px 32px rgba(0, 0, 0, 0.5); }
+.gauges-pop .switch { justify-content: flex-start; padding: 6px 8px; border-radius: 6px; }
+.gauges-pop .switch:hover { background: var(--wash); }
+.gauges-none { margin: 4px 6px; max-width: 220px; font-size: 12px; color: var(--muted); }
 .msg-mods { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
 .msg-mod { padding: 2px 7px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--rule-2); font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .msg-mod b { font-weight: 500; color: var(--text); }

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { setAblActive } from "../abl/engine";
 import {
-  addNeurons, continueReply, copyReply, findNeurons, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat,
+  addNeurons, continueReply, copyReply, toggleGauge, findNeurons, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat,
   setPickBy, STARTERS, toggleCompare, toggleFound, toggleNeurons, toggleSteer,
 } from "../chat/engine";
 import { api } from "../lib/api";
@@ -9,7 +9,7 @@ import { isDir, itemKey, labelOf, lensLabel, modelName } from "../lib/format";
 import { patchAt, removeAt } from "../steer/recipe";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
-import { useChat, type ColKey, type Mods } from "../store/chat";
+import { useChat, type ColKey, type Mods, type Reading } from "../store/chat";
 
 const cancel = () => api("/api/cancel", {});
 
@@ -55,6 +55,46 @@ function CompareSwitch() {
   );
 }
 
+// Gauges: one strip per direction under a reply, a cell for each piece of text as it came, coloured toward the
+// direction's pole (+) or away from it (−), full at ±0.5, about where text written in either pole's voice sits.
+// Hovering a cell shows the text and every direction's reading there.
+const signedV = (v: number) => (v < 0 ? "−" : "+") + Math.abs(v).toFixed(2);
+const cell = (v: number) => ({ background: `color-mix(in oklab, var(--g-${v < 0 ? "neg" : "pos"}) ${Math.round(Math.min(1, Math.abs(v) * 2) * 100)}%, transparent)` });
+
+// the few words leading up to a piece of text, to place it in the reply
+const before = (read: Reading, at: number) => {
+  const s = read.toks.slice(Math.max(0, at - 12), at).map((t) => t.t).join("").replace(/\s+/g, " ");
+  return s.length > 28 ? "…" + s.slice(-28).replace(/^\S*\s/, "") : s;
+};
+
+function Gauges({ read }: { read?: Reading }) {
+  useChat((s) => s.gv);
+  const [at, setAt] = useState<number | null>(null);
+  const n = read?.toks.length ?? 0;
+  if (!read || !n) return null;
+
+  return (
+    <div className="gauges" onMouseLeave={() => setAt(null)}>
+      {read.ids.map((id, d) => {
+        const vals = read.toks.map((t) => t.v[d]), avg = vals.reduce((a, b) => a + b, 0) / n;
+
+        return (
+          <div key={id} className="gauge" data-gauge={id}>
+            <span className="gauge-n">{read.names[d]}</span>
+            <div className="gauge-strip">
+              {vals.map((v, k) => <i key={k} className={k === at ? "at" : undefined} style={cell(v)} onMouseEnter={() => setAt(k)} />)}
+            </div>
+            <span className="gauge-v" title={at === null ? "Average over the reply" : undefined}>{signedV(at === null ? avg : vals[at])}</span>
+          </div>
+        );
+      })}
+      {at !== null && <div className="gauge-tip" style={{ left: `${((at + 0.5) / n) * 100}%` }}>
+        <span>{before(read, at)}</span><b>{read.toks[at].t.replace(/\s+/g, " ") || "␣"}</b>
+      </div>}
+    </div>
+  );
+}
+
 // What was on for a reply: the neurons and directions pushed with their doses, and the erased refusal direction. In
 // Compare, the steered column shows what it pushed (the erased one's heading already says so).
 function ModsLine({ mods, only }: { mods?: Mods; only?: ColKey }) {
@@ -68,6 +108,32 @@ function ModsLine({ mods, only }: { mods?: Mods; only?: ColKey }) {
       ))}
       {abl && <span className="msg-mod"><b>Refusals erased</b></span>}
     </div>
+  );
+}
+
+// the directions to read as replies are written, picked from the ones the loaded model has
+function GaugesPick() {
+  const dirs = (useApp((s) => s.dirs) ?? []).filter((d) => d.ready), on = useChat((s) => s.gauges);
+  const box = useRef<HTMLDetailsElement>(null);
+  const n = dirs.filter((d) => on.includes(d.id)).length;
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => !(e.target as Element).closest("#chat-gauges") && box.current?.removeAttribute("open");
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, []);
+
+  return (
+    <details className="gauges-pick" id="chat-gauges" ref={box}>
+      <summary className={n ? "btn ghost sm on" : "btn ghost sm"}>Gauges{n ? ` · ${n}` : ""}</summary>
+      <div className="gauges-pop">
+        {dirs.length ? dirs.map((d) => (
+          <button key={d.id} className="switch" role="switch" aria-checked={on.includes(d.id)} data-dir={d.id} onClick={() => toggleGauge(d.id)}>
+            <i />{d.name}
+          </button>
+        )) : <p className="gauges-none">This model has no directions yet. Make one in Steer.</p>}
+      </div>
+    </details>
   );
 }
 
@@ -104,6 +170,7 @@ function Log() {
               <div key={c.key} className="cmp-col" data-col={c.key}>
                 <div className="cmp-h">{c.label}</div>
                 <Md m={c} done={!typing} />
+                <Gauges read={c.read} />
                 <ModsLine mods={m.mods} only={c.key} />
                 <div className="msg-acts">
                   {!typing && !!c.content && <Copy text={c.content} />}
@@ -123,6 +190,7 @@ function Log() {
       return (
         <div key={i} className={typing ? "msg bot typing" : "msg bot"} data-i={i}>
           <Md m={m} done={!typing} />
+          <Gauges read={m.read} />
           <ModsLine mods={m.mods} />
           <div className="msg-acts">
             {!typing && <>
@@ -322,6 +390,7 @@ export function Chat({ hidden }: { hidden: boolean }) {
           <div className="chat-title"><b id="chat-model">{model}</b></div>
           <Mods />
           <CompareSwitch />
+          <GaugesPick />
           <NeuronsButton />
           <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
         </header>
