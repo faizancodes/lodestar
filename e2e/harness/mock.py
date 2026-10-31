@@ -116,8 +116,10 @@ def stand_in(method, path, body):
         if method == "POST":
             S["serve"] = body
             return {"ok": True}
+        log = [{"at": 1793409424, "model": "Qwen3-0.6B-plain", "prompt": 18, "tokens": 27, "seconds": 2.2, "finish": "stop"},
+               {"at": 1793409422, "model": "Qwen3-0.6B", "prompt": 18, "tokens": 40, "seconds": 3.0, "finish": "length"}]
         return {"models": [{"id": "Qwen3-0.6B", "about": "As set in Lodestar"}, {"id": "Qwen3-0.6B-plain", "about": "Plain"}],
-                "log": [], "active": 0}
+                "log": log, "active": 0}
 
     chats = S["chats"]
     summary = lambda c: {"id": c["id"], "title": c["title"], "model": c["model"], "updated": c["updated"],
