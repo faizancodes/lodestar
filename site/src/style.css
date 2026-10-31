@@ -115,7 +115,7 @@ p { margin: 0; }
 .step-n { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); letter-spacing: 0.04em; }
 .step-n::after { content: " / 05"; color: rgba(237, 237, 237, 0.22); }
 .kicker { display: block; margin: 22px 0 12px; font-size: 13px; font-weight: 600; color: var(--ascii); }
-.step h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; }
+.step h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; text-wrap: balance; }
 .step p { margin-top: 18px; max-width: 340px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
 .step code { padding: 1px 6px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--well); font-family: var(--mono); font-size: 13px; color: var(--text); }
 .dc { position: relative; color: transparent; }
