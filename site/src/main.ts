@@ -2,9 +2,9 @@ import { startAblScene } from "../../web/src/art/ablscene";
 import { createDecoder } from "../../web/src/art/decode";
 import { startSideArt, startSpinner } from "../../web/src/art/glyphs";
 import { render as renderHomeArt, type HomeArt } from "../../web/src/art/home";
-import { finishScene, setLayers, setProgress, startScene, stopScene, wake } from "../../web/src/art/loader";
 import { markSVG } from "../../web/src/art/mark";
 import { startScan } from "../../web/src/art/scan";
+import { startDive } from "./dive";
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = <T extends HTMLElement>(s: string) => document.querySelector<T>(s)!;
@@ -21,38 +21,14 @@ for (const el of document.querySelectorAll<HTMLElement>("[data-mark]")) {
   el.innerHTML = markSVG(px, px < 30 ? 21 : 31);
 }
 
-// ---------------------------------------------------------------- hero: the model arriving, layer by layer, on repeat
-const LAYERS = 32, LOAD_S = 7.5;
-async function hero() {
-  const canvas = $<HTMLCanvasElement>("#hero-art"), status = $("#hero-status"), count = $("#hero-layers");
-  const spin = startSpinner($<HTMLCanvasElement>("#hero-spin"), () => !status.dataset.ready);
-
-  for (;;) {
-    startScene(canvas);
-    setLayers(LAYERS, null);
-    wake();
-    delete status.dataset.ready;
-    $("#readout").classList.remove("ready");
-    status.textContent = "Loading Qwen3.5-4B";
-    spin();
-
-    const t0 = performance.now();
-    for (let p = 0; p < 1; p = (performance.now() - t0) / 1000 / LOAD_S) {
-      setProgress(0.04 + p * 0.86);
-      count.textContent = `${Math.min(LAYERS, Math.floor(p * LAYERS))} / ${LAYERS} layers`;
-      await wait(120);
-    }
-
-    count.textContent = `${LAYERS} / ${LAYERS} layers`;
-    await finishScene();
-    status.dataset.ready = "1";
-    $("#readout").classList.add("ready");
-    status.textContent = "Qwen3.5-4B ready";
-    if (still) return;
-
-    await wait(5000);
-    stopScene();
-  }
+// ---------------------------------------------------------------- hero: falling through layer after layer, forever
+function hero() {
+  const readout = $("#hero-depth");
+  startSpinner($<HTMLCanvasElement>("#hero-spin"), () => true);
+  startDive($<HTMLCanvasElement>("#hero-art"), (level) => {
+    const layer = 1 + (((level * 7) % 32) + 32) % 32, neuron = 100 + Math.floor(Math.abs(Math.sin(level * 91.7)) * 14000);
+    readout.textContent = `L${layer} · n${neuron}`;
+  });
 }
 
 // ---------------------------------------------------------------- the home cards' scenes, playing while on screen
