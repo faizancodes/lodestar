@@ -51,9 +51,11 @@ function hero() {
 
 // ---------------------------------------------------------------- the rest
 function copyInstall() {
-  for (const btn of document.querySelectorAll<HTMLButtonElement>("#get .cp")) {
-    const code = btn.previousElementSibling!.textContent!;
-    btn.addEventListener("click", async () => {
+  // the whole row copies; its button is there for the eye and the keyboard (its click bubbles up to the row)
+  for (const row of document.querySelectorAll<HTMLLIElement>("#get .term li")) {
+    const btn = row.querySelector<HTMLButtonElement>(".cp")!, code = row.querySelector("code")!.textContent!;
+    row.addEventListener("click", async () => {
+      if (getSelection()?.toString()) return; // they were selecting it by hand
       try { await navigator.clipboard.writeText(code); } catch { return; }
       btn.classList.add("done");
       btn.setAttribute("aria-label", "Copied");
