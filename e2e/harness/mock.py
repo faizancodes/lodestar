@@ -112,6 +112,12 @@ def stand_in(method, path, body):
         return MEMORY
     if path == "/api/memory/fit":
         return {"known": True, "fits": True}
+    if path == "/api/serve":  # the OpenAI-compatible API's state: what the window steers with, and who's asked
+        if method == "POST":
+            S["serve"] = body
+            return {"ok": True}
+        return {"models": [{"id": "Qwen3-0.6B", "about": "As set in Lodestar"}, {"id": "Qwen3-0.6B-plain", "about": "Plain"}],
+                "log": [], "active": 0}
 
     chats = S["chats"]
     summary = lambda c: {"id": c["id"], "title": c["title"], "model": c["model"], "updated": c["updated"],
