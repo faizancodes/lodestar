@@ -62,17 +62,21 @@ on your Mac</h1>
 
     <!-- get it -->
     <section class="get" id="get">
-      <canvas id="sky-art" class="art sky" aria-hidden="true"></canvas>
+      <div class="hud" aria-hidden="true"></div>
       <div class="get-in reveal">
-        <span class="brand-mark big" data-mark="72"></span>
-        <h2>Bring your own model.</h2>
-        <p>Any Llama-style model on Hugging Face. Runs offline after the first load.</p>
-        <pre class="install"><code><span class="c"># on an Apple silicon Mac</span>
-git clone https://github.com/faizancodes/auto-interp
-cd auto-interp && uv sync
-./scripts/build_app.sh
-open dist/Lodestar.app</code></pre>
-        <div class="cta"><a class="btn lg" href="https://github.com/faizancodes/auto-interp">View on GitHub</a></div>
+        <div class="get-copy">
+          <span class="kicker">Get Lodestar</span>
+          <h2>Bring your own model.</h2>
+          <p>Any Llama-style model on Hugging Face. Runs offline after the first load.</p>
+          <div class="cta"><a class="btn lg" href="https://github.com/faizancodes/auto-interp">View on GitHub</a></div>
+        </div>
+        <figure class="term">
+          <figcaption class="term-h"><span>Apple silicon Mac</span><button class="term-copy" type="button">Copy</button></figcaption>
+          <pre><code><i>$</i> git clone https://github.com/faizancodes/auto-interp
+<i>$</i> cd auto-interp &amp;&amp; uv sync
+<i>$</i> ./scripts/build_app.sh
+<i>$</i> open dist/Lodestar.app</code></pre>
+        </figure>
       </div>
     </section>
   </main>

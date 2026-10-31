@@ -1,4 +1,3 @@
-import { startSideArt } from "../../web/src/art/glyphs";
 import { createDecoder } from "../../web/src/art/decode";
 import { markSVG } from "../../web/src/art/mark";
 import { startLodestar } from "./lodestar";
@@ -49,6 +48,15 @@ function hero() {
 }
 
 // ---------------------------------------------------------------- the rest
+function copyInstall() {
+  const btn = $("#get .term-copy"), code = $("#get .term code");
+  btn.addEventListener("click", async () => {
+    const text = code.textContent!.split("\n").map((l) => l.replace(/^\$ /, "")).join("\n");
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; } catch { btn.textContent = "Select to copy"; }
+    setTimeout(() => (btn.textContent = "Copy"), 1600);
+  });
+}
+
 function reveal() {
   const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))), { rootMargin: "0px 0px -8% 0px" });
   document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
@@ -57,5 +65,5 @@ function reveal() {
 reveal();
 hero();
 startSequence($("#features"), [erase, layers, steer, chat, api]);
-startSideArt($<HTMLCanvasElement>("#sky-art"));
+copyInstall();
 
