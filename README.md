@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/media/banner.gif" width="880" alt="Lodestar: Local LLM Interpretability. An ASCII armillary sphere of neurons turning around a compass star." />
+  <img src="docs/media/banner.gif" width="880" alt="Lodestar: Abliterate, Steer, &amp; Inspect Open Models. An ASCII armillary sphere of neurons turning around a compass star." />
 </p>
 
-<p align="center"><b>Local LLM interpretability on your Mac.</b><br />Inspect, steer and abliterate open models. <a href="https://lodestar.so">lodestar.so</a></p>
+<p align="center"><b>Abliterate, steer, and inspect open models.</b><br />Take any open model apart and change how it behaves, on your own machine. <a href="https://lodestar.so">lodestar.so</a></p>
 
 # Lodestar
 

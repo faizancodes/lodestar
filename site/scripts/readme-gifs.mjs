@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const SITE = "http://localhost:5180";
+const SITE = process.env.SITE ?? "http://localhost:5180";
 const OUT = resolve(import.meta.dirname, "../../docs/media");
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = 9333;
