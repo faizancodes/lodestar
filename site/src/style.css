@@ -88,8 +88,8 @@ p { margin: 0; }
 .hud-c { position: absolute; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 .hud-c.tr { top: 14px; right: 16px; }
 .hud-c.br { bottom: 14px; right: 16px; color: var(--ascii); }
-.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%; transform: translateY(-50%); max-width: 600px; }
-.hero h1 { font-size: clamp(46px, 7.2vw, 96px); line-height: 0.94; letter-spacing: -0.055em; color: #fff; text-shadow: 0 0 32px var(--bg), 0 0 12px var(--bg); }
+.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%; transform: translateY(-50%); max-width: 780px; }
+.hero h1 { white-space: pre-line; font-size: clamp(46px, 7.2vw, 96px); line-height: 0.94; letter-spacing: -0.055em; color: #fff; text-shadow: 0 0 32px var(--bg), 0 0 12px var(--bg); }
 .lede { margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); color: rgba(237, 237, 237, 0.8); }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
 
