@@ -13,10 +13,11 @@ const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/M
 const PORT = 9333;
 
 // name → page, size, frames per second, seconds, and how a frame is made
-const scene = (name, seconds = 7) => ({
+const scene = (name, seconds = 8) => ({
   name, url: `capture.html?scene=${name}&w=800&h=420`, w: 800, h: 420, fps: 12, seconds,
-  // the story plays over the first five seconds, as if scrolled through, then holds
-  frame: (i, fps) => `__frame(${2 + i / fps}, ${Math.min(1, i / (fps * 5))})`,
+  // it opens on the finished picture (what a still preview shows), then plays the story over five seconds, as
+  // if scrolled through, and holds
+  frame: (i, fps) => { const s = i / fps; return `__frame(${2 + s}, ${s < 1.5 ? 1 : Math.min(1, (s - 1.5) / 5)})`; },
 });
 const clock = (name, url, w, h, fps, seconds, scale) => ({
   name, url, w, h, fps, seconds, scale, warm: 1000, frame: (_, fps) => `__step(${1000 / fps})`,
