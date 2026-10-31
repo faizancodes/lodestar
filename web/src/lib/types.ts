@@ -72,6 +72,7 @@ export type NeuronDetail = {
 /** GET /api/trace/token */
 export type TokenDetail = {
   lens: { tok: string; p: number }[][];
+  jlens: { tok: string; p: number }[][] | null; // null until the model's J-lens is computed
   neurons: NeuronRow[];
 };
 
