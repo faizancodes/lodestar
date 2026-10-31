@@ -73,7 +73,7 @@ on your Mac</h1>
           <div class="cta"><a class="btn lg" href="https://github.com/faizancodes/auto-interp">View on GitHub</a></div>
         </div>
         <figure class="term">
-          <figcaption class="term-h"><span>Apple silicon Mac</span><button class="term-copy" type="button">Copy</button></figcaption>
+          <figcaption class="term-h"><button class="term-copy" type="button">Copy</button></figcaption>
           <pre><code><i>$</i> git clone https://github.com/faizancodes/auto-interp
 <i>$</i> cd auto-interp &amp;&amp; uv sync
 <i>$</i> ./scripts/build_app.sh
@@ -84,9 +84,7 @@ on your Mac</h1>
     </section>
   </main>
 
-  <footer class="foot">
-    <a class="brand" href="#top"><span class="brand-mark" data-mark="18"></span><b>Lodestar</b></a>
-  </footer>
+  <footer class="foot" aria-hidden="true"><canvas id="foot-art" class="art"></canvas></footer>
 
   <script type="module" src="./src/main.ts"></script>
 </body>

@@ -1,6 +1,7 @@
 import { startAssembly } from "./assemble";
 import { createDecoder } from "../../web/src/art/decode";
 import { markSVG } from "../../web/src/art/mark";
+import { startFooter } from "./footer";
 import { startLodestar } from "./lodestar";
 import { api, chat, erase, layers, steer } from "./scenes";
 import { startSequence } from "./sequence";
@@ -75,4 +76,5 @@ hero();
 startSequence($("#features"), [erase, layers, steer, chat, api]);
 get();
 copyInstall();
+startFooter($<HTMLCanvasElement>("#foot-art"));
 
