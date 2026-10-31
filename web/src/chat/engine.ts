@@ -33,7 +33,7 @@ const lastRates = () => [...document.querySelectorAll<HTMLElement>("#chat-log .m
 
 // ------------------------------------------------------------------ speed
 // When each streaming part got its first and latest words. Kept off the messages, which are saved as they are.
-const timing = new WeakMap<object, { t0: number; t1: number }>();
+const timing = new WeakMap<object, { t0: number; t1: number; w0: number }>(); // w0: words it had by its first
 const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 
 /** Words a second: measured from the first word, so the wait before it (reading the prompt) doesn't count. */
@@ -42,7 +42,7 @@ export function rateOf(part: { content: string; wps?: number }) {
 
   const t = timing.get(part);
   if (!t || t.t1 - t.t0 < 500) return null;
-  return (words(part.content) - 1) / ((t.t1 - t.t0) / 1000);
+  return (words(part.content) - t.w0) / ((t.t1 - t.t0) / 1000);
 }
 
 export const rateText = (r: number | null) => (r == null ? "" : `${r.toFixed(1)} words/s`);
@@ -50,7 +50,7 @@ export const rateText = (r: number | null) => (r == null ? "" : `${r.toFixed(1)}
 function arrived(part: object) {
   const now = performance.now(), t = timing.get(part);
   if (t) t.t1 = now;
-  else timing.set(part, { t0: now, t1: now });
+  else timing.set(part, { t0: now, t1: now, w0: words((part as { content: string }).content) });
 }
 
 // keep following the reply unless the user has scrolled up to read
@@ -67,7 +67,7 @@ export const jumpDown = () => ((follow = true), toBottom(true));
 let decoders: ReturnType<typeof createDecoder>[] = []; // the replies being written decode in, mark by mark
 
 // the parts of a reply that stream: the message itself, or its columns side by side
-const parts = (m: Msg): { content: string; wps?: number }[] => m.cols ?? [m];
+const parts = (m: Msg): { content: string; wps?: number; cut?: boolean }[] => m.cols ?? [m];
 
 function updateLastBot() {
   const m = get().messages[get().messages.length - 1];
@@ -115,27 +115,42 @@ function history(key: ColKey) {
   return (sys ? [{ role: "system", content: sys }] : []).concat(turns);
 }
 
-async function reply() {
+// a part of a reply that wrote to the length limit before it finished
+const cutParts = (m: Msg) => parts(m).filter((p) => p.cut);
+
+/** The next reply, or with `more`, the rest of the last one: each part that ran out of length carries on from where it stopped. */
+async function reply(more = false) {
   const { recipe, dirs } = app();
-  const cols = get().compare ? compareCols() : [];
+  const last = get().messages[get().messages.length - 1];
+  const m: Msg = more ? last : { role: "assistant", content: "" };
+  const cols = more ? (m.cols ?? []) : get().compare ? compareCols() : [];
   const many = cols.length > 1;
+  const going = more ? cutParts(m) : null; // the parts this continues, in row order
+
+  const row = (key: ColKey, steer: boolean, abl: boolean) => ({
+    messages: history(key),
+    pushes: steer ? pushes(recipe.items, dirs, 1) : [],
+    abl,
+  });
 
   const body = many
     ? {
-        rows: cols.map((c) => ({ messages: history(c.key), pushes: c.key === "steer" ? pushes(recipe.items, dirs, 1) : [], abl: c.key === "abl" })),
+        rows: ((going ?? cols) as Col[]).map((c) => row(c.key, c.key === "steer", c.key === "abl")),
         temperature: +get().temp,
         max_new: +get().max,
+        ...(more && { continue: true }),
       }
-    : {
-        messages: history(soloKey()),
-        pushes: get().steer ? pushes(recipe.items, dirs, 1) : [],
-        abl: ablActive(app()),
-        temperature: +get().temp,
-        max_new: +get().max,
-      };
+    : { ...row(soloKey(), get().steer, ablActive(app())), temperature: +get().temp, max_new: +get().max, ...(more && { continue: true }) };
 
-  const m: Msg = { role: "assistant", content: "", ...(many && { cols: cols.map((c) => ({ ...c, content: "" })) }) };
-  get().messages.push(m);
+  if (!more) {
+    if (many) m.cols = cols.map((c) => ({ ...c, content: "" }));
+    get().messages.push(m);
+  }
+
+  const live = going ?? parts(m); // row i streams into live[i]
+  live.forEach((p) => ((p.cut = false), delete p.wps, timing.delete(p))); // its speed is the new stretch's
+  m.stopped = false;
+
   set({ streaming: true });
   decoders = parts(m).map(() => createDecoder());
   render();
@@ -144,8 +159,14 @@ async function reply() {
 
   let raf = 0;
   const ok = await stream("/api/chat", body, (ev) => {
+    if (ev.type === "done") {
+      const cut = ev.cut as boolean | boolean[];
+      live.forEach((p, i) => (p.cut = Array.isArray(cut) ? cut[i] : cut));
+      return;
+    }
     if (ev.type !== "delta") return;
-    const part = parts(m)[many ? (ev.row as number) : 0];
+
+    const part = live[many ? (ev.row as number) : 0];
     part.content += ev.delta as string;
     arrived(part);
     if (!raf) raf = requestAnimationFrame(() => ((raf = 0), updateLastBot()));
@@ -154,7 +175,7 @@ async function reply() {
   cancelAnimationFrame(raf);
   set({ streaming: false });
 
-  for (const p of parts(m)) {
+  for (const p of live) {
     const r = rateOf(p);
     if (r) p.wps = Math.round(r * 10) / 10;
   }
@@ -186,6 +207,14 @@ export function retry() {
   if (get().streaming) return;
   get().messages.pop();
   reply();
+}
+
+/** Carry on writing a reply that ran out of length. */
+export function continueReply() {
+  const m = get().messages[get().messages.length - 1];
+  if (get().streaming || !m || m.role !== "assistant" || !cutParts(m).length) return;
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
+  reply(true);
 }
 
 export async function copyReply(text: string) {
