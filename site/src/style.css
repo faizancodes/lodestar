@@ -63,7 +63,7 @@ p { margin: 0; }
 .brand.crest { display: inline-flex; margin-bottom: clamp(22px, 3vh, 32px); }
 
 /* ------------------------------------------------------------ hero: the lodestar's sky, framed like a viewfinder */
-.hero { position: relative; height: clamp(560px, 80vh, 820px); overflow: hidden; }
+.hero { position: relative; height: 100vh; height: 100svh; min-height: 560px; overflow: hidden; }
 .hero #hero-art {
   position: absolute; inset: 0; width: 100%; height: 100%;
   -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
@@ -86,13 +86,13 @@ p { margin: 0; }
 .hud-c { position: absolute; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 .hud-c.tr { top: 14px; right: 16px; }
 .hud-c.br { bottom: 14px; right: 16px; color: var(--ascii); }
-.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%; transform: translateY(-50%); max-width: 780px; }
-.hero h1 { white-space: pre-line; font-size: clamp(32px, 6vw, 72px); line-height: 0.96; letter-spacing: -0.055em; color: #fff; text-shadow: 0 0 32px var(--bg), 0 0 12px var(--bg); }
-.lede { max-width: 700px; margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); line-height: 1.5; color: rgba(237, 237, 237, 0.8); }
-.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%; transform: translateY(-50%); max-width: calc(100vw - 2 * var(--gut)); }
+.hero h1 { white-space: pre-line; font-size: clamp(32px, min(6vw, 11svh), 120px); line-height: 0.96; letter-spacing: -0.055em; color: #fff; text-shadow: 0 0 32px var(--bg), 0 0 12px var(--bg); }
+.lede { max-width: 44em; margin-top: clamp(18px, 2.6svh, 32px); font-size: clamp(16px, min(1.3vw, 2.4svh), 24px); line-height: 1.5; color: rgba(237, 237, 237, 0.8); }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: clamp(24px, 3.6svh, 44px); }
 
 /* ------------------------------------------------------------ features: one pinned stage, scrolled through */
-.seq { position: relative; --step: 100vh; height: calc((var(--steps) + 1) * 100vh); margin-top: clamp(60px, 10vh, 120px); }
+.seq { position: relative; --step: 100vh; height: calc((var(--steps) + 1) * 100vh); }
 .seq-mark { position: absolute; left: 0; width: 1px; height: 1px; }
 .stage { position: sticky; top: 0; height: 100vh; overflow: hidden; }
 .seq-art {
@@ -134,10 +134,10 @@ p { margin: 0; }
 .rail a.on i { background: var(--ascii); border-color: var(--ascii); box-shadow: 0 0 0 4px rgba(195, 207, 245, 0.12); }
 
 /* get it: framed like the hero, the commands in a terminal panel */
-.get { position: relative; padding: clamp(110px, 18vh, 180px) var(--gut); }
+.get { position: relative; display: grid; align-content: center; min-height: 100vh; min-height: 100svh; padding: clamp(80px, 12svh, 160px) var(--gut); }
 .get .hud { inset: clamp(16px, 3vw, 32px) clamp(16px, 3vw, 32px); }
 .get-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: clamp(32px, 5vw, 72px); max-width: var(--w); margin: 0 auto; }
-#get-art { width: 100%; height: clamp(460px, 64vh, 620px); }
+#get-art { width: 100%; height: clamp(460px, 68svh, 820px); }
 .get-side { display: flex; flex-direction: column; gap: 40px; }
 .get h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; }
 .get p { margin-top: 18px; max-width: 380px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
@@ -173,7 +173,7 @@ p { margin: 0; }
 @media (max-width: 900px) {
   .get-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   #get-art { height: min(100vw, 480px); }
-  .hero { height: auto; min-height: 0; padding-top: min(84vw, 560px); }
+  .hero { height: auto; min-height: 100svh; padding-top: min(84vw, 560px); }
   .hero #hero-art { bottom: auto; height: min(96vw, 640px); }
   .hero-copy { position: relative; left: auto; top: auto; transform: none; padding: 40px var(--gut) 56px; }
   .hero::after { content: none; }
