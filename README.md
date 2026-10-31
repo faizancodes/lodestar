@@ -18,32 +18,32 @@ whose hook placement and dose units this app reuses.
 
 ## What it does
 
-<img src="docs/media/erase.gif" width="600" alt="Two clouds of activations draw apart, the refusal direction draws between them, and a plane projects it out until they fall flat into one." />
-
 **Remove safety filters.** Refusal is one direction the model represents in its residual stream. Lodestar finds it,
 then takes it out, either live with a hook you can switch off, or baked into a new copy of the weights.
 [More below.](#abliteration)
 
-<img src="docs/media/layers.gif" width="600" alt="A stack of layer sheets unfolds, and a token climbs it, lighting neurons and wiring its path from sheet to sheet." />
+<img src="docs/media/erase.gif" width="600" alt="Two clouds of activations draw apart, the refusal direction draws between them, and a plane projects it out until they fall flat into one." />
 
 **See inside every layer.** Pick any word in a reply and see which neurons fire for it, layer by layer, with the
 logit lens showing what each layer would say next and which neurons push hardest there.
 
-<img src="docs/media/steer.gif" width="600" alt="The residual stream as level flow lines; a push slides in and parts it, and everything downstream stays bent." />
+<img src="docs/media/layers.gif" width="600" alt="A stack of layer sheets unfolds, and a token climbs it, lighting neurons and wiring its path from sheet to sheet." />
 
 **Turn a concept up or down.** Raise or lower a neuron or a direction while the model writes. Stack them into
 recipes, or describe a behaviour and let the app search for the neurons that produce it.
 [How the search works.](#how-tune-finds-neurons)
 
-<img src="docs/media/chat.gif" width="600" alt="One prompt forks into two replies written token by token, the original above and the edited one below, fanning apart as they disagree." />
+<img src="docs/media/steer.gif" width="600" alt="The residual stream as level flow lines; a push slides in and parts it, and everything downstream stays bent." />
 
 **Compare as it writes.** Chat with your steering and erased refusals switched on or off, and see the original
 model's reply beside your edited one.
 
-<img src="docs/media/api.gif" width="600" alt="The lodestar at the centre of an orbit; clients arrive on it, requests curve in and tokens stream back out." />
+<img src="docs/media/chat.gif" width="600" alt="One prompt forks into two replies written token by token, the original above and the edited one below, fanning apart as they disagree." />
 
 **Use it from your own code.** An OpenAI-compatible server at `http://127.0.0.1:8792/v1` runs the model with your
 changes, so any OpenAI client can talk to it.
+
+<img src="docs/media/api.gif" width="600" alt="The lodestar at the centre of an orbit; clients arrive on it, requests curve in and tokens stream back out." />
 
 ## Run it
 
