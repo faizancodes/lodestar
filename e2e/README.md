@@ -14,6 +14,11 @@ plain-JS UI, and the React UI in ../web was ported until it matched them pixel f
     npm install && npx playwright install webkit   # once
     npx playwright test                              # replay against the UI (`pnpm build` in ../web first)
 
+    AUDIT=/tmp/fit.jsonl npx playwright test        # instead of comparing, check every step at 900-1920px wide
+
+The audit (`tests/audit.ts`) records what spills out of its box, scrolls sideways or squeezes a text field, one JSON
+line per finding; add `AUDIT_SHOTS=<folder>` for full-page shots at 1100 and 1920px.
+
 `tests/parity.spec.ts` walks every view the way a person would; `tests/rules.spec.ts` checks what that walk doesn't
 reach (one stream at a time, the Stop buttons, a narrow window) and runs on replay only.
 

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { audit, AUDIT } from "./audit";
 
 export const RECORD = process.env.MODE === "record";
 // how long to wait for the engine: minutes against a real model; against the mock, the longest replay (describe's
@@ -25,6 +26,7 @@ export async function snap(target: Page | Locator, name: string) {
   if (RECORD) return;
 
   const page = "page" in target ? target.page() : target;
+  if (AUDIT) return audit(page, name);
   const tag = await page.addStyleTag({ content: STILL });
 
   // WebKit paints only what's inside the window, so a panel taller than it would come out blank at the bottom:
