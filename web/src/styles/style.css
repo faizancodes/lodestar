@@ -221,8 +221,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 /* ------------------------------------------------------------ main */
 /* ------------------------------------------------------------ home */
-/* up past main's top padding, so the model's name starts level with the Lodestar wordmark */
-.home { max-width: 920px; margin: -22px auto 0; display: flex; flex-direction: column; gap: 36px; }
+.home { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
 .home-h h2 { margin: 0; font-size: 40px; line-height: 1.05; font-weight: 600; letter-spacing: -0.035em; }
 .home-meta { display: flex; margin: 20px 0 0; }
 .home-meta div { padding: 0 24px; border-left: 1px solid var(--rule); }
