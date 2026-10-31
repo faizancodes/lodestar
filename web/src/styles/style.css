@@ -570,11 +570,12 @@ body.busy .tl-comp .send.stop { display: grid; }
 .found .panel, .rc-list .panel { margin: 0 0 4px; }
 .panel-h { display: flex; align-items: center; gap: 12px; padding: 14px 18px 12px; border-bottom: 1px solid var(--rule); }
 .panel-h h3 { flex: 1; font-size: 15px; letter-spacing: -0.02em; color: var(--accent); }
-.panel-b { padding: 18px 18px 20px; }
+.panel-b { padding: 18px 18px 20px; container-type: inline-size; }
 .panel-b h4 { margin: 24px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
 .panel-b h4:first-child, .in-cols h4 { margin-top: 0; }
 .in-detail { margin-top: 24px; }
 .in-cols { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@container (max-width: 600px) { .in-cols { grid-template-columns: minmax(0, 1fr); } }
 
 .tokens { font-family: var(--mono); font-size: 12.5px; line-height: 2; word-break: break-word; }
 .tok { padding: 2px 1px; border-radius: 4px; white-space: pre-wrap; cursor: pointer; }
@@ -589,10 +590,11 @@ body.busy .tl-comp .send.stop { display: grid; }
 .lbl { margin-bottom: 6px; font-size: 12px; font-weight: 700; }
 .lbl.neg { color: var(--bad); margin-top: 16px; }
 
-.guess { width: 100%; border-collapse: collapse; font-size: 12px; }
+.guess { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
 .guess td { padding: 3px 4px; border-bottom: 1px solid var(--rule); }
 .guess td.l { width: 26px; font-family: var(--mono); color: var(--muted); }
-.guess td.t { font-family: var(--mono); white-space: pre; }
+.guess td.t { font-family: var(--mono); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.guess td:last-child { width: 80px; }
 .guess .bar { width: 60px; height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
 .guess .bar i { display: block; height: 100%; background: var(--accent); }
 
@@ -620,7 +622,7 @@ body.busy .tl-comp .send.stop { display: grid; }
 .found-row .who b { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .found-row .who .nid { font-size: 10.5px; font-weight: 500; color: var(--muted); }
 .scan { display: flex; flex-direction: column; align-items: center; padding-top: 18px; }
-.scan canvas { display: block; color: var(--ascii); animation: rise 0.25s ease-out; }
+.scan canvas { display: block; width: 100%; height: auto; color: var(--ascii); animation: rise 0.25s ease-out; }
 .scan-cap { margin-top: 22px; font-size: 13px; font-weight: 500; color: var(--muted); }
 
 /* ------------------------------------------------------------ transitions: loading placeholder out, content in */
@@ -856,8 +858,8 @@ body.busy .tl-comp .send.stop { display: grid; }
 .guess td.t { font-size: 12.5px; color: var(--text); }
 .guess .bar { width: 72px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); }
 .guess .bar i { background: var(--ascii); }
-.guess td.more { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: pre; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-.lens-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.guess td.more { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.lens-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; }
 .lens-h h4 { margin: 0; }
 .jl-setup { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 0; border-top: 1px solid var(--rule); }
 .jl-note { font-size: 12.5px; line-height: 1.5; color: var(--muted); max-width: 340px; }
