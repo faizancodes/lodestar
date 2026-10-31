@@ -192,14 +192,24 @@ p { margin: 0; }
   .term li { gap: 10px; padding-left: 10px; }
 }
 
-/* ------------------------------------------------------------ the app, acted out (src/appdemo.ts) */
-.demo { padding: clamp(40px, 8svh, 100px) var(--gut) clamp(80px, 14svh, 160px); }
-.demo-copy { max-width: var(--w); margin: 0 auto clamp(28px, 4svh, 48px); }
-.demo h2 { max-width: 15em; font-size: clamp(30px, 3.6vw, 48px); line-height: 1.05; }
+/* ------------------------------------------------------------ the app, acted out (src/appdemo.ts), framed like the hero */
+.demo { position: relative; display: grid; align-content: center; min-height: 100vh; min-height: 100svh; padding: clamp(56px, 9svh, 110px) var(--gut); }
+.demo::before { /* a faint field of marks behind the window, the scenes' light at rest */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, rgba(195, 207, 245, 0.32) 1px, transparent 1.5px) 0 0 / 20px 20px;
+  -webkit-mask-image: radial-gradient(ellipse 58% 52% at 55% 64%, #000 25%, transparent 80%);
+  mask-image: radial-gradient(ellipse 58% 52% at 55% 64%, #000 25%, transparent 80%);
+}
+.demo-in { position: relative; max-width: var(--w); margin: 0 auto; }
+.demo-copy { margin-bottom: clamp(28px, 4svh, 44px); }
+.demo-copy .kicker { margin-top: 0; }
+.demo h2 { max-width: 13em; font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; text-wrap: balance; }
 .demo-win {
-  position: relative; max-width: min(1180px, calc((100svh - 80px) * 1180 / 720)); margin: 0 auto; overflow: hidden;
-  border: 1px solid var(--rule-2); border-radius: clamp(8px, 1vw, 14px); background: var(--bg);
-  box-shadow: 0 40px 120px -40px rgba(195, 207, 245, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.6);
+  position: relative; max-width: max(560px, calc((100svh - 2 * clamp(56px, 9svh, 110px) - 170px) * 1180 / 720)); /* the copy and the window in one screen */ overflow: hidden; border-radius: clamp(8px, 1vw, 12px);
+  background: var(--bg);
+  box-shadow: 0 0 0 1px rgba(195, 207, 245, 0.16), 0 0 80px -10px rgba(195, 207, 245, 0.16), 0 0 0 6px rgba(195, 207, 245, 0.025);
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, #000 78%, transparent);
 }
 .ad-stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; display: grid; grid-template: 38px 1fr / 230px 1fr; font-family: var(--sans); color: var(--text); background: var(--bg); }
 .ad-bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--rule); background: #0d0d0d; }
