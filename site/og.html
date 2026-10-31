@@ -1,11 +1,23 @@
 <!doctype html>
-<!-- The share card, 1200 × 630. Not part of the site: scripts/og.sh renders it to public/og.png. -->
+<!-- The share card, 1200 × 630. Not part of the site: scripts/og.sh renders it to public/og.png, and
+     scripts/readme-gifs.mjs, animated, to the README's banner. -->
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Lodestar card</title>
   <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500&display=block" rel="stylesheet" />
   <link rel="stylesheet" href="./src/style.css" />
+  <script>
+    // with ?step, the clock only moves on __step(ms), so scripts/readme-gifs.mjs can take the card frame by frame
+    if (location.search.includes("step")) {
+      let T = 0;
+      const queue = [];
+      performance.now = () => T;
+      window.requestAnimationFrame = (cb) => (queue.push(cb), queue.length);
+      window.cancelAnimationFrame = () => {};
+      window.__step = (ms) => { T += ms; queue.splice(0).forEach((cb) => cb(T)); };
+    }
+  </script>
   <style>
     html, body { width: 1200px; height: 630px; overflow: hidden; }
     .card { position: relative; width: 1200px; height: 630px; background: var(--bg); }
