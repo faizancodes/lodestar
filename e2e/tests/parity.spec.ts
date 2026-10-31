@@ -614,3 +614,39 @@ test("chat: continue a reply that ran out of length", async ({ page }) => {
   await expect(bot.locator('[data-a="continue"]')).toHaveCount(0);
   await snap(page, "chat-continued");
 });
+
+// Assembled from chat's haiku, with a direction to read and made-up readings
+test("chat: gauges read a direction as the reply is written", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "chat-gauges");
+  await page.goto("/");
+  await page.keyboard.press("Meta+3");
+  await page.locator('#chat-mods .mod[data-mod="abl"]').click();
+
+  await page.locator("#chat-opts summary").click();
+  await page.locator("#chat-temp").fill("0");
+  await page.locator("#chat-max").fill("192");
+  await page.locator("#chat-model").click();
+
+  await page.locator("#chat-gauges summary").click();
+  const sw = page.locator('#chat-gauges .switch[data-dir="cheerful"]');
+  await sw.click();
+  await expect(sw).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("#chat-gauges summary")).toHaveText("Gauges · 1");
+  await snap(page, "chat-gauges-pick");
+  await page.locator("#chat-model").click();
+  await expect(page.locator("#chat-gauges")).not.toHaveAttribute("open");
+
+  await page.locator("#chat-starters .starter", { hasText: "Write a haiku about Mondays" }).click();
+  await idle(page);
+  const g = page.locator('#chat-log .msg.bot .gauge[data-gauge="cheerful"]');
+  await expect(g.locator(".gauge-n")).toHaveText("Cheerful");
+  await expect(g.locator(".gauge-strip i")).toHaveCount(17);
+  await expect(g.locator(".gauge-v")).toHaveText(/^[+−]\d\.\d\d$/);
+
+  await g.locator(".gauge-strip i").nth(2).hover();
+  await expect(page.locator(".gauge-tip b")).toHaveText("ays");
+  await expect(g.locator(".gauge-v")).toHaveText("−0.24");
+  await snap(page, "chat-gauges");
+});
