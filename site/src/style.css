@@ -76,27 +76,32 @@ p { margin: 0; }
 .nav-links a { font-size: 13.5px; font-weight: 500; color: var(--text-2); transition: color 0.15s; }
 .nav-links a:hover { color: var(--text); }
 
-/* ------------------------------------------------------------ hero */
-.hero { position: relative; max-width: var(--w); margin: 0 auto; padding: clamp(56px, 10vh, 110px) var(--gut) 40px; text-align: center; }
-.hero h1 { font-size: clamp(42px, 7.4vw, 84px); line-height: 1; letter-spacing: -0.05em; }
-.lede { max-width: 600px; margin: 22px auto 0; font-size: clamp(16px, 1.6vw, 18px); line-height: 1.6; color: var(--text-2); }
-.cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
-.hero-scene { position: relative; margin: clamp(28px, 5vh, 56px) calc(-1 * var(--gut)) 0; }
-.hero-scene canvas#hero-art {
-  width: 100%; height: clamp(380px, 62vh, 620px);
-  /* the dive fades out at its edges, into the page */
-  -webkit-mask-image: radial-gradient(ellipse 60% 58% at 50% 50%, #000 45%, transparent 100%);
-  mask-image: radial-gradient(ellipse 60% 58% at 50% 50%, #000 45%, transparent 100%);
+/* ------------------------------------------------------------ hero: the dive fills the screen, framed like a viewfinder */
+.hero { position: relative; height: calc(100svh - 61px); min-height: 560px; overflow: hidden; }
+.hero #hero-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero::after { /* shade under the words */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 70% 80% at 0% 100%, rgba(10, 10, 10, 0.92) 30%, transparent 75%), linear-gradient(to top, var(--bg), transparent 22%);
 }
-.readout {
-  position: absolute; left: 50%; bottom: 4%; z-index: 1; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 10px;
-  border: 1px solid var(--rule-2); border-radius: 999px; background: rgba(17, 17, 17, 0.85);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap;
+.hud { position: absolute; inset: clamp(16px, 3vw, 32px); z-index: 1; pointer-events: none; }
+.hud::before { /* the frame's corners */
+  content: ""; position: absolute; inset: 0;
+  --c: rgba(195, 207, 245, 0.35); --l: 18px;
+  background:
+    linear-gradient(var(--c), var(--c)) 0 0 / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 0 0 / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 0 / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 100% 0 / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 100% / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 0 100% / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 100% 100% / 1px var(--l) no-repeat;
 }
-.readout .spin { width: 18px; height: 18px; }
-.readout-n { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.hud-c { position: absolute; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.hud-c.tl { top: 14px; left: 16px; color: var(--text-2); }
+.hud-c.tr { top: 14px; right: 16px; }
+.hud-c.br { bottom: 14px; right: 16px; color: var(--ascii); }
+.hud .spin { width: 16px; height: 16px; }
+.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); bottom: clamp(56px, 11vh, 120px); max-width: 640px; }
+.hero h1 { font-size: clamp(48px, 8.4vw, 112px); line-height: 0.94; letter-spacing: -0.055em; }
+.lede { margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); color: var(--text-2); }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
 
 /* ------------------------------------------------------------ features: one pinned stage, scrolled through */
 .seq { position: relative; --step: 100vh; height: calc((var(--steps) + 1) * 100vh); margin-top: clamp(60px, 10vh, 120px); }
@@ -174,5 +179,7 @@ p { margin: 0; }
 @media (max-width: 640px) {
   .nav-links { display: none; }
   .nav .btn { margin-left: auto; }
-  .readout { bottom: 2%; padding: 6px 12px 6px 8px; font-size: 12px; }
+  .hud-c.br { display: none; }
+  .hero-copy { right: var(--gut); bottom: 48px; }
+  .hero::after { background: linear-gradient(to top, rgba(10, 10, 10, 0.94) 28%, transparent 62%); }
 }

@@ -15,8 +15,10 @@ const N = 5, GAP = 0.38, NODE = 0.075; // neurons per side, their spacing and ha
 const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 
-/** depth: called with the absolute level the camera has reached, each time it passes one. */
-export function startDive(canvas: HTMLCanvasElement, depth?: (level: number) => void) {
+/** depth: called with the absolute level the camera has reached, each time it passes one. at: where the vanishing
+ *  point sits, as a fraction of the width. boost: extra speed, multiplying the fall (scrolling pushes it deeper). */
+export function startDive(canvas: HTMLCanvasElement, opts: { depth?: (level: number) => void; at?: () => number; boost?: () => number } = {}) {
+  const { depth, at: atX = () => 0.5, boost = () => 0 } = opts;
   let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
 
   const size = () => {
@@ -64,10 +66,12 @@ export function startDive(canvas: HTMLCanvasElement, depth?: (level: number) => 
     }
   };
 
+  let z = 0.4, lastT = -1;
   const draw = (t: number) => {
     grid.fill(0);
-    const cx = cols / 2, cy = rows / 2, R = Math.hypot(cx, cy);
-    const z = t / PERIOD;
+    const cx = cols * atX(), cy = rows / 2, R = Math.hypot(Math.max(cx, cols - cx), cy);
+    z += lastT < 0 ? 0 : (Math.min(0.2, t - lastT) / PERIOD) * (1 + boost());
+    lastT = t;
 
     // dust streaming out past the camera, faster the further out it is
     for (let i = 0; i < 160; i++) {
@@ -146,13 +150,13 @@ export function startDive(canvas: HTMLCanvasElement, depth?: (level: number) => 
     raf = requestAnimationFrame(tick);
     if (now - last < 50) return; // ~20 fps
     last = now;
-    draw((now - t0) / 1000 + PERIOD * 0.4);
+    draw((now - t0) / 1000);
   };
-  const run = () => (still ? draw(PERIOD * 0.4) : raf || (raf = requestAnimationFrame(tick)));
+  const run = () => (still ? draw(0) : raf || (raf = requestAnimationFrame(tick)));
 
   if (size()) run();
   new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(canvas);
   document.addEventListener("visibilitychange", () => !document.hidden && run());
   let rt: ReturnType<typeof setTimeout> | undefined;
-  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => size() && (still ? draw(PERIOD * 0.4) : run()), 150); });
+  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => size() && (still ? draw(0) : run()), 150); });
 }
