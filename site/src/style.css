@@ -81,24 +81,22 @@ p { margin: 0; }
 .hero h1 { font-size: clamp(42px, 7.4vw, 84px); line-height: 1; letter-spacing: -0.05em; }
 .lede { max-width: 600px; margin: 22px auto 0; font-size: clamp(16px, 1.6vw, 18px); line-height: 1.6; color: var(--text-2); }
 .cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
-.hero-scene { position: relative; margin: clamp(36px, 6vh, 64px) auto 0; width: fit-content; max-width: 100%; }
-.hero-scene canvas#hero-art { width: 691px !important; max-width: 100%; height: auto !important; aspect-ratio: 192 / 128; }
-.hero-scene::after { /* the lake fades into the page */
-  content: ""; position: absolute; inset: auto 0 0; height: 30%; pointer-events: none;
-  background: linear-gradient(transparent, var(--bg));
+.hero-scene { position: relative; margin: clamp(28px, 5vh, 56px) calc(-1 * var(--gut)) 0; }
+.hero-scene canvas#hero-art {
+  width: 100%; height: clamp(380px, 62vh, 620px);
+  /* the dive fades out at its edges, into the page */
+  -webkit-mask-image: radial-gradient(ellipse 60% 58% at 50% 50%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 60% 58% at 50% 50%, #000 45%, transparent 100%);
 }
 .readout {
-  position: absolute; left: 50%; bottom: 6%; z-index: 1; transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: 4%; z-index: 1; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 10px;
   border: 1px solid var(--rule-2); border-radius: 999px; background: rgba(17, 17, 17, 0.85);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap;
 }
 .readout .spin { width: 18px; height: 18px; }
-.readout.ready .spin { display: none; }
-.readout.ready { padding-left: 14px; }
 .readout-n { font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
-#hero-status[data-ready]::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--good); vertical-align: 1px; }
 
 /* ------------------------------------------------------------ sections */
 .sec { max-width: var(--w); margin: 0 auto; padding: clamp(72px, 12vh, 130px) var(--gut) 0; }
