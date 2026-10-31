@@ -3,7 +3,11 @@ import { load } from "../lib/storage";
 import type { ChatMessage, ChatSummary, WordSearch } from "../lib/types";
 
 // The conversation. As on Steer, the reply being streamed is a mutable message, redrawn when `v` changes.
-export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number; cut?: boolean }; // cut: wrote to the length limit
+export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number; cut?: boolean; mods?: Mods }; // cut: wrote to the length limit
+
+// What shaped a reply: the neurons and directions pushed, each with its dose, and whether refusals were erased
+export type Pushed = { label: string; dose: number; erase?: boolean };
+export type Mods = { steer?: Pushed[]; abl?: boolean };
 
 // Compare's side-by-side replies: the plain model, and each switch that was on, alone. Each column carries on its
 // own thread, so a later turn's history takes that column's earlier replies.
