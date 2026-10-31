@@ -114,8 +114,8 @@ export function startScan(canvas: HTMLCanvasElement) {
   const dpr = devicePixelRatio || 1;
   canvas.width = COLS * CELL * dpr;
   canvas.height = ROWS * CELL * dpr;
-  canvas.style.width = COLS * CELL + "px";
-  canvas.style.height = ROWS * CELL + "px";
+  canvas.style.maxWidth = COLS * CELL + "px"; // full size, or as wide as the panel allows
+  canvas.style.aspectRatio = `${COLS} / ${ROWS}`;
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = getComputedStyle(canvas).color;
