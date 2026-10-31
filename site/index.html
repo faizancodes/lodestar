@@ -45,45 +45,31 @@
       </figure>
     </section>
 
-    <!-- the features: a line each, and a scene drawn for it -->
-    <section class="feat" id="abliterate">
-      <div class="feat-h reveal"><span class="kicker">Abliterate</span><h2>Erase the refusal.</h2><p>Find the one direction it refuses along, and project it out.</p></div>
-      <canvas class="feat-art art" id="art-erase" aria-hidden="true"></canvas>
-    </section>
-
-    <section class="feat" id="inspect">
-      <div class="feat-h reveal"><span class="kicker">Inspect</span><h2>Every neuron, every token.</h2><p>Watch each word climb the layers and light what it touches.</p></div>
-      <canvas class="feat-art art" id="art-layers" aria-hidden="true"></canvas>
-    </section>
-
-    <section class="feat" id="steer">
-      <div class="feat-h reveal"><span class="kicker">Steer</span><h2>Push a neuron.</h2><p>Nudge one, and everything downstream bends with it.</p></div>
-      <canvas class="feat-art art" id="art-steer" aria-hidden="true"></canvas>
-    </section>
-
-    <section class="feat" id="chat">
-      <div class="feat-h reveal"><span class="kicker">Chat</span><h2>Side by side.</h2><p>The plain model and yours, read as they write.</p></div>
-      <div class="chat reveal" id="chat-demo">
-        <div class="bubble">Write a two-line villain's toast for my play.</div>
-        <div class="cmp">
-          <div class="cmp-col" data-col="plain">
-            <div class="cmp-h">Plain</div>
-            <p class="md" data-reply="0"></p>
-            <div class="gauge"><span class="gauge-n">Cheerful</span><span class="gauge-strip" data-strip="0"></span><span class="gauge-v" data-gv="0">+0.00</span></div>
-          </div>
-          <div class="cmp-col">
-            <div class="cmp-h">Pirate captain</div>
-            <p class="md" data-reply="1"></p>
-            <div class="gauge"><span class="gauge-n">Cheerful</span><span class="gauge-strip" data-strip="1"></span><span class="gauge-v" data-gv="1">+0.00</span></div>
-          </div>
+    <!-- the features, as one scroll sequence over a pinned stage -->
+    <section class="seq" id="features" style="--steps: 5">
+      <span class="seq-mark" id="abliterate" style="top: calc(0 * var(--step))"></span>
+      <span class="seq-mark" id="inspect" style="top: calc(1 * var(--step))"></span>
+      <span class="seq-mark" id="steer" style="top: calc(2 * var(--step))"></span>
+      <span class="seq-mark" id="chat" style="top: calc(3 * var(--step))"></span>
+      <span class="seq-mark" id="api" style="top: calc(4 * var(--step))"></span>
+      <div class="stage">
+        <canvas class="seq-art art" aria-hidden="true"></canvas>
+        <div class="seq-copy">
+          <article class="step"><span class="step-n">01</span><span class="kicker">Abliterate</span><h2>Erase the refusal.</h2><p>Find the one direction it refuses along, and project it out of every layer.</p></article>
+          <article class="step"><span class="step-n">02</span><span class="kicker">Inspect</span><h2>Every neuron, every token.</h2><p>Follow a word up through the layers and see what each one makes of it.</p></article>
+          <article class="step"><span class="step-n">03</span><span class="kicker">Steer</span><h2>Push a neuron.</h2><p>Nudge one, and everything downstream bends with it.</p></article>
+          <article class="step"><span class="step-n">04</span><span class="kicker">Chat</span><h2>Side by side.</h2><p>The plain model and yours, answering together, read as they write.</p></article>
+          <article class="step"><span class="step-n">05</span><span class="kicker">API</span><h2>Any OpenAI client.</h2><p>Point it at <code>127.0.0.1:8792/v1</code> and it answers as you've set it.</p></article>
         </div>
+        <nav class="rail" aria-label="Features">
+          <span class="rail-line"><span class="rail-fill"></span></span>
+          <a href="#abliterate"><span>Abliterate</span><i></i></a>
+          <a href="#inspect"><span>Inspect</span><i></i></a>
+          <a href="#steer"><span>Steer</span><i></i></a>
+          <a href="#chat"><span>Chat</span><i></i></a>
+          <a href="#api"><span>API</span><i></i></a>
+        </nav>
       </div>
-    </section>
-
-    <section class="feat" id="api">
-      <div class="feat-h reveal"><span class="kicker">API</span><h2>Any OpenAI client.</h2><p>Point it at your Mac.</p></div>
-      <canvas class="feat-art art" id="art-api" aria-hidden="true"></canvas>
-      <code class="addr reveal">http://127.0.0.1:8792/v1</code>
     </section>
 
     <!-- get it -->
