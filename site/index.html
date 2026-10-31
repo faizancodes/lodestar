@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lodestar</title>
+  <meta name="description" content="Lodestar runs open language models on your Mac and opens them up: watch neurons fire, steer how the model talks, and erase the direction it refuses along." />
+  <meta name="theme-color" content="#0a0a0a" />
+  <!-- the share card (og.html, rendered by scripts/og.sh); %SITE% is the address it's served from (vite.config.ts) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Lodestar" />
+  <meta property="og:title" content="Lodestar: Local LLM Interpretability" />
+  <meta property="og:description" content="Inspect, steer and abliterate open models on your Mac." />
+  <meta property="og:url" content="%SITE%/" />
+  <meta property="og:image" content="%SITE%/og.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Lodestar: Local LLM Interpretability. An ASCII armillary sphere of neurons around a compass star." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Lodestar: Local LLM Interpretability" />
+  <meta name="twitter:description" content="Inspect, steer and abliterate open models on your Mac." />
+  <meta name="twitter:image" content="%SITE%/og.png" />
+  <meta name="twitter:image:alt" content="Lodestar: Local LLM Interpretability. An ASCII armillary sphere of neurons around a compass star." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+
+  <main id="top">
+    <!-- hero: an endless dive into the model, layer inside neuron inside layer -->
+    <section class="hero">
+      <canvas id="hero-art" class="art" aria-hidden="true"></canvas>
+      <div class="hud" aria-hidden="true">
+        <span class="hud-c tr" id="hero-depth">L1 · n4096</span>
+        <span class="hud-c br" id="hero-act">+0.000</span>
+      </div>
+      <div class="hero-copy">
+        <a class="brand crest" href="#top" aria-label="Lodestar"><span class="brand-mark" data-mark="26"></span><b>Lodestar</b></a>
+        <h1 id="hero-title">Local LLM
+Interpretability</h1>
+        <p class="lede">Inspect, steer and abliterate open models</p>
+        <div class="cta">
+          <a class="btn lg" href="https://github.com/faizancodes/auto-interp">View on GitHub</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- the features, as one scroll sequence over a pinned stage -->
+    <section class="seq" id="features" style="--steps: 5">
+      <span class="seq-mark" id="abliterate" style="top: calc(0 * var(--step))"></span>
+      <span class="seq-mark" id="inspect" style="top: calc(1 * var(--step))"></span>
+      <span class="seq-mark" id="steer" style="top: calc(2 * var(--step))"></span>
+      <span class="seq-mark" id="chat" style="top: calc(3 * var(--step))"></span>
+      <span class="seq-mark" id="api" style="top: calc(4 * var(--step))"></span>
+      <div class="stage">
+        <canvas class="seq-art art" aria-hidden="true"></canvas>
+        <div class="seq-copy">
+          <article class="step"><span class="step-n">01</span><span class="kicker">Abliterate</span><h2>Remove safety filters.</h2><p>Find the direction a model refuses along, then take it out of every layer's weights.</p></article>
+          <article class="step"><span class="step-n">02</span><span class="kicker">Inspect</span><h2>See inside every layer.</h2><p>Pick any word in the prompt and see which neurons fire for it, layer by layer.</p></article>
+          <article class="step"><span class="step-n">03</span><span class="kicker">Steer</span><h2>Turn a concept up or down.</h2><p>Raise or lower a neuron or a direction while the model writes, and watch the reply change.</p></article>
+          <article class="step"><span class="step-n">04</span><span class="kicker">Chat</span><h2>Compare as it writes.</h2><p>The original model and your edited one answer the same prompt, side by side.</p></article>
+          <article class="step"><span class="step-n">05</span><span class="kicker">API</span><h2>Use it from your own code.</h2><p>An OpenAI-compatible server at <code>127.0.0.1:8792/v1</code> runs the model with your changes.</p></article>
+        </div>
+        <nav class="rail" aria-label="Features">
+          <span class="rail-line"><span class="rail-fill"></span></span>
+          <a href="#abliterate"><span>Abliterate</span><i></i></a>
+          <a href="#inspect"><span>Inspect</span><i></i></a>
+          <a href="#steer"><span>Steer</span><i></i></a>
+          <a href="#chat"><span>Chat</span><i></i></a>
+          <a href="#api"><span>API</span><i></i></a>
+        </nav>
+      </div>
+    </section>
+
+    <!-- get it -->
+    <section class="get" id="get">
+      <div class="hud" aria-hidden="true"><span class="hud-c tr" id="get-model"></span><span class="hud-c br" id="get-layers"></span></div>
+      <div class="get-in">
+        <canvas id="get-art" class="art" aria-hidden="true"></canvas>
+        <div class="get-side reveal">
+        <div class="get-copy">
+          <span class="kicker">Get Lodestar</span>
+          <h2>Bring your own model.</h2>
+          <p>Any Llama-style model on Hugging Face. Runs offline after the first load.</p>
+          <div class="cta"><a class="btn lg" href="https://github.com/faizancodes/auto-interp">View on GitHub</a></div>
+        </div>
+        <ol class="term">
+          <li><span class="n">1</span><code>git clone https://github.com/faizancodes/auto-interp</code><button class="cp" type="button" aria-label="Copy"></button></li>
+          <li><span class="n">2</span><code>cd auto-interp &amp;&amp; uv sync</code><button class="cp" type="button" aria-label="Copy"></button></li>
+          <li><span class="n">3</span><code>./scripts/build_app.sh</code><button class="cp" type="button" aria-label="Copy"></button></li>
+          <li><span class="n">4</span><code>open dist/Lodestar.app</code><button class="cp" type="button" aria-label="Copy"></button></li>
+        </ol>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot" aria-hidden="true"><canvas id="foot-art" class="art"></canvas></footer>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

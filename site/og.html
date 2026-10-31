@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- The share card, 1200 × 630. Not part of the site: scripts/og.sh renders it to public/og.png. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Lodestar card</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500&display=block" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/style.css" />
+  <style>
+    html, body { width: 1200px; height: 630px; overflow: hidden; }
+    .card { position: relative; width: 1200px; height: 630px; background: var(--bg); }
+    .card canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .card::after { /* shade under the words, as in the hero */
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(ellipse 46% 70% at 18% 52%, rgba(10, 10, 10, 0.92) 30%, transparent 75%);
+    }
+    .card .hud { inset: 28px; }
+    .words { position: absolute; z-index: 2; left: 84px; top: 50%; transform: translateY(-50%); }
+    .words .brand { margin-bottom: 34px; }
+    .words .brand b { font-size: 26px; }
+    .words h1 { font-size: 88px; line-height: 0.96; color: #fff; text-shadow: 0 2px 30px rgba(10, 10, 10, 0.8); }
+    .words p { margin-top: 26px; font-size: 26px; color: var(--text-2); letter-spacing: -0.01em; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <canvas id="og-art" class="art"></canvas>
+    <div class="hud"></div>
+    <div class="words">
+      <div class="brand"><span class="brand-mark" data-mark="34"></span><b>Lodestar</b></div>
+      <h1>Local LLM<br />Interpretability</h1>
+      <p>Inspect, steer and abliterate open models</p>
+    </div>
+  </div>
+  <script type="module">
+    import { markSVG } from "../web/src/art/mark";
+    import { startLodestar } from "./src/lodestar";
+    const el = document.querySelector("[data-mark]");
+    el.innerHTML = markSVG(34, 31);
+    startLodestar(document.querySelector("#og-art"), { at: () => [0.74, 0.5] });
+  </script>
+</body>
+</html>
