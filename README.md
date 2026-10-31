@@ -51,8 +51,8 @@ changes, so any OpenAI client can talk to it.
 
 On an Apple silicon Mac:
 
-    git clone https://github.com/faizancodes/auto-interp
-    cd auto-interp && uv sync
+    git clone https://github.com/faizancodes/lodestar
+    cd lodestar && uv sync
     ./scripts/build_app.sh          # builds the UI and makes dist/Lodestar.app; drag it to /Applications or the Dock
     open dist/Lodestar.app
 
@@ -73,8 +73,8 @@ gradients; bigger ones in bfloat16. Logs go to `~/Library/Logs/Lodestar.log`, re
 With an NVIDIA card (RTX 20-series or newer, with a driver recent enough for CUDA 13), [uv](https://docs.astral.sh/uv/),
 Node 22 and pnpm:
 
-    git clone https://github.com/faizancodes/auto-interp
-    cd auto-interp
+    git clone https://github.com/faizancodes/lodestar
+    cd lodestar
     powershell -ExecutionPolicy Bypass -File scripts\build_app.ps1
 
 That builds the UI, installs the CUDA build of torch, and adds Lodestar to the Start menu and the desktop. Without the
