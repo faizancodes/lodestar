@@ -411,6 +411,24 @@ async function fetchLens(it: { layer: number; neuron: number }) {
 export const recipeNeurons = (items: ReturnType<typeof app>["recipe"]["items"]) =>
   items.flatMap((it, i) => (isDir(it) ? [] : [{ it: it as NeuronItem, i }]));
 
+// ------------------------------------------------------------------ the API
+// Other apps reach the loaded model at /v1 (see interp/server.py). Its default model steers the way Chat does, so the
+// server is told whenever that changes: the recipe, its directions, or Chat's Steered switch.
+let served = "";
+function syncServe() {
+  const a = app();
+  if (!a.info?.loaded) return void (served = "");
+
+  const body = { pushes: get().steer ? pushes(a.recipe.items, a.dirs, 1) : [] };
+  const k = JSON.stringify(body) + a.info.model;
+  if (k === served) return;
+
+  served = k;
+  api("/api/serve", body).catch(() => (served = ""));
+}
+useApp.subscribe(syncServe);
+useChat.subscribe(syncServe);
+
 /** The Chat tab was opened, or a model got ready while it's open. */
 export function onChatShown() {
   recipeNeurons(app().recipe.items).forEach(({ it }) => fetchLens(it));

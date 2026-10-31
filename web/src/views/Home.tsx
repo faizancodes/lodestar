@@ -1,8 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { drawHomeArt, type HomeArt } from "../art/home";
-import { modelName } from "../lib/format";
+import { api } from "../lib/api";
+import { isDir, modelName } from "../lib/format";
 import { setTab } from "../shell/engine";
-import { useApp } from "../store/app";
+import { ablActive, useApp } from "../store/app";
+import { useChat } from "../store/chat";
 import { ICONS } from "../components/Sidebar";
 
 const CARDS: { go: HomeArt; title: string; text: string; key: string }[] = [
@@ -53,6 +55,66 @@ export function Home({ hidden }: { hidden: boolean }) {
           </button>
         ))}
       </div>
+      {shown && <Api />}
+    </section>
+  );
+}
+
+type Serve = {
+  models: { id: string; about: string }[];
+  log: { at: number; model: string; prompt: number; tokens: number; seconds: number; finish: string }[];
+  active: number;
+};
+
+// what the default model does right now: what Chat steers with, and whether refusals are erased
+function asSet(items: ReturnType<typeof useApp.getState>["recipe"]["items"], steer: boolean, erased: boolean) {
+  const nd = items.filter(isDir).length, nn = items.length - nd;
+  const what = [nn && `${nn} neuron${nn > 1 ? "s" : ""}`, nd && `${nd} direction${nd > 1 ? "s" : ""}`].filter(Boolean).join(", ");
+  return [erased && "Refusals erased", steer && what && `Steered · ${what}`].filter(Boolean).join(" · ") || "Plain right now";
+}
+
+const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+// The OpenAI-compatible API: where other apps reach this model, the names it answers to, and the latest requests
+function Api() {
+  const [s, setS] = useState<Serve | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const items = useApp((a) => a.recipe.items), erased = useApp(ablActive), steer = useChat((c) => c.steer);
+  const url = `${location.origin}/v1`;
+
+  useEffect(() => {
+    let live = true;
+    const poll = () => api<Serve>("/api/serve").then((r) => live && setS(r)).catch(() => {});
+    poll();
+    const t = setInterval(poll, 2500);
+    return () => ((live = false), clearInterval(t));
+  }, []);
+
+  const copy = (k: string, text: string) => navigator.clipboard.writeText(text).then(() => (setCopied(k), setTimeout(() => setCopied(null), 1400)));
+  const first = s?.models[0]?.id ?? "";
+  const example = `from openai import OpenAI\n\nclient = OpenAI(base_url="${url}", api_key="lodestar")\nreply = client.chat.completions.create(\n    model="${first}",\n    messages=[{"role": "user", "content": "Hello!"}],\n)\nprint(reply.choices[0].message.content)`;
+
+  return (
+    <section className="api" id="home-api">
+      <div className="api-h">
+        <span className="hc-t">API{!!s?.active && <i className="hc-on" title="Answering a request" />}</span>
+        <span className="hc-d">Any app that speaks the OpenAI API can use this model.</span>
+      </div>
+      <div className="api-url">
+        <code id="api-url">{url}</code>
+        <button className="btn ghost sm" onClick={() => copy("url", url)}>{copied === "url" ? "Copied" : "Copy"}</button>
+      </div>
+      {!!s?.models.length && <dl className="api-models" id="api-models">{s.models.map((m, i) => (
+        <div key={m.id} data-model={m.id}><dt>{m.id}</dt><dd>{i ? m.about : `${m.about}: ${asSet(items, steer, erased)}`}</dd></div>
+      ))}</dl>}
+      <details className="api-ex">
+        <summary>Python example</summary>
+        <pre><code>{example}</code></pre>
+        <button className="btn ghost sm" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copied" : "Copy"}</button>
+      </details>
+      {!!s?.log.length && <div className="api-log" id="api-log">{s.log.map((r) => (
+        <div key={r.at}><span>{clock(r.at)}</span><b>{r.model}</b><span>{r.prompt} → {r.tokens} tokens</span><span>{r.seconds} s</span></div>
+      ))}</div>}
     </section>
   );
 }
