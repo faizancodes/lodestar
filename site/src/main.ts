@@ -1,4 +1,4 @@
-import { startSideArt, startSpinner } from "../../web/src/art/glyphs";
+import { startSideArt } from "../../web/src/art/glyphs";
 import { createDecoder } from "../../web/src/art/decode";
 import { markSVG } from "../../web/src/art/mark";
 import { startLodestar } from "./lodestar";
@@ -16,7 +16,6 @@ for (const el of document.querySelectorAll<HTMLElement>("[data-mark]")) {
 // ---------------------------------------------------------------- hero: the lodestar, and the sky turning about it
 function hero() {
   const readout = $("#hero-depth"), act = $("#hero-act"), wide = matchMedia("(min-width: 901px)");
-  startSpinner($<HTMLCanvasElement>("#hero-spin"), () => true);
 
   // scrolling winds the sky faster, easing back when the page stops
   let boost = 0, lastY = scrollY;
