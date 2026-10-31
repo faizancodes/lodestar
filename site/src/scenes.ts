@@ -8,7 +8,8 @@ import { compassStar } from "../../web/src/art/mark";
 //   layers  the layer stack unfolds from a block into sheets, and a token climbs it, lighting neurons and wiring
 //           its path sheet to sheet, the logit lens growing surer toward the top
 //   steer   the residual stream; a push slides in and parts it, and everything downstream stays bent
-//   chat    one question, two replies writing side by side, a gauge reading each as it goes
+//   chat    one prompt forks; the original and yours write token by token, each weighing its candidates and
+//           reading back along attention arcs, the two fanning apart with every token they disagree on
 //   api     the lodestar; the orbit draws round, clients arrive on it, requests curve in and tokens stream back
 
 export type Frame = { put: Put; cols: number; rows: number; t: number; u: number; pointer: { x: number; y: number } | null };
@@ -193,58 +194,87 @@ export function steer({ put, cols, rows, t, u, pointer }: Frame) {
 }
 
 // ---------------------------------------------------------------- chat: two replies, side by side
+const AGREE = 4, TOKENS = 40; // the two replies open alike, then part
 export function chat({ put, cols, rows, t, u }: Frame) {
-  const W = Math.min(cols - 8, Math.round(cols * 0.74), 180), x0 = Math.round((cols - W) / 2), y0 = Math.round(rows / 2 - 34);
-  const box = (bx0: number, by0: number, bx1: number, by1: number, b: number) => { // a rounded outline in dots
-    for (let x = bx0 + 2; x <= bx1 - 2; x += 2) (put(x, by0, b), put(x, by1, b));
-    for (let y = by0 + 2; y <= by1 - 2; y += 2) (put(bx0, y, b), put(bx1, y, b));
-    put(bx0 + 1, by0 + 1, b); put(bx1 - 1, by0 + 1, b); put(bx0 + 1, by1 - 1, b); put(bx1 - 1, by1 - 1, b);
-  };
-  const words = (wx0: number, y: number, wx1: number, b: number, seed: number, upto = Infinity) => { // text as runs of marks
-    let x = wx0, n = 0;
-    while (x < wx1 && n < upto) {
-      const w = 2 + Math.floor(hash(seed, x) * 5);
-      for (let k = 0; k < w && x + k < wx1 && n < upto; k++, n++) put(x + k, y, b);
-      x += w + 1;
+  const W = Math.min(cols - 26, Math.round(cols * 0.8), 220), x0 = Math.max(4, Math.round(cols * 0.9 - W)), x1 = x0 + W, cy = Math.round(rows / 2); // clear of the words on its left
+  const xb = x0 + Math.round(W * 0.18), xs = xb + 8; // where the prompt forks, and where the replies begin
+  const bez = (ax: number, ay: number, bx: number, by: number, mx: number, my: number, b: (q: number) => number, every = 1) => {
+    const n = Math.ceil(Math.hypot(bx - ax, by - ay) * 1.3);
+    for (let j = 0; j <= n; j += every) {
+      const q = j / n, p = 1 - q;
+      put(p * p * ax + 2 * p * q * mx + q * q * bx, p * p * ay + 2 * p * q * my + q * q * by, b(q));
     }
-    return { x, n };
   };
 
-  // the question, top right
-  const ask = ease(u / 0.15), qx0 = x0 + Math.round(W * 0.45), qy = y0;
-  if (ask > 0) {
-    box(qx0, qy, x0 + W, qy + 8, 0.4 * ask);
-    words(qx0 + 3, qy + 4, qx0 + 3 + Math.round((x0 + W - qx0 - 6) * ask), 0.55 * ask, 3);
+  // the tokens of both replies, left to right; they open alike, and from there each one they disagree on
+  // carries them further apart, so the two lines fan out as the replies diverge
+  const diff = (k: number) => (k < AGREE ? 0 : 0.25 + 0.75 * hash(k, 77) ** 1.5);
+  const toks: { x: number; w: number; off: number; d: number }[] = [];
+  let x = xs, cum = 0;
+  for (let k = 0; k < TOKENS; k++) {
+    const w = 2 + Math.floor(hash(k, 4) * 4);
+    if (x + w > x1) break;
+    cum += diff(k);
+    toks.push({ x, w, off: cum, d: diff(k) });
+    x += w + 2;
+  }
+  const spread = (rows * 0.3) / Math.max(1, cum);
+  const yOf = (k: number, s: number) => cy + (s ? 1 : -1) * (3 + toks[k].off * spread);
+  const wOf = (k: number, s: number) => (k < AGREE ? toks[k].w : Math.max(1, toks[k].w + Math.round((hash(s, k, 5) - 0.5) * 3)));
+
+  // the prompt along the trunk, typing in
+  const ask = ease(u / 0.14);
+  let px = x0;
+  for (let k = 0; px < xb - 2 && px < x0 + (xb - x0) * ask; k++) {
+    const w = 2 + Math.floor(hash(k, 9) * 4);
+    for (let j = 0; j < w && px + j < xb - 2; j++) put(px + j, cy, 0.7);
+    px += w + 1;
+  }
+  if (ask < 1) return;
+  put(xb - 1, cy, 1);
+
+  const typed = clamp((u - 0.16) / 0.68) * toks.length, n = Math.floor(typed);
+
+  // between them, a thread from each token to its counterpart, brighter where they disagree
+  for (let k = 0; k < Math.min(n, toks.length); k++) {
+    const xm = toks[k].x + 1, a = yOf(k, 0) + 2, b = yOf(k, 1) - 2, sh = 0.7 + 0.3 * Math.sin(t * 1.6 - k * 0.5);
+    for (let y = a; y <= b; y += toks[k].d > 0.6 ? 2 : 4) put(xm, y, (0.05 + toks[k].d * 0.2) * sh);
   }
 
-  // the two replies, writing as the reader scrolls, each with its gauge beneath
-  const colW = Math.floor((W - 4) / 2), typed = ease((u - 0.15) / 0.65);
-  [0, 1].forEach((c) => {
-    const bx0 = x0 + c * (colW + 4), bx1 = bx0 + colW, by0 = qy + 14, by1 = by0 + 46, bright = c ? 0.82 : 0.42;
-    if (ask < 1) return;
-    box(bx0, by0, bx1, by1, c ? 0.5 : 0.28);
-    for (let k = 0; k < 6; k++) put(bx0 + 4 + k, by0 + 4, c ? 0.55 : 0.3); // its header
-
-    let left = typed * 380 * (c ? 1 : 0.9), caret: [number, number] | null = null;
-    for (let l = 0; l < 7 && left > 0; l++) {
-      const y = by0 + 9 + l * 4, end = bx1 - 4 - (l === 6 ? Math.round(colW * 0.4) : 0);
-      const r = words(bx0 + 4, y, end, bright, c * 31 + l, left);
-      left -= r.n;
-      caret = [Math.min(r.x, end), y];
+  [0, 1].forEach((s) => {
+    const dir = s ? 1 : -1, base = s ? 0.8 : 0.42;
+    // the fork, from the end of the prompt to the first token
+    bez(xb - 1, cy, xs, yOf(0, s), xs - 3, cy, () => base * 0.6);
+    for (let k = 0; k < Math.min(n, toks.length); k++) {
+      const y = yOf(k, s), w = wOf(k, s), fresh = clamp(1 - (typed - k - 1) * 0.7);
+      for (let j = 0; j < w; j++) put(toks[k].x + j, y, base * (0.85 + 0.15 * hash(s, k, j)) + fresh * 0.4);
+      if (k > 0) line(put, toks[k - 1].x + wOf(k - 1, s), yOf(k - 1, s), toks[k].x - 1, y, base * 0.25, 2);
     }
-    if (caret && typed < 1 && Math.floor(t * 2.5) % 2 === 0) put(caret[0] + 1, caret[1], 1);
+    if (n >= toks.length) return;
 
-    // the gauge: a strip of cells, one per word so far, brighter the further toward the pole
-    const gy = by1 + 5, cells = Math.floor((colW - 8) / 2), shown = Math.round(cells * typed);
-    for (let k = 0; k < cells; k++) {
-      const v = c ? 0.45 + 0.4 * hash(k, 5) * (k / cells) + 0.15 : 0.12 + 0.18 * hash(k, 6);
-      put(bx0 + 4 + k * 2, gy, k < shown ? v : 0.08);
-      put(bx0 + 4 + k * 2, gy + 1, k < shown ? v * 0.8 : 0.06);
+    // at the head: the cursor, and the candidates it weighs for the next token, the one it takes lit
+    const hx = toks[n].x, hy = yOf(n, s), pick = Math.floor(hash(s, n, 8) * 2);
+    if (Math.floor(t * 3) % 2 === 0) put(hx, hy, 1);
+    for (let i = 0; i < 5; i++) {
+      const len = Math.round((i ? 13 * Math.exp(-i * 0.65) * (0.6 + 0.4 * hash(s, n, i)) : 15) * (0.88 + 0.12 * Math.sin(t * 4 + i * 1.3)));
+      const ry = hy + dir * (4 + i * 2);
+      put(hx - 2, ry, i === pick ? 0.9 : 0.2);
+      for (let j = 0; j < len; j++) put(hx + j, ry, i === pick ? (s ? 1 : 0.65) : (s ? 0.32 : 0.2));
+    }
+
+    // attention: arcs from the head back over what it has read, the prompt among it, a pulse running each
+    for (let a = 0; a < 4; a++) {
+      const back = a === 3 || n === 0;
+      const tx = back ? x0 + hash(s, n, 11) * (xb - x0 - 4) : toks[Math.floor(hash(s, n, a, 12) * n)].x + 1;
+      const ty = back ? cy : yOf(Math.floor(hash(s, n, a, 12) * n), s);
+      const lift = (s ? Math.max(hy, ty) : Math.min(hy, ty)) + dir * (6 + a * 3 + Math.abs(hx - tx) * 0.05);
+      const ph = (t * 0.7 + a / 4) % 1;
+      bez(hx, hy - dir, tx, ty + (back ? -dir : -dir), (hx + tx) / 2, lift, (q) => (0.1 + 0.75 * Math.exp(-((q - ph) ** 2) / 0.003)) * (s ? 1 : 0.6), 2);
     }
   });
 }
 
-// ---------------------------------------------------------------- api: requests in, tokens out
+// ---------------------------------------------------------------- api: the lodestar takes requests
 const CLIENTS = 7, TRIP = 2.6;
 
 export function api({ put, cols, rows, t, u }: Frame) {
