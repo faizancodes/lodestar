@@ -71,6 +71,7 @@ class Engine:
         # how far along it is and how much of each layer's weights has arrived, for the loading scene
         self.load_state = None
         self.trace = None
+        self.jlens = None  # [L, H, H] on the device once computed or loaded (interp/jlens.py)
 
         self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None), "dir": {layer: [B, H]}, "erase": [...]}
         self.dirs = {}  # direction id -> {"unit": [L, H] float32 on device, "mag": [L] list, "band": [layers],
@@ -250,6 +251,7 @@ class Engine:
         self.model = self.tok = None
         self.model_id = None
         self.trace = None
+        self.jlens = None
         self.dirs = {}
         self.abl_vec = self._abl_mask = None
         self._abl_any = False
@@ -679,6 +681,7 @@ class Engine:
                         del lg, p
 
                 acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
+                resid = torch.stack([self._cap_resid[l] for l in range(L)]).half().cpu()  # [L, T, H], for the J-lens
             finally:
                 self._cap_acts = self._cap_resid = None
                 self._push_state = None
@@ -688,10 +691,19 @@ class Engine:
             impact_scale = (self.dnorm / self.resid_p50[:, None]).cpu().numpy().astype(np.float32)  # [L, N]
             self.trace = {
                 "ids": ids, "n_prompt": len(prompt_ids), "tokens": self.token_strs(ids), "acts": acts,
-                "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
+                "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p), "resid": resid,
             }
 
             return self.trace
+
+    def trace_jlens(self, t, k=5):
+        """The J-lens at token t of the trace, every layer: (ids [L, k], p [L, k]), or None without a lens."""
+        if self.jlens is None or self.trace is None:
+            return None
+        from . import jlens
+        with self.lock:
+            ids, p = jlens.read(self, self.jlens, self.trace["resid"][:, t : t + 1].to(self.dev), k)
+        return ids[:, 0], p[:, 0]
 
     def trace_top_neurons(self, t=None, k=40, response_only=True):
         """Neurons with the largest impact (|activation| x down-column norm / layer residual median) at token t, or

@@ -145,14 +145,76 @@ function InspectBody({ tr, first }: { tr: Trace; first: JSX.Element }) {
 async function wordDetail(t: number) {
   const d = await api<TokenDetail>(`/api/trace/token?t=${t}`);
   const rows = d.neurons.slice(0, 12).map((x) => ({ ...x, dose: ((x.act as number) >= 0 ? 1 : -1) * 0.8 }));
-  const every = d.lens.length > 24 ? 2 : 1; // keep the layer table short on deep models
 
   return (
     <div className="in-cols">
       <div><h4>Neurons most active here</h4><div className="found">{rows.map((x, i) => <FoundRow key={i} x={x} scope="in" />)}</div></div>
-      <div><h4>What each layer expects next</h4><table className="guess"><tbody>{d.lens.map((row, l) => l % every && l !== d.lens.length - 1 ? null : (
-        <tr key={l}><td className="l">{l}</td><td className="t">{showTok(row[0].tok)}</td><td><div className="bar"><i data-w={`${Math.round(row[0].p * 100)}%`} /></div></td></tr>
-      ))}</tbody></table></div>
+      <LayerLens t={t} lens={d.lens} jlens={d.jlens} />
+    </div>
+  );
+}
+
+type JobState = { ready: boolean; status: string; done: number; total: number; elapsed: number };
+let lensMode: "logit" | "j" | null = null; // the reader's last pick, kept from word to word
+
+/** Each layer read through the logit lens (what it expects next) or the J-lens (what it holds ready to say). */
+function LayerLens({ t, lens, jlens: j0 }: { t: number; lens: TokenDetail["lens"]; jlens: TokenDetail["jlens"] }) {
+  const [jlens, setJ] = useState(j0);
+  const [mode, setMode] = useState<"logit" | "j">(lensMode ?? (j0 ? "j" : "logit"));
+  const [moved, setMoved] = useState(false); // after a switch, bars take their width at once
+  const pick = (m: "logit" | "j") => { lensMode = m; setMode(m); setMoved(true); };
+  const rows = mode === "j" ? jlens : lens;
+  const every = lens.length > 24 ? 2 : 1; // keep the layer table short on deep models
+
+  return (
+    <div>
+      <div className="lens-h">
+        <h4>{mode === "j" ? "What each layer holds" : "What each layer expects next"}</h4>
+        <div className="seg"><button className={mode === "logit" ? "on" : ""} onClick={() => pick("logit")}>Logit lens</button>
+          <button className={mode === "j" ? "on" : ""} onClick={() => pick("j")}>J-lens</button></div>
+      </div>
+      {rows ? <table className="guess"><tbody>{rows.map((row, l) => l % every && l !== rows.length - 1 ? null : (
+        <tr key={l}><td className="l">{l}</td><td className="t">{showTok(row[0].tok)}</td>
+          {mode === "j" && <td className="more">{row.slice(1, 3).map((x) => showTok(x.tok)).join("  ")}</td>}
+          <td><div className="bar"><i data-w={`${Math.round(row[0].p * 100)}%`} style={moved ? { width: `${Math.round(row[0].p * 100)}%` } : undefined} /></div></td></tr>
+      ))}</tbody></table> : <JLensSetup onReady={async () => setJ((await api<TokenDetail>(`/api/trace/token?t=${t}`)).jlens)} />}
+    </div>
+  );
+}
+
+function JLensSetup({ onReady }: { onReady: () => void }) {
+  const [job, setJob] = useState<JobState | null>(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let live = true, timer = 0;
+    const poll = async () => {
+      const s = await api<JobState>("/api/jlens").catch(() => null);
+      if (!live || !s) return;
+      setJob(s);
+      if (s.ready) return onReady();
+      if (s.status.startsWith("error")) setErr(s.status.slice(7));
+      if (s.status === "computing") timer = window.setTimeout(poll, 1000);
+    };
+    poll();
+    return () => { live = false; clearTimeout(timer); };
+  }, [job?.status === "computing"]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const start = () => api<JobState>("/api/jlens/compute", {}).then(setJob).catch((e) => setErr(e.message));
+  const left = job && job.done ? (job.elapsed / job.done) * (job.total - job.done) : 0;
+
+  if (job?.status === "computing") return (
+    <div className="jl-setup">
+      <div className="bar wide"><i style={{ width: `${(100 * job.done) / Math.max(1, job.total)}%` }} /></div>
+      <div className="jl-note">{job.done ? `About ${Math.max(1, Math.round(left / 60))} min left` : "Starting…"}</div>
+      <button className="btn ghost sm" onClick={() => api("/api/jlens/cancel", {})}>Stop</button>
+    </div>
+  );
+  return (
+    <div className="jl-setup">
+      <p className="jl-note">Computed once per model: a few minutes on a small model, longer on a large one.</p>
+      <button className="btn sm" onClick={start}>Compute J-lens</button>
+      {err && <div className="jl-note bad">{err}</div>}
     </div>
   );
 }

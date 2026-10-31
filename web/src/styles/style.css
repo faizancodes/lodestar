@@ -856,6 +856,14 @@ body.busy .tl-comp .send.stop { display: grid; }
 .guess td.t { font-size: 12.5px; color: var(--text); }
 .guess .bar { width: 72px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); }
 .guess .bar i { background: var(--ascii); }
+.guess td.more { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: pre; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.lens-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.lens-h h4 { margin: 0; }
+.jl-setup { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 0; border-top: 1px solid var(--rule); }
+.jl-note { font-size: 12.5px; line-height: 1.5; color: var(--muted); max-width: 340px; }
+.jl-note.bad { color: var(--bad); }
+.jl-setup .bar.wide { width: 100%; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.jl-setup .bar.wide i { display: block; height: 100%; background: var(--ascii); transition: width 0.4s; }
 
 /* ------------------------------------------------------------ chat */
 main.is-chat { padding: 0; overflow: hidden; }

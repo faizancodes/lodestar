@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from . import abl as abl_mod
 from . import directions as dir_mod
 from . import discover
+from . import jlens as jlens_mod
 from . import memory
 from .engine import Cancelled, Engine, Push
 
@@ -35,6 +36,7 @@ ABL_FILE = DATA / "abl.json"  # saved refusal directions + state, keyed by model
 LAST_MODEL = DATA / "last_model.txt"  # the model to open again at the next launch
 PROBES_FILE = DATA / "abl-probes.json"  # customised probe lists
 CHATS = DATA / "chats"  # one file per saved conversation
+JLENS = DATA / "jlens"  # each model's J-lens, computed once (interp/jlens.py)
 HF_CACHE = Path(os.environ.get("HF_HUB_CACHE", Path.home() / ".cache" / "huggingface" / "hub"))
 
 PRESETS = [
@@ -302,6 +304,7 @@ async def load(req: Request):
             eng.load(mid)
             restore_for(mid)
             dirs.load()
+            eng.jlens = jlens_mod.load(jlens_mod.path_for(JLENS, mid), eng)
             LAST_MODEL.write_text(mid)
         except Exception as e:
             traceback.print_exc()
@@ -382,13 +385,63 @@ def trace_token(t: int, k: int = 24):
         raise HTTPException(404, "no trace")
 
     top = eng.trace_top_neurons(t=t, k=k)
-    ids, ps = tr["lens_ids"][:, t, :], tr["lens_p"][:, t, :]
+    rows = lambda ids, ps: [[{"tok": eng.tok.decode([int(i)]), "p": round(float(p), 4)} for i, p in zip(ids[l], ps[l])]
+                            for l in range(ids.shape[0])]
+    j = eng.trace_jlens(t)
 
     return {
-        "lens": [[{"tok": eng.tok.decode([int(i)]), "p": round(float(p), 4)} for i, p in zip(ids[l], ps[l])]
-                 for l in range(ids.shape[0])],
+        "lens": rows(tr["lens_ids"][:, t, :], tr["lens_p"][:, t, :]),
+        "jlens": rows(*j) if j else None,
         "neurons": [_neuron_row(*x) for x in top],
     }
+
+
+# ------------------------------------------------------------------ J-lens
+jlens_job = {"model": None, "status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
+jlens_cancel = threading.Event()
+
+
+@app.get("/api/jlens")
+def jlens_status():
+    job = jlens_job if jlens_job["model"] == eng.model_id else {"status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
+    return {"ready": eng.jlens is not None, **{k: v for k, v in job.items() if k != "model"}}
+
+
+@app.post("/api/jlens/compute")
+def jlens_compute():
+    """Computes the loaded model's J-lens in the background (minutes; see interp/jlens.py) and saves it."""
+    need_model()
+    if jlens_job["status"] == "computing":
+        raise HTTPException(409, "Already computing a J-lens.")
+
+    mid = eng.model_id
+    jlens_cancel.clear()
+    jlens_job.update(model=mid, status="computing", done=0, total=int(eng.layers[0].mlp.down_proj.out_features), elapsed=0.0)
+
+    def prog(done, total, elapsed):
+        jlens_job.update(done=done, total=total, elapsed=round(elapsed, 1))
+
+    def work():
+        try:
+            J = jlens_mod.compute(eng, jlens_cancel, prog)
+            jlens_mod.save(J, jlens_mod.path_for(JLENS, mid))
+            if eng.model_id == mid:
+                eng.jlens = J.to(eng.dev, eng.model.dtype)
+            jlens_job["status"] = "done"
+        except Cancelled:
+            jlens_job["status"] = "idle"
+        except Exception as e:
+            traceback.print_exc()
+            jlens_job["status"] = f"error: {e}"
+
+    threading.Thread(target=work, daemon=True).start()
+    return jlens_status()
+
+
+@app.post("/api/jlens/cancel")
+def jlens_stop():
+    jlens_cancel.set()
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------ neurons
