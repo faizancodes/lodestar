@@ -138,7 +138,9 @@ p { margin: 0; }
 /* get it: framed like the hero, the commands in a terminal panel */
 .get { position: relative; padding: clamp(110px, 18vh, 180px) var(--gut); }
 .get .hud { inset: clamp(16px, 3vw, 32px) clamp(16px, 3vw, 32px); }
-.get-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: center; gap: clamp(40px, 6vw, 88px); max-width: var(--w); margin: 0 auto; }
+.get-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: clamp(32px, 5vw, 72px); max-width: var(--w); margin: 0 auto; }
+#get-art { width: 100%; height: clamp(460px, 64vh, 620px); }
+.get-side { display: flex; flex-direction: column; gap: 40px; }
 .get h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; }
 .get p { margin-top: 18px; max-width: 380px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
 .get .cta { margin-top: 30px; }
@@ -162,7 +164,8 @@ p { margin: 0; }
 
 /* ------------------------------------------------------------ narrow */
 @media (max-width: 900px) {
-  .get-in { grid-template-columns: minmax(0, 1fr); }
+  .get-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  #get-art { height: min(100vw, 480px); }
   .hero { height: auto; min-height: 0; padding-top: min(84vw, 560px); }
   .hero #hero-art { bottom: auto; height: min(96vw, 640px); }
   .hero-copy { position: relative; left: auto; top: auto; transform: none; padding: 40px var(--gut) 56px; }

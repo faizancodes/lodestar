@@ -1,3 +1,4 @@
+import { startAssembly } from "./assemble";
 import { createDecoder } from "../../web/src/art/decode";
 import { markSVG } from "../../web/src/art/mark";
 import { startLodestar } from "./lodestar";
@@ -62,8 +63,16 @@ function reveal() {
   document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
 }
 
+function get() {
+  const model = $("#get-model"), layers = $("#get-layers");
+  startAssembly($<HTMLCanvasElement>("#get-art"), {
+    status: (m, n) => { model.textContent = m.name; layers.textContent = `${n} / ${m.layers} layers`; },
+  });
+}
+
 reveal();
 hero();
 startSequence($("#features"), [erase, layers, steer, chat, api]);
+get();
 copyInstall();
 

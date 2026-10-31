@@ -62,8 +62,10 @@ on your Mac</h1>
 
     <!-- get it -->
     <section class="get" id="get">
-      <div class="hud" aria-hidden="true"></div>
-      <div class="get-in reveal">
+      <div class="hud" aria-hidden="true"><span class="hud-c tr" id="get-model"></span><span class="hud-c br" id="get-layers"></span></div>
+      <div class="get-in">
+        <canvas id="get-art" class="art" aria-hidden="true"></canvas>
+        <div class="get-side reveal">
         <div class="get-copy">
           <span class="kicker">Get Lodestar</span>
           <h2>Bring your own model.</h2>
@@ -77,13 +79,13 @@ on your Mac</h1>
 <i>$</i> ./scripts/build_app.sh
 <i>$</i> open dist/Lodestar.app</code></pre>
         </figure>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="foot">
     <a class="brand" href="#top"><span class="brand-mark" data-mark="18"></span><b>Lodestar</b></a>
-    <span>Mechanistic interpretability for local models, on your Mac.</span>
   </footer>
 
   <script type="module" src="./src/main.ts"></script>
