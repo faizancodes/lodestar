@@ -145,14 +145,14 @@ p { margin: 0; }
 .get p { margin-top: 18px; max-width: 380px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
 .get .cta { margin-top: 30px; }
 .term { margin: 0; border: 1px solid var(--rule-2); border-radius: 10px; background: var(--panel); box-shadow: 0 30px 80px -30px rgba(195, 207, 245, 0.12); overflow: hidden; }
-.term-h { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--rule); font-size: 12px; font-weight: 500; color: var(--muted); }
+.term-h { display: flex; align-items: center; justify-content: flex-end; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--rule); font-size: 12px; font-weight: 500; color: var(--muted); }
 .term-copy { padding: 4px 10px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--panel-2); color: var(--text-2); font: 500 12px/1.2 var(--sans); cursor: pointer; transition: color 0.15s, border-color 0.15s; }
 .term-copy:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.22); }
 .term pre { margin: 0; padding: 20px 22px 22px; overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.9; color: var(--text); }
 .term pre i { font-style: normal; color: var(--ascii); user-select: none; }
 
-.foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 26px var(--gut); border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
-.foot .brand b { font-size: 15px; color: var(--text); }
+.foot { position: relative; border-top: 1px solid var(--rule); }
+#foot-art { width: 100%; height: clamp(240px, 34vw, 420px); }
 
 /* things arrive as they come into view */
 .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
