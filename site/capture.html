@@ -1,0 +1,29 @@
+<!doctype html>
+<!-- One of the site's animations alone on a page, on a clock that only moves when told to, so scripts/readme-gifs.mjs
+     can take it frame by frame for the README. Not part of the site. ?scene= hero | get | foot | erase | layers |
+     steer | chat | api; ?w=&h= its size. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Lodestar capture</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@600&display=block" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/style.css" />
+  <style>
+    html, body { margin: 0; overflow: hidden; background: var(--bg); }
+    #art { display: block; }
+  </style>
+  <script>
+    // the clock: performance.now and animation frames advance only on __step(ms)
+    let T = 0;
+    const queue = [];
+    performance.now = () => T;
+    window.requestAnimationFrame = (cb) => (queue.push(cb), queue.length);
+    window.cancelAnimationFrame = () => {};
+    window.__step = (ms) => { T += ms; queue.splice(0).forEach((cb) => cb(T)); };
+  </script>
+</head>
+<body>
+  <canvas id="art" class="art"></canvas>
+  <script type="module" src="./src/capture.ts"></script>
+</body>
+</html>
