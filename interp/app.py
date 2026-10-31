@@ -1,4 +1,5 @@
-"""Lodestar as a Mac app: the API server on a background thread, the UI in a native WebKit window."""
+"""Lodestar as a desktop app: the API server on a background thread, the UI in a native window (WebKit on a Mac, Edge
+WebView2 on Windows)."""
 import os
 import socket
 import sys
@@ -25,6 +26,10 @@ def serve(port):
 
 
 def main():
+    if sys.stdout is None:  # started without a console (pythonw, from the Windows shortcut): keep a log instead
+        from .places import log_file
+        sys.stdout = sys.stderr = open(log_file(), "a", buffering=1, encoding="utf-8")
+
     preferred = int(os.environ.get("AUTO_INTERP_PORT", 8792))
 
     # the window can live on any port; headless mode keeps the one asked for so bookmarks and tools find it

@@ -11,6 +11,7 @@ import { useSteer } from "../store/steer";
 import { cancelExport } from "../steer/exporting";
 import { Ans, LiveLine, SEND } from "../steer/Live";
 import { setCompare } from "../steer/refine";
+import { HERE } from "../lib/platform";
 
 const cancel = () => api("/api/cancel", {});
 const xs = (c: number | null) => (c == null ? "" : `${(+c).toFixed(2)}×`);
@@ -208,7 +209,7 @@ function Step3() {
           <div className="export-line status-line">{exp.line}</div>
         </div>
         <div id="abl-saved" className="saved-model" hidden={!saved}>
-          <div><b>{saved?.name}</b><span>On this Mac</span></div>
+          <div><b>{saved?.name}</b><span>On {HERE}</span></div>
           <button className="btn" id="abl-load" onClick={() => saved && loadModel(saved.dst)}>Load it</button>
         </div>
       </div>
