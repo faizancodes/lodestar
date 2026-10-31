@@ -1,4 +1,3 @@
-import { startAppDemo } from "./appdemo";
 import { startAssembly } from "./assemble";
 import { createDecoder } from "../../web/src/art/decode";
 import { markSVG } from "../../web/src/art/mark";
@@ -80,6 +79,5 @@ hero();
 startSequence($("#features"), [erase, layers, steer, chat, api]);
 get();
 copyInstall();
-startAppDemo($("#app-demo"), { state: (t) => ($("#app-state").textContent = t), read: (t) => ($("#app-read").textContent = t) });
 startFooter($<HTMLCanvasElement>("#foot-art"));
 
