@@ -22,6 +22,9 @@ or without the bundle:
 
 The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`; `build_app.sh` does this).
 
+The landing page is in `site/` (`pnpm install && pnpm dev` there; `pnpm build` writes a static site to `site/dist`).
+Its ASCII scenes are imported from `web/src/art`, so they stay the app's own.
+
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
 The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise
 gradients; bigger ones in bfloat16. Logs go to `~/Library/Logs/Lodestar.log`, recipes to
