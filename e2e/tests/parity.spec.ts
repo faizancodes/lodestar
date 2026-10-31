@@ -53,6 +53,11 @@ test("start: pick a model, load it, land on Home", async ({ page }) => {
   await expect(page.locator("#model-status .txt")).toHaveText("Ready");
   await expect(page.locator("#start")).toBeHidden();
   await snap(page, "home");
+
+  // other apps reach the model at /v1, under the names it lists
+  await expect(page.locator("#api-url")).toHaveText(/\/v1$/);
+  await expect(page.locator("#api-models dt")).toHaveText(["Qwen3-0.6B", "Qwen3-0.6B-plain"]);
+  await expect(page.locator('#api-models [data-model="Qwen3-0.6B"] dd')).toHaveText("As set in Lodestar: Plain right now");
 });
 
 test("shell: tabs, shortcuts, brand, model menu", async ({ page }) => {
