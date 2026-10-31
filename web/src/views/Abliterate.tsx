@@ -152,8 +152,9 @@ function Answer({ e, i, last, cmp, cur, busy }: { e: Entry; i: number; last: boo
       {e.change ? <div className="tl-note">{e.change.to > e.change.from ? "Stronger" : "Weaker"} · {xs(e.change.from)} → {xs(e.change.to)}</div>
         : <div className="tl-you">{e.prompt}</div>}
       <div className={"tl-a" + (last ? " cur" : " old") + (e.open ? " open" : "")} data-i={i} onClick={last ? undefined : fold}>
-        <div className="tl-a-h"><span className="tl-tag">{xs(e.coef) || "Erased"}</span>{verdict(e.refused, e.worse)}<span className="grow" />{!e.typing && acts}</div>
+        <div className="tl-a-h"><span className="tl-tag">{xs(e.coef) || "Erased"}</span>{verdict(e.refused, e.worse)}</div>
         <Ans s={e.text} typing={e.typing} />
+        {!e.typing && acts && <div className="tl-a-f">{acts}</div>}
         {last && (cmp || (e.typing && e.coef == null)) && <div className="tl-normal">
           <div className="tl-a-h"><span className="tl-tag">Normal</span>{verdict(e.refusedNormal)}</div>
           <Ans s={e.normal} typing={e.typing} />
