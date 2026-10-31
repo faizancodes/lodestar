@@ -3,12 +3,12 @@ import { load } from "../lib/storage";
 import type { ChatMessage, ChatSummary, WordSearch } from "../lib/types";
 
 // The conversation. As on Steer, the reply being streamed is a mutable message, redrawn when `v` changes.
-export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number };
+export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number; cut?: boolean }; // cut: wrote to the length limit
 
 // Compare's side-by-side replies: the plain model, and each switch that was on, alone. Each column carries on its
 // own thread, so a later turn's history takes that column's earlier replies.
 export type ColKey = "plain" | "steer" | "abl";
-export type Col = { key: ColKey; label: string; content: string; wps?: number }; // wps: words a second, once done
+export type Col = { key: ColKey; label: string; content: string; wps?: number; cut?: boolean }; // wps: words a second, once done
 
 type Chat = {
   v: number;
