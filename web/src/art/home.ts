@@ -101,7 +101,7 @@ const ART: Record<HomeArt, (put: Put, cols: number, rows: number, t: number) => 
   },
 };
 
-export function render(canvas: HTMLCanvasElement, kind: HomeArt, t: number) {
+function render(canvas: HTMLCanvasElement, kind: HomeArt, t: number) {
   const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
   if (!w || !h || !ART[kind]) return;
 
