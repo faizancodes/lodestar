@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { setAblActive } from "../abl/engine";
 import {
-  addNeurons, copyReply, findNeurons, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat,
+  addNeurons, continueReply, copyReply, findNeurons, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat,
   setPickBy, STARTERS, toggleCompare, toggleFound, toggleNeurons, toggleSteer,
 } from "../chat/engine";
 import { api } from "../lib/api";
@@ -95,6 +95,7 @@ function Log() {
               </div>
             ))}</div>
             <div className="msg-acts" hidden={typing || (!last && !m.stopped)}>
+              {last && m.cols.some((c) => c.cut) && <button data-a="continue" className="hint" onClick={continueReply}>Continue</button>}
               {last && <button data-a="retry" onClick={retry}>Retry</button>}
               {m.stopped && <span className="msg-note">Stopped</span>}
             </div>
@@ -106,7 +107,9 @@ function Log() {
         <div key={i} className={typing ? "msg bot typing" : "msg bot"} data-i={i}>
           <Md m={m} done={!typing} />
           <div className="msg-acts">
-            {!typing && <><Copy text={m.content} />{last && <button data-a="retry" onClick={retry}>Retry</button>}</>}
+            {!typing && <>
+              {last && m.cut && <button data-a="continue" className="hint" onClick={continueReply}>Continue</button>}
+              <Copy text={m.content} />{last && <button data-a="retry" onClick={retry}>Retry</button>}</>}
             {m.stopped && <span className="msg-note">Stopped</span>}
             <Rate part={m} />
           </div>

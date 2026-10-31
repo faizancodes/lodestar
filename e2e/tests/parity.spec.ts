@@ -583,3 +583,31 @@ test("chat: neurons pushed by hand", async ({ page }) => {
   await page.locator("#chat-neurons .nr-x").click();
   await expect(page.locator("#chat-neurons")).toHaveCount(0);
 });
+
+// Assembled from chat's haiku, cut off partway and then carried on
+test("chat: continue a reply that ran out of length", async ({ page }) => {
+  test.skip(RECORD);
+
+  await scenario(page, "chat-continue");
+  await page.goto("/");
+  await page.keyboard.press("Meta+3");
+  await page.locator('#chat-mods .mod[data-mod="abl"]').click();
+
+  await page.locator("#chat-opts summary").click();
+  await page.locator("#chat-temp").fill("0");
+  await page.locator("#chat-max").fill("192");
+  await page.locator("#chat-model").click();
+
+  await page.locator("#chat-starters .starter", { hasText: "Write a haiku about Mondays" }).click();
+  await idle(page);
+  const bot = page.locator("#chat-log .msg.bot");
+  await expect(bot.locator(".md")).toHaveText(/The world$/);
+  await snap(page, "chat-cut");
+
+  await bot.locator('[data-a="continue"]').click();
+  await idle(page);
+  await expect(bot).toHaveCount(1);
+  await expect(bot.locator(".md")).toContainText("A quiet day.");
+  await expect(bot.locator('[data-a="continue"]')).toHaveCount(0);
+  await snap(page, "chat-continued");
+});
