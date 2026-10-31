@@ -554,6 +554,8 @@ test("chat: neurons pushed by hand", async ({ page }) => {
   await expect(cols.nth(0).locator(".md")).toContainText("long walk");
   await expect(cols.nth(1).locator(".cmp-h")).toHaveText("Steered");
   await expect(cols.nth(1).locator(".md")).toContainText("plotting");
+  await expect(cols.nth(0).locator(".msg-mod")).toHaveCount(0);
+  await expect(cols.nth(1).locator(".msg-mod")).toHaveText(["L14 N2949 +1", "L13 N1956 −1"]);
   await snap(page, "chat-neurons");
 
   // a dose nudged, a neuron taken out
