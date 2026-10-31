@@ -1,10 +1,12 @@
 import { modelName, ram } from "../lib/format";
 import { loadModel } from "../shell/engine";
 import { useApp } from "../store/app";
+import { MAC } from "../lib/platform";
 
 const close = () => useApp.setState({ fitWarn: null });
 
-/** Asked before loading a model that won't fit beside what's already running: loading it makes macOS swap. */
+/** Asked before loading a model that won't fit beside what's already running: loading it makes the system swap, or
+ * (on an NVIDIA card) runs out of GPU memory. */
 export function FitWarn() {
   const w = useApp((s) => s.fitWarn);
   if (!w) return null;
@@ -14,7 +16,7 @@ export function FitWarn() {
   return (
     <div className="dialog-back" onClick={close}>
       <div className="dialog" id="fit-warn" role="alertdialog" aria-labelledby="fit-h" onClick={(e) => e.stopPropagation()}>
-        <h3 id="fit-h">{modelName(w.id)} won’t fit in memory</h3>
+        <h3 id="fit-h">{modelName(w.id)} won’t fit in {w.fit.gpu ? "GPU memory" : "memory"}</h3>
         <p>It needs about {ram(need)}, and about {ram(free)} is free.</p>
 
         {!!others.length && (
@@ -26,7 +28,9 @@ export function FitWarn() {
           </div>
         )}
 
-        <p className="dialog-note">Loading it anyway makes macOS swap to disk, and replies slow to a crawl.</p>
+        <p className="dialog-note">{w.fit.gpu
+          ? "Loading it anyway will likely fail, or spill into system memory and slow replies to a crawl."
+          : `Loading it anyway makes ${MAC ? "macOS" : "Windows"} swap to disk, and replies slow to a crawl.`}</p>
         <div className="dialog-acts">
           <button className="btn ghost" onClick={close}>Cancel</button>
           <button className="btn" id="fit-go" onClick={() => (close(), loadModel(w.id, true))}>Load anyway</button>

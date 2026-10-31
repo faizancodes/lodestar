@@ -1,7 +1,7 @@
 [project]
 name = "auto-interp"
 version = "0.1.0"
-description = "Local Mac app for mechanistic interpretability on local LLMs: activations, neuron steering, automatic tuning search."
+description = "Local app for mechanistic interpretability on open LLMs (macOS and Windows): activations, neuron steering, abliteration."
 requires-python = ">=3.11"
 dependencies = [
     "torch>=2.5",
@@ -17,3 +17,13 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# On Windows, torch from PyPI is CPU-only: take the CUDA 13 build (RTX 20-series and newer) from PyTorch's index.
+# macOS keeps PyPI's build, which has the Apple GPU (MPS) backend.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

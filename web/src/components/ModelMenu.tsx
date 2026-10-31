@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { loadModel, modelChoices, toggleModelMenu, unloadModel, type Choice } from "../shell/engine";
 import { useApp } from "../store/app";
 import { CopyAction } from "./CopyAction";
+import { HERE } from "../lib/platform";
 
 export function ModelMenu() {
   const menu = useApp((s) => s.menu);
@@ -47,7 +48,7 @@ function MenuBody() {
 
   return (
     <>
-      {group("On this Mac", c.here)}{group("On external drives", c.drives)}{group("Download", c.get)}
+      {group(`On ${HERE}`, c.here)}{group("On external drives", c.drives)}{group("Download", c.get)}
       <div className="mm-custom">
         <input id="mm-custom" placeholder="Any Hugging Face name" spellCheck={false} value={custom}
           onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && go()} />

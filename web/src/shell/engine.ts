@@ -12,6 +12,7 @@ import { resetAbl, syncAbl } from "../abl/engine";
 import { useSteer } from "../store/steer";
 import { pollExport } from "../steer/exporting";
 import { redrawn } from "../steer/recipe";
+import { HERE } from "../lib/platform";
 
 const get = useApp.getState;
 const set = useApp.setState;
@@ -35,13 +36,13 @@ export function modelChoices(m: Models, job: CopyJob | null) {
   const cached = new Set(m.cached), notes = new Map(m.presets.map((p) => [p.id, p.note]));
   return {
     here: [
-      ...(m.copies || []).map((x): Choice => ({ id: x.path, name: x.name, sub: "On this Mac", copy: x })),
+      ...(m.copies || []).map((x): Choice => ({ id: x.path, name: x.name, sub: `On ${HERE}`, copy: x })),
       ...m.cached.map((id): Choice => ({ id, name: modelName(id), sub: notes.get(id) || id })),
     ],
     // a drive model that has a copy on this Mac is listed once, as the copy
     drives: (m.local || []).filter((x) => !x.copied).map((x): Choice => ({
       id: x.path, name: x.name, drive: x,
-      sub: copying(x) ? `Copying to this Mac… ${Math.floor((100 * job!.done) / job!.total)}%` : `On ${x.drive}`,
+      sub: copying(x) ? `Copying to ${HERE}… ${Math.floor((100 * job!.done) / job!.total)}%` : `On ${x.drive}`,
     })),
     get: m.presets.filter((p) => !cached.has(p.id)).map((p): Choice => ({ id: p.id, name: modelName(p.id), sub: p.note, tag: p.size })),
   };
@@ -64,7 +65,7 @@ async function pollCopy() {
       set({ copy });
 
       if (copy.status !== "copying") {
-        if (copy.status === "done") toast(`Copied ${copy.name}. It loads from this Mac now.`);
+        if (copy.status === "done") toast(`Copied ${copy.name}. It loads from ${HERE} now.`);
         else if (copy.status.startsWith("error")) toast(copy.status.replace(/^error: /, "Couldn’t copy: "), true);
         await refreshModels();
         break;

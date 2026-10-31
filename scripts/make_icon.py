@@ -5,6 +5,7 @@ compassStar, on the same 15-cell grid the sidebar draws it on, so it reads as on
 menu bar.
 
   uv run --with pillow python scripts/make_icon.py out.icns
+  uv run --with pillow python scripts/make_icon.py out.ico             # for Windows: 16 to 256 px in one file
   uv run --with pillow python scripts/make_icon.py preview.png 512     # one size, as a png
 """
 import math
@@ -154,6 +155,10 @@ def draw(px):
 
 def main(out):
     out = Path(out)
+    if out.suffix == ".ico":
+        draw(256).save(out, sizes=[(px, px) for px in (16, 24, 32, 48, 64, 128, 256)])
+        return
+
     with tempfile.TemporaryDirectory() as tmp:
         iconset = Path(tmp) / "icon.iconset"
         iconset.mkdir()

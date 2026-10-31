@@ -68,6 +68,27 @@ The first load downloads the weights. Models under 2.5B parameters run in float3
 gradients; bigger ones in bfloat16. Logs go to `~/Library/Logs/Lodestar.log`, recipes to
 `~/Library/Application Support/Auto Interp/recipes.json`.
 
+### On Windows
+
+With an NVIDIA card (RTX 20-series or newer, with a driver recent enough for CUDA 13), [uv](https://docs.astral.sh/uv/),
+Node 22 and pnpm:
+
+    git clone https://github.com/faizancodes/auto-interp
+    cd auto-interp
+    powershell -ExecutionPolicy Bypass -File scripts\build_app.ps1
+
+That builds the UI, installs the CUDA build of torch, and adds Lodestar to the Start menu and the desktop. Without the
+shortcuts, `uv run python -m interp.app` opens the window (Edge WebView2, already on Windows 10 and 11) and
+`--server` runs it headless, as on a Mac. With no NVIDIA card it runs on the CPU, which is fine for models under ~1B
+and slow beyond that. The memory check reads the card's free VRAM before a load. Logs go to
+`%LOCALAPPDATA%\Lodestar\Lodestar.log`, recipes and directions to `%APPDATA%\Lodestar`, and models on other
+drives (`D:\models\...`) show up in the model menu the way Mac drives do.
+
+What's tested on Windows: [CI](.github/workflows/windows.yml) installs everything on GitHub's Windows runner, loads
+Qwen3-0.6B on the CPU through the CUDA build of torch, writes a reply and traces it, runs the UI's unit tests, and
+replays the e2e flows in WebKit without comparing screenshots. What isn't: those runners have no GPU, so nothing has run
+on an NVIDIA card yet, and the native window, the shortcuts and the drive scan haven't been tried on a real PC.
+
 ## What a neuron is here
 
 One unit at the input of a layer's MLP `down_proj`, where `silu(gate) * up` lives. Reading, adding and multiplying
@@ -132,7 +153,7 @@ frame by frame in headless Chrome and writes them to `docs/media/`.
     web/                 the interface (React + TypeScript, Vite)
     site/                the landing page (Vite), and the scripts that render the share card and these GIFs
     e2e/                 the parity suite: recorded API sessions, mock replay, golden screenshots
-    scripts/             app bundle and icon builders
+    scripts/             app bundle (Mac), shortcuts (Windows) and icon builders; the CI smoke test
 
 <p align="center">
   <img src="docs/media/footer.gif" width="720" alt="The lodestar on the horizon of a turning astrolabe, above the name Lodestar in ASCII marks." />

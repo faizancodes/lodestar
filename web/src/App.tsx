@@ -12,6 +12,7 @@ import { Home } from "./views/Home";
 import { Start } from "./views/Start";
 import { Steer } from "./views/Steer";
 import { closeLast } from "./steer/panels";
+import { modDown } from "./lib/platform";
 
 // Registered as the app loads, not in an effect: React's first render can land after the page's load event, and a
 // shortcut pressed before then would be lost.
@@ -24,7 +25,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
 
-  if (!e.metaKey || e.shiftKey || e.altKey) return;
+  if (!modDown(e) || e.shiftKey || e.altKey) return;
 
   const i = ["1", "2", "3"].indexOf(e.key);
   if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
