@@ -21,7 +21,7 @@ function hero() {
   let boost = 0, lastY = scrollY;
   addEventListener("scroll", () => { boost = Math.min(8, boost + Math.abs(scrollY - lastY) / 30); lastY = scrollY; }, { passive: true });
   startLodestar($<HTMLCanvasElement>("#hero-art"), {
-    at: () => (wide.matches ? [0.7, 0.5] : [0.5, 0.36]),
+    at: () => (wide.matches ? [0.7, 0.5] : [0.5, 0.5]),
     boost: () => (boost *= 0.9),
   });
   const probe = () => (readout.textContent = `L${1 + Math.floor(Math.random() * 32)} · n${100 + Math.floor(Math.random() * 14000)}`);
@@ -41,6 +41,7 @@ function hero() {
     title.textContent = text.slice(0, ++n);
     dec.update(title);
     if (n < text.length) setTimeout(type, 38);
+    else title.style.minHeight = "";
   };
   title.textContent = "";
   setTimeout(type, 250);
