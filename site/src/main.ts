@@ -1,7 +1,7 @@
 import { startSideArt, startSpinner } from "../../web/src/art/glyphs";
 import { createDecoder } from "../../web/src/art/decode";
 import { markSVG } from "../../web/src/art/mark";
-import { startDive } from "./dive";
+import { startLodestar } from "./lodestar";
 import { api, chat, erase, layers, steer } from "./scenes";
 import { startSequence } from "./sequence";
 
@@ -13,22 +13,21 @@ for (const el of document.querySelectorAll<HTMLElement>("[data-mark]")) {
   el.innerHTML = markSVG(px, px < 30 ? 21 : 31);
 }
 
-// ---------------------------------------------------------------- hero: falling through layer after layer, forever
+// ---------------------------------------------------------------- hero: the lodestar, and the sky turning about it
 function hero() {
   const readout = $("#hero-depth"), act = $("#hero-act"), wide = matchMedia("(min-width: 901px)");
   startSpinner($<HTMLCanvasElement>("#hero-spin"), () => true);
 
-  // scrolling pushes the fall faster, easing back when the page stops
+  // scrolling winds the sky faster, easing back when the page stops
   let boost = 0, lastY = scrollY;
-  addEventListener("scroll", () => { boost = Math.min(6, boost + Math.abs(scrollY - lastY) / 40); lastY = scrollY; }, { passive: true });
-  startDive($<HTMLCanvasElement>("#hero-art"), {
-    at: () => (wide.matches ? 0.64 : 0.5),
+  addEventListener("scroll", () => { boost = Math.min(8, boost + Math.abs(scrollY - lastY) / 30); lastY = scrollY; }, { passive: true });
+  startLodestar($<HTMLCanvasElement>("#hero-art"), {
+    at: () => (wide.matches ? [0.7, 0.5] : [0.5, 0.36]),
     boost: () => (boost *= 0.9),
-    depth: (level) => {
-      const layer = 1 + (((level * 7) % 32) + 32) % 32, neuron = 100 + Math.floor(Math.abs(Math.sin(level * 91.7)) * 14000);
-      readout.textContent = `L${layer} · n${neuron}`;
-    },
   });
+  const probe = () => (readout.textContent = `L${1 + Math.floor(Math.random() * 32)} · n${100 + Math.floor(Math.random() * 14000)}`);
+  probe();
+  setInterval(probe, 1800);
   setInterval(() => {
     const v = Math.sin(performance.now() / 900) * 0.6 + (Math.random() - 0.5) * 0.25;
     act.textContent = (v < 0 ? "−" : "+") + Math.abs(v).toFixed(3);

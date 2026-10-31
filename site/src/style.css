@@ -76,12 +76,16 @@ p { margin: 0; }
 .nav-links a { font-size: 13.5px; font-weight: 500; color: var(--text-2); transition: color 0.15s; }
 .nav-links a:hover { color: var(--text); }
 
-/* ------------------------------------------------------------ hero: the dive fills the screen, framed like a viewfinder */
-.hero { position: relative; height: calc(100svh - 61px); min-height: 560px; overflow: hidden; }
-.hero #hero-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* ------------------------------------------------------------ hero: the lodestar's sky, framed like a viewfinder */
+.hero { position: relative; height: clamp(540px, 74vh, 760px); overflow: hidden; }
+.hero #hero-art {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
 .hero::after { /* shade under the words */
   content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse 70% 80% at 0% 100%, rgba(10, 10, 10, 0.92) 30%, transparent 75%), linear-gradient(to top, var(--bg), transparent 22%);
+  background: radial-gradient(ellipse 62% 90% at 8% 72%, rgba(10, 10, 10, 0.97) 35%, rgba(10, 10, 10, 0.6) 60%, transparent 85%);
 }
 .hud { position: absolute; inset: clamp(16px, 3vw, 32px); z-index: 1; pointer-events: none; }
 .hud::before { /* the frame's corners */
@@ -98,9 +102,9 @@ p { margin: 0; }
 .hud-c.tr { top: 14px; right: 16px; }
 .hud-c.br { bottom: 14px; right: 16px; color: var(--ascii); }
 .hud .spin { width: 16px; height: 16px; }
-.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); bottom: clamp(56px, 11vh, 120px); max-width: 640px; }
-.hero h1 { font-size: clamp(48px, 8.4vw, 112px); line-height: 0.94; letter-spacing: -0.055em; }
-.lede { margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); color: var(--text-2); }
+.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%; transform: translateY(-50%); max-width: 600px; }
+.hero h1 { font-size: clamp(46px, 7.2vw, 96px); line-height: 0.94; letter-spacing: -0.055em; color: #fff; text-shadow: 0 0 32px var(--bg), 0 0 12px var(--bg); }
+.lede { margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); color: rgba(237, 237, 237, 0.8); }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
 
 /* ------------------------------------------------------------ features: one pinned stage, scrolled through */
@@ -167,6 +171,9 @@ p { margin: 0; }
 
 /* ------------------------------------------------------------ narrow */
 @media (max-width: 900px) {
+  .hero { height: auto; min-height: 0; padding-top: min(62vw, 440px); }
+  .hero-copy { position: relative; left: auto; top: auto; transform: none; padding: 40px var(--gut) 56px; }
+  .hero::after { background: linear-gradient(to top, var(--bg) 48%, transparent 70%); }
   .seq-art { right: 0; width: 100%; height: 62%; -webkit-mask-image: radial-gradient(ellipse 62% 56% at 50% 50%, #000 45%, transparent 100%); mask-image: radial-gradient(ellipse 62% 56% at 50% 50%, #000 45%, transparent 100%); }
   .seq-copy { left: var(--gut); right: calc(var(--gut) + 28px); top: auto; bottom: 4vh; width: auto; height: 34vh; transform: none; }
   .step { justify-content: flex-start; }
@@ -180,6 +187,4 @@ p { margin: 0; }
   .nav-links { display: none; }
   .nav .btn { margin-left: auto; }
   .hud-c.br { display: none; }
-  .hero-copy { right: var(--gut); bottom: 48px; }
-  .hero::after { background: linear-gradient(to top, rgba(10, 10, 10, 0.94) 28%, transparent 62%); }
 }
