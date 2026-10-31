@@ -1,5 +1,6 @@
 """Local HTTP API for the Lodestar window. Streams (server-sent events) for anything that generates text or runs a
 search; plain JSON for lookups. Serves the UI built in ../web/dist."""
+import asyncio
 import json
 import math
 import os
@@ -8,12 +9,15 @@ import shutil
 import threading
 import time
 import traceback
+import uuid
+from collections import deque
 from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from . import abl as abl_mod
 from . import directions as dir_mod
@@ -932,6 +936,207 @@ async def chat_save(req: Request):
 def chat_delete(cid: str):
     _chat_file(cid).unlink(missing_ok=True)
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ OpenAI-compatible API
+# The loaded model for other apps (chat front ends, editors, scripts, agents), at /v1 on this same local port. Each
+# model it lists is the loaded one under a different switch: as Lodestar has it set (the recipe Chat steers with, and
+# refusals erased when they are), plain, or with refusals erased and nothing else. The window tells the server what
+# it's steering with (/api/serve); the erasure is already the server's.
+serving = {"pushes": [], "log": deque(maxlen=12), "active": 0}
+
+
+@app.post("/api/serve")
+async def serve_set(req: Request):
+    """What the window steers Chat with now, for "as set in Lodestar"."""
+    body = await req.json()
+    serving["pushes"] = [p for p in body.get("pushes") or [] if isinstance(p, dict)]
+    return {"ok": True}
+
+
+@app.get("/api/serve")
+def serve_get():
+    return {"models": _api_models(), "log": list(serving["log"]), "active": serving["active"]}
+
+
+def _api_models():
+    """The ids /v1 serves, first the one that follows the app: [(id, plain or erased or None for as set, about)]."""
+    if eng.model is None or eng.status != "ready":
+        return []
+
+    name = eng.model_id.rstrip("/").split("/")[-1]
+    out = [{"id": name, "about": "As set in Lodestar"}, {"id": f"{name}-plain", "about": "Plain"}]
+    if abl_now().get("vec") is not None:
+        out.append({"id": f"{name}-abliterated", "about": "Refusals erased"})
+    return out
+
+
+def _oai_error(status, msg, kind="invalid_request_error"):
+    return JSONResponse({"error": {"message": msg, "type": kind, "param": None, "code": None}}, status_code=status)
+
+
+def _text(content):
+    """A message's content as text: a string, or the text parts of a list of parts."""
+    if isinstance(content, list):
+        return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") in ("text", "input_text"))
+    return "" if content is None else str(content)
+
+
+@app.get("/v1/models")
+def api_models():
+    return {"object": "list", "data": [{"id": m["id"], "object": "model", "created": 0, "owned_by": "lodestar"}
+                                       for m in _api_models()]}
+
+
+@app.post("/v1/chat/completions")
+async def api_chat(req: Request):
+    try:
+        body = await req.json()
+    except ValueError:
+        return _oai_error(400, "The body isn't JSON.")
+
+    models = {m["id"]: m for m in _api_models()}
+    if not models:
+        return _oai_error(503, "No model is loaded in Lodestar.", "server_error")
+
+    want = str(body.get("model") or "")
+    first = next(iter(models))
+    if want and want not in models:
+        return _oai_error(404, f"No model called {want!r}. This server has: {', '.join(models)}.", "not_found_error")
+    if body.get("tools"):
+        return _oai_error(400, "Tool calling isn't supported.")
+    if int(body.get("n") or 1) != 1:
+        return _oai_error(400, "Only n=1 is supported.")
+
+    msgs = []
+    for m in body.get("messages") or []:
+        role = {"developer": "system"}.get(m.get("role"), m.get("role"))
+        if role not in ("system", "user", "assistant"):
+            return _oai_error(400, f"Messages with role {m.get('role')!r} aren't supported.")
+        text = _text(m.get("content"))
+        if text.strip():
+            msgs.append({"role": role, "content": text})
+    if not msgs or msgs[-1]["role"] != "user":
+        return _oai_error(400, "The conversation must end with a user message.")
+
+    mid = want or first
+    if mid.endswith("-plain"):
+        pushes, erase = [], False
+    elif mid.endswith("-abliterated"):
+        pushes, erase = [], True
+    else:
+        pushes, erase = serving["pushes"], bool(abl_now().get("active"))
+
+    try:
+        row = (eng.messages_ids(msgs), pushes_of({"pushes": pushes}))
+    except (ValueError, KeyError) as e:
+        return _oai_error(400, str(e))
+
+    max_new = max(1, min(int(body.get("max_completion_tokens") or body.get("max_tokens") or 1024), 8192))
+    temp = float(body.get("temperature") if body.get("temperature") is not None else 0.7)
+    seed = int(body["seed"]) if body.get("seed") is not None else int(time.time())
+    stops = body.get("stop") or []
+    stops = [stops] if isinstance(stops, str) else [str(x) for x in stops if x]
+    erase = erase and eng.abl_vec is not None
+
+    rid, made = f"chatcmpl-{uuid.uuid4().hex[:24]}", int(time.time())
+    stop_ev = threading.Event()
+
+    def run():
+        """Yields text deltas, then (finish_reason, completion tokens) once."""
+        serving["active"] += 1
+        t0, text, n, finish = time.time(), "", 0, "stop"
+        gen = eng.generate([row], max_new=max_new, temperature=temp, cancel=stop_ev, seed=seed, abl=[erase])
+
+        try:
+            for r, x in gen:
+                if r is None:
+                    n = len(x[0])
+                    finish = "length" if n >= max_new else "stop"
+                    break
+
+                cut = None
+                for s in stops:  # end at the first stop sequence, which isn't sent
+                    i = (text + x).find(s, max(0, len(text) - len(s)))
+                    if i >= 0 and (cut is None or i < cut):
+                        cut = i
+                if cut is not None:
+                    if cut > len(text):
+                        yield (text + x)[len(text):cut]
+                    text, finish = (text + x)[:cut], "stop"
+                    n = len(eng.encode(text))
+                    break
+
+                text += x
+                yield x
+        except Cancelled:
+            finish, n = "stop", len(eng.encode(text))
+        finally:
+            gen.close()
+            serving["active"] -= 1
+            serving["log"].appendleft({"at": time.time(), "model": mid, "prompt": len(row[0]), "tokens": n,
+                                       "seconds": round(time.time() - t0, 1), "finish": finish,
+                                       "stream": bool(body.get("stream"))})
+
+        yield (finish, n)
+
+    usage = lambda n: {"prompt_tokens": len(row[0]), "completion_tokens": n, "total_tokens": len(row[0]) + n}
+
+    if not body.get("stream"):
+        def whole():
+            parts, end = [], ("stop", 0)
+            for x in run():
+                if isinstance(x, tuple):
+                    end = x
+                else:
+                    parts.append(x)
+            return "".join(parts), end
+
+        text, (finish, n) = await run_in_threadpool(whole)
+        return {"id": rid, "object": "chat.completion", "created": made, "model": mid,
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": finish}],
+                "usage": usage(n)}
+
+    def chunk(delta, finish=None, **extra):
+        return "data: " + json.dumps({"id": rid, "object": "chat.completion.chunk", "created": made, "model": mid,
+                                      "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], **extra},
+                                     ensure_ascii=False) + "\n\n"
+
+    # Generation runs on its own thread and hands its pieces over a queue. A client that goes away mid-reply cancels
+    # this coroutine, which stops the thread at its next token, so the model doesn't stay locked behind a reader
+    # that's gone (a plain generator would be left paused inside the engine's lock).
+    loop, q = asyncio.get_running_loop(), asyncio.Queue()
+
+    def work():
+        try:
+            for x in run():
+                loop.call_soon_threadsafe(q.put_nowait, x)
+        except Exception as e:  # noqa: BLE001 — reported to the client as the stream's last word
+            loop.call_soon_threadsafe(q.put_nowait, e)
+
+    async def events():
+        threading.Thread(target=work, daemon=True).start()
+        try:
+            yield chunk({"role": "assistant", "content": ""})
+            while True:
+                x = await q.get()
+                if isinstance(x, Exception):
+                    yield "data: " + json.dumps({"error": {"message": str(x), "type": "server_error"}}) + "\n\n"
+                    break
+                if isinstance(x, tuple):
+                    finish, n = x
+                    yield chunk({}, finish)
+                    if (body.get("stream_options") or {}).get("include_usage"):
+                        yield "data: " + json.dumps({"id": rid, "object": "chat.completion.chunk", "created": made,
+                                                     "model": mid, "choices": [], "usage": usage(n)}) + "\n\n"
+                    break
+                if x:
+                    yield chunk({"content": x})
+            yield "data: [DONE]\n\n"
+        finally:
+            stop_ev.set()
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 # ------------------------------------------------------------------ ui
