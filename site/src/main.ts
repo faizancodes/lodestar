@@ -1,10 +1,8 @@
-import { startAblScene } from "../../web/src/art/ablscene";
 import { createDecoder } from "../../web/src/art/decode";
 import { startSideArt, startSpinner } from "../../web/src/art/glyphs";
-import { render as renderHomeArt, type HomeArt } from "../../web/src/art/home";
 import { markSVG } from "../../web/src/art/mark";
-import { startScan } from "../../web/src/art/scan";
 import { startDive } from "./dive";
+import { api, erase, layers, scene, steer } from "./scenes";
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const $ = <T extends HTMLElement>(s: string) => document.querySelector<T>(s)!;
@@ -29,44 +27,6 @@ function hero() {
     const layer = 1 + (((level * 7) % 32) + 32) % 32, neuron = 100 + Math.floor(Math.abs(Math.sin(level * 91.7)) * 14000);
     readout.textContent = `L${layer} · n${neuron}`;
   });
-}
-
-// ---------------------------------------------------------------- the home cards' scenes, playing while on screen
-function homeArts() {
-  for (const canvas of document.querySelectorAll<HTMLCanvasElement>("canvas[data-art]")) {
-    const kind = canvas.dataset.art as HomeArt;
-    let raf = 0, last = 0;
-    const t0 = performance.now() - Math.random() * 4000;
-    const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
-      if (now - last < 50) return;
-      last = now;
-      renderHomeArt(canvas, kind, (now - t0) / 1000);
-    };
-
-    renderHomeArt(canvas, kind, 0);
-    if (still) continue;
-    whileSeen(canvas, (seen) => (seen ? raf || (raf = requestAnimationFrame(tick)) : (cancelAnimationFrame(raf), (raf = 0))));
-    addEventListener("resize", () => renderHomeArt(canvas, kind, (performance.now() - t0) / 1000));
-  }
-}
-
-// ---------------------------------------------------------------- abliterate: the four stages, in turn
-function abliterate() {
-  const scene = startAblScene($<HTMLCanvasElement>("#abl-art"));
-  const items = [...document.querySelectorAll<HTMLElement>("#abl-stages li")];
-  let at = 0, timer = 0;
-
-  const show = (i: number) => {
-    at = i;
-    scene.set(i);
-    items.forEach((li) => li.classList.toggle("on", +li.dataset.i! === i));
-  };
-  const next = () => { clearTimeout(timer); timer = setTimeout(() => (show((at + 1) % items.length), next()), 5200); };
-
-  items.forEach((li) => li.addEventListener("click", () => (show(+li.dataset.i!), next())));
-  show(0);
-  if (!still) next();
 }
 
 // ---------------------------------------------------------------- chat: two replies decoding in, gauges reading along
@@ -121,22 +81,13 @@ function reveal() {
   document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
 }
 
-function copyUrl() {
-  const b = $<HTMLButtonElement>("#copy-url");
-  b.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText("http://127.0.0.1:8792/v1"); } catch { return; }
-    b.textContent = "Copied";
-    setTimeout(() => (b.textContent = "Copy"), 1400);
-  });
-}
-
 reveal();
 hero();
-homeArts();
-abliterate();
-startScan($<HTMLCanvasElement>("#scan-art"));
+scene($<HTMLCanvasElement>("#art-erase"), 4, erase, 8.5);
+scene($<HTMLCanvasElement>("#art-layers"), 4, layers, 2.4);
+scene($<HTMLCanvasElement>("#art-steer"), 4, steer);
+scene($<HTMLCanvasElement>("#art-api"), 4, api, 1.8);
 startSideArt($<HTMLCanvasElement>("#sky-art"));
-copyUrl();
 
 let chatStarted = false;
 whileSeen($("#chat-demo"), (seen) => seen && !chatStarted && ((chatStarted = true), chat()), "0px 0px -20% 0px");

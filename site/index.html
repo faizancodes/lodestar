@@ -16,6 +16,7 @@
     <a class="brand" href="#top" aria-label="Lodestar"><span class="brand-mark" data-mark="26"></span><b>Lodestar</b></a>
     <nav class="nav-links">
       <a href="#abliterate">Abliterate</a>
+      <a href="#inspect">Inspect</a>
       <a href="#steer">Steer</a>
       <a href="#chat">Chat</a>
       <a href="#api">API</a>
@@ -44,92 +45,24 @@
       </figure>
     </section>
 
-    <!-- the three pages, as the home screen's cards -->
-    <section class="sec" id="what">
-      <div class="sec-h reveal">
-        <h2>Three ways in.</h2>
-        <p>Everything runs on the Apple GPU, on your machine. No account, no cloud, nothing leaves the Mac.</p>
-      </div>
-      <div class="cards">
-        <a class="card-art reveal" href="#abliterate">
-          <canvas class="home-art art" data-art="abliterate" aria-hidden="true"></canvas>
-          <div class="ca-b"><h3>Abliterate</h3><p>Find the direction it refuses along, erase it, and save the result as a new model.</p></div>
-        </a>
-        <a class="card-art reveal" href="#steer">
-          <canvas class="home-art art" data-art="steer" aria-hidden="true"></canvas>
-          <div class="ca-b"><h3>Steer</h3><p>Push individual neurons to change how it talks, then save what works as recipes.</p></div>
-        </a>
-        <a class="card-art reveal" href="#chat">
-          <canvas class="home-art art" data-art="chat" aria-hidden="true"></canvas>
-          <div class="ca-b"><h3>Chat</h3><p>Talk to it with your steering and erased refusals switched on or off.</p></div>
-        </a>
-      </div>
+    <!-- the features: a line each, and a scene drawn for it -->
+    <section class="feat" id="abliterate">
+      <div class="feat-h reveal"><span class="kicker">Abliterate</span><h2>Erase the refusal.</h2><p>Find the one direction it refuses along, and project it out.</p></div>
+      <canvas class="feat-art art" id="art-erase" aria-hidden="true"></canvas>
     </section>
 
-    <!-- abliterate: the four analysis stages, as the app shows them -->
-    <section class="sec split" id="abliterate">
-      <div class="split-copy reveal">
-        <span class="kicker">Abliterate</span>
-        <h2>Refusal is one direction. Take it out.</h2>
-        <p>A model's refusals live along a single direction in its residual stream. Lodestar finds it from about sixty probe prompts and removes it, live with one click or baked into a copy of the weights.</p>
-        <ol class="stages" id="abl-stages">
-          <li data-i="0"><b>Read</b><span>Refusing and everyday prompts pass through every layer, and each leaves its last word's state behind.</span></li>
-          <li data-i="1"><b>Compare</b><span>The difference between the two clouds' means is the refusal direction, one per layer.</span></li>
-          <li data-i="2"><b>Trial</b><span>Candidate layers are tried in turn; the one where two halves of the set agree best wins.</span></li>
-          <li data-i="3"><b>Check</b><span>Replies are written out and judged, so you see the refusal rate fall and what fluency it costs.</span></li>
-        </ol>
-      </div>
-      <div class="panel scene-panel reveal">
-        <canvas id="abl-art" class="art" aria-hidden="true"></canvas>
-        <div class="panel-f"><span class="dot-on"></span>Refusals erased at layer 11<span class="panel-n">cos 0.94</span></div>
-      </div>
+    <section class="feat" id="inspect">
+      <div class="feat-h reveal"><span class="kicker">Inspect</span><h2>Every neuron, every token.</h2><p>Watch each word climb the layers and light what it touches.</p></div>
+      <canvas class="feat-art art" id="art-layers" aria-hidden="true"></canvas>
     </section>
 
-    <!-- neurons: the scan -->
-    <section class="sec split flip" id="neurons">
-      <div class="panel scene-panel reveal">
-        <canvas id="scan-art" class="art" aria-hidden="true"></canvas>
-      </div>
-      <div class="split-copy reveal">
-        <span class="kicker">Inspect</span>
-        <h2>Read every neuron, every token.</h2>
-        <p>One forward pass captures every neuron at every token. Click a word to see what each layer would have said next, and which neurons pushed hardest to get there.</p>
-        <dl class="facts">
-          <div><dt>Logit lens</dt><dd>What each layer predicts, layer by layer</dd></div>
-          <div><dt>Impact</dt><dd>Activations scaled so neurons compare across layers</dd></div>
-          <div><dt>Any decoder</dt><dd>Qwen, Llama, Mistral, Gemma, SmolLM</dd></div>
-        </dl>
-      </div>
+    <section class="feat" id="steer">
+      <div class="feat-h reveal"><span class="kicker">Steer</span><h2>Push a neuron.</h2><p>Nudge one, and everything downstream bends with it.</p></div>
+      <canvas class="feat-art art" id="art-steer" aria-hidden="true"></canvas>
     </section>
 
-    <!-- steer: the flow field and a recipe -->
-    <section class="sec split" id="steer">
-      <div class="split-copy reveal">
-        <span class="kicker">Steer</span>
-        <h2>Push a neuron. Change the voice.</h2>
-        <p>Nudge single neurons or whole directions up or down and hear the difference straight away. Describe a behaviour in words and let Lodestar search for the neurons that produce it. Keep what works as a recipe.</p>
-      </div>
-      <div class="panel recipe reveal">
-        <canvas class="home-art art tall" data-art="steer" aria-hidden="true"></canvas>
-        <div class="recipe-b">
-          <div class="recipe-h"><b>Pirate captain</b><span>Recipe · Qwen3.5-4B</span></div>
-          <ul class="pushes" id="pushes">
-            <li><span>L14 · n8812</span><i style="--v:0.62"></i><b>+0.62</b></li>
-            <li><span>L17 · n3301</span><i style="--v:0.48"></i><b>+0.48</b></li>
-            <li><span>L9 · n12077</span><i style="--v:0.35"></i><b>+0.35</b></li>
-            <li><span>Formal</span><i class="neg" style="--v:0.4"></i><b>−0.40</b></li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- chat: compare, decoding in, with gauges -->
-    <section class="sec" id="chat">
-      <div class="sec-h reveal">
-        <span class="kicker">Chat</span>
-        <h2>Talk to it, side by side.</h2>
-        <p>Compare the plain model with your changes on, reply against reply. Gauges read a direction off the model as it writes, token by token.</p>
-      </div>
+    <section class="feat" id="chat">
+      <div class="feat-h reveal"><span class="kicker">Chat</span><h2>Side by side.</h2><p>The plain model and yours, read as they write.</p></div>
       <div class="chat reveal" id="chat-demo">
         <div class="bubble">Write a two-line villain's toast for my play.</div>
         <div class="cmp">
@@ -147,31 +80,10 @@
       </div>
     </section>
 
-    <!-- the local OpenAI-compatible API -->
-    <section class="sec split" id="api">
-      <div class="split-copy reveal">
-        <span class="kicker">API</span>
-        <h2>Use it from other apps.</h2>
-        <p>Any app that speaks the OpenAI API can reach the model at a local address, as you've set it: steered, erased, or plain. Recent requests show up in the app as they come in.</p>
-      </div>
-      <div class="panel api reveal">
-        <div class="field"><span>Address</span><div class="field-row"><code>http://127.0.0.1:8792/v1</code><button class="btn sm" id="copy-url">Copy</button></div></div>
-        <pre><code><span class="k">from</span> openai <span class="k">import</span> OpenAI
-
-client = OpenAI(
-    base_url=<span class="s">"http://127.0.0.1:8792/v1"</span>,
-    api_key=<span class="s">"lodestar"</span>,
-)
-reply = client.chat.completions.create(
-    model=<span class="s">"Qwen3.5-4B"</span>,
-    messages=[{<span class="s">"role"</span>: <span class="s">"user"</span>, <span class="s">"content"</span>: <span class="s">"Hello!"</span>}],
-)</code></pre>
-        <dl class="models">
-          <div><dt>Qwen3.5-4B</dt><dd><i class="dot-on"></i>As set in Lodestar</dd></div>
-          <div><dt>Qwen3.5-4B-plain</dt><dd>Plain</dd></div>
-          <div><dt>Qwen3.5-4B-abliterated</dt><dd>Refusals erased</dd></div>
-        </dl>
-      </div>
+    <section class="feat" id="api">
+      <div class="feat-h reveal"><span class="kicker">API</span><h2>Any OpenAI client.</h2><p>Point it at your Mac.</p></div>
+      <canvas class="feat-art art" id="art-api" aria-hidden="true"></canvas>
+      <code class="addr reveal">http://127.0.0.1:8792/v1</code>
     </section>
 
     <!-- get it -->
@@ -180,7 +92,7 @@ reply = client.chat.completions.create(
       <div class="get-in reveal">
         <span class="brand-mark big" data-mark="72"></span>
         <h2>Bring your own model.</h2>
-        <p>Any Hugging Face id for a Llama-style decoder. The first load downloads the weights; after that it runs offline.</p>
+        <p>Any Llama-style model on Hugging Face. Runs offline after the first load.</p>
         <pre class="install"><code><span class="c"># on an Apple silicon Mac</span>
 git clone https://github.com/faizancodes/auto-interp
 cd auto-interp && uv sync
