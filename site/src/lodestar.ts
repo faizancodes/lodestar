@@ -1,18 +1,29 @@
 import { drawMarks, type Put } from "../../web/src/art/glyphs";
 import { compassStar } from "../../web/src/art/mark";
 
-// The hero: the lodestar as the pole of a night sky. Its mark burns at the centre, light running out along its
-// rays, held in an astrolabe of turning rings: an outer ring of degree ticks, and an inner one of 32 notches, a
-// layer each, lit where the model is busy. Around it the sky wheels, every star (a neuron) dragging a trail as in a
-// long exposure of the pole, and now and then a few flare together and are joined into a passing constellation.
+// The hero: an armillary sphere of the model, turning in true perspective with the lodestar at its core. Its
+// surface is a lattice of neurons, faint at the back and bright at the front, lit where two slow foci of attention
+// pass over them. Great-circle arcs lift off the surface and carry pulses between neurons. Three gimbal rings, one
+// of them ticked like an ecliptic, turn on their own axes, and the pole axis runs up through the star. An outer
+// astrolabe ring holds it all. Scrolling winds it faster; the pointer tilts it.
 const CELL = 4;
-const STARS = 280;
-const SPIN = 0.05; // radians a second the sky turns
+const NODES = 900;
+const ARCS = 8;
+const TILT = 0.41; // the ticked ring's tilt against the equator
 
 const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
+type V = [number, number, number];
+const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const norm = (a: V): V => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
-/** at: the pole's place as fractions of the canvas. boost: extra spin, multiplying the turn (scrolling winds it). */
+// neurons spread evenly over the unit sphere
+const lattice: V[] = Array.from({ length: NODES }, (_, i) => {
+  const y = 1 - (2 * (i + 0.5)) / NODES, r = Math.sqrt(1 - y * y), a = i * Math.PI * (3 - Math.sqrt(5));
+  return [Math.cos(a) * r, y, Math.sin(a) * r];
+});
+
+/** at: the sphere's centre as fractions of the canvas. boost: extra turn, multiplying the spin (scrolling winds it). */
 export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [number, number]; boost?: () => number } = {}) {
   const { at = () => [0.5, 0.5], boost = () => 0 } = opts;
   let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
@@ -38,69 +49,121 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
     if (b > grid[i]) grid[i] = b;
   };
 
-  const line = (x0: number, y0: number, x1: number, y1: number, b: number, every = 2) => {
-    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
-    for (let s = 0; s <= n; s += every) put(x0 + ((x1 - x0) * s) / n, y0 + ((y1 - y0) * s) / n, b);
-  };
+  // the pointer, as -1..1 across the canvas, eased
+  let px = 0, py = 0, tx = 0, ty = 0;
+  addEventListener("pointermove", (e) => {
+    const r = canvas.getBoundingClientRect();
+    tx = clamp((e.clientX - r.left) / r.width) * 2 - 1;
+    ty = clamp((e.clientY - r.top) / r.height) * 2 - 1;
+  }, { passive: true });
 
-  let turn = 0, lastT = -1;
+  let yaw = 0.6, lastT = -1;
   const draw = (t: number) => {
     grid.fill(0);
     const [fx, fy] = at(), cx = cols * fx, cy = rows * fy;
-    const R = Math.hypot(Math.max(cx, cols - cx), Math.max(cy, rows - cy));
-    const extra = boost(), dt = lastT < 0 ? 0 : Math.min(0.2, t - lastT);
-    turn += dt * SPIN * (1 + extra);
+    const Rs = Math.min(rows * 0.3, cols * 0.27), D = Rs * 3.4;
+    const dt = lastT < 0 ? 0 : Math.min(0.2, t - lastT);
     lastT = t;
-    const star = Math.min(rows * 0.27, cols * 0.2); // the mark's radius, in cells
+    yaw += dt * 0.16 * (1 + boost());
+    px += (tx - px) * 0.06;
+    py += (ty - py) * 0.06;
+    const pitch = 0.32 + 0.08 * Math.sin(t * 0.21) + py * 0.18, y0 = yaw + px * 0.3;
+    const cyw = Math.cos(y0), syw = Math.sin(y0), cp = Math.cos(pitch), sp = Math.sin(pitch);
 
-    // the sky wheeling about the pole, each star trailing an arc behind it
-    const trail = 0.22 + extra * 0.05;
-    const flares: [number, number, number][] = [];
-    for (let i = 0; i < STARS; i++) {
-      const r = star * 1.5 + (R - star * 1.2) * Math.sqrt(hash(i, 1)), a = hash(i, 2) * Math.PI * 2 + turn;
-      const mag = 0.18 + hash(i, 3) ** 2.5 * 0.6;
-      const flare = clamp(Math.sin(t * 0.35 + hash(i, 4) * 40) * 6 - 5.2); // rare, brief
-      const steps = Math.max(2, Math.round(r * trail));
-      for (let s = 0; s <= steps; s++) {
-        const aa = a - (s / steps) * trail;
-        put(cx + Math.cos(aa) * r, cy + Math.sin(aa) * r, mag * (1 - s / (steps + 1)) ** 1.6 * 0.55);
+    // world (unit sphere, y up) → screen cells, with depth 0 (back) .. 1 (front)
+    const project = (v: V, r = 1): [number, number, number] => {
+      const x1 = v[0] * cyw + v[2] * syw, z1 = -v[0] * syw + v[2] * cyw;
+      const y2 = v[1] * cp - z1 * sp, z2 = v[1] * sp + z1 * cp;
+      const f = D / (D - z2 * Rs * r);
+      return [cx + x1 * Rs * r * f, cy - y2 * Rs * r * f, (z2 + 1) / 2];
+    };
+    const shade = (d: number) => 0.18 + 0.82 * d ** 1.4;
+
+    // a circle on the sphere's shell: around axis n, at radius r
+    const ring = (n: V, r: number, b: number, step = 0.035, ticks = 0) => {
+      n = norm(n);
+      const u = norm(Math.abs(n[1]) < 0.9 ? [n[2], 0, -n[0]] : [1, 0, 0]);
+      const w: V = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
+      for (let a = 0; a < Math.PI * 2; a += step) {
+        const v: V = [u[0] * Math.cos(a) + w[0] * Math.sin(a), u[1] * Math.cos(a) + w[1] * Math.sin(a), u[2] * Math.cos(a) + w[2] * Math.sin(a)];
+        const [x, y, d] = project(v, r);
+        put(x, y, b * shade(d));
+        if (ticks && Math.round(a / step) % ticks === 0)
+          for (let k = 1; k <= 3; k++) { const [x2, y2, d2] = project(v, r + k * 0.018); put(x2, y2, b * 1.4 * shade(d2)); }
       }
-      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r, b = Math.min(1, mag + flare * 0.8);
+    };
+
+    // faint parallels, for the globe's form
+    for (let k = -2; k <= 2; k++) {
+      const lat = (k * Math.PI) / 7, r = Math.cos(lat), h = Math.sin(lat);
+      for (let a = 0; a < Math.PI * 2; a += 0.05) {
+        const [x, y, d] = project([Math.cos(a) * r, h, Math.sin(a) * r]);
+        put(x, y, 0.13 * shade(d));
+      }
+    }
+
+    // two slow foci of attention wandering the sphere
+    const foci: V[] = [
+      norm([Math.cos(t * 0.23), Math.sin(t * 0.17) * 0.8, Math.sin(t * 0.23)]),
+      norm([Math.sin(t * 0.13 + 2), Math.cos(t * 0.19) * 0.7, Math.cos(t * 0.11 + 1)]),
+    ];
+
+    // the neurons
+    lattice.forEach((v, i) => {
+      const [x, y, d] = project(v);
+      const heat = Math.max(...foci.map((f) => Math.exp(-(1 - dot(v, f)) / 0.11)));
+      const flick = 0.5 + 0.5 * Math.sin(t * (1.2 + hash(i, 1) * 2) + hash(i, 2) * 6.3);
+      const b = (0.24 + heat * (0.6 + 0.4 * flick) + hash(i, 3) ** 6 * 0.35) * shade(d);
       put(x, y, b);
-      if (flare > 0.2) {
-        flares.push([x, y, flare]);
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, flare * 0.6);
+      if (heat * d > 0.45) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, b * 0.55);
+    });
+
+    // signals: great-circle arcs lifting off the surface, a pulse running along each
+    for (let k = 0; k < ARCS; k++) {
+      const phase = t / 2.6 + k / ARCS, slot = Math.floor(phase), s = phase - slot;
+      const a = lattice[Math.floor(hash(slot, k, 1) * NODES)], c = lattice[Math.floor(hash(slot, k, 2) * NODES)];
+      const cos = dot(a, c);
+      if (cos < -0.85 || cos > 0.98) continue;
+      const om = Math.acos(cos), so = Math.sin(om), drawn = clamp(s * 1.8), fade = clamp((1 - s) * 3);
+      const n = Math.ceil(om * Rs * 1.2);
+      for (let j = 0; j <= n * drawn; j++) {
+        const u = j / n, p1 = Math.sin((1 - u) * om) / so, p2 = Math.sin(u * om) / so;
+        const v: V = [a[0] * p1 + c[0] * p2, a[1] * p1 + c[1] * p2, a[2] * p1 + c[2] * p2];
+        const [x, y, d] = project(v, 1 + 0.28 * Math.sin(Math.PI * u));
+        const head = Math.exp(-((u - drawn) ** 2) / 0.002);
+        if (j % 2 === 0 || head > 0.3) put(x, y, (0.34 + head * 0.9) * fade * shade(d));
       }
     }
-    // flaring stars near each other join into a constellation while they burn
-    for (let i = 0; i < flares.length; i++)
-      for (let j = i + 1; j < flares.length; j++) {
-        const [x0, y0, f0] = flares[i], [x1, y1, f1] = flares[j];
-        if (Math.hypot(x1 - x0, y1 - y0) < star * 2.2) line(x0, y0, x1, y1, Math.min(f0, f1) * 0.45, 2);
-      }
 
-    // the astrolabe: degree ticks turning one way, the layers' notches the other
-    const r1 = star * 1.32, r2 = star * 1.12;
-    for (let d = 0; d < 360; d += 2) {
-      const a = (d * Math.PI) / 180 + turn * 0.6, long = d % 30 === 0 ? 4 : d % 10 === 0 ? 2.2 : 1;
-      for (let k = 0; k <= long; k += 0.8) put(cx + Math.cos(a) * (r1 + k), cy + Math.sin(a) * (r1 + k), d % 30 === 0 ? 0.5 : 0.24);
-    }
-    for (let L = 0; L < 32; L++) {
-      const a = (L / 32) * Math.PI * 2 - turn * 1.4, busy = clamp(Math.sin(t * 0.9 + L * 1.9) * 1.6 - 0.4);
-      for (let k = -1; k <= 1; k += 0.5) put(cx + Math.cos(a + k * 0.03) * r2, cy + Math.sin(a + k * 0.03) * r2, 0.2 + busy * 0.75);
-    }
-    for (let a = 0; a < Math.PI * 2; a += 1.6 / r2) put(cx + Math.cos(a) * (r2 - 3), cy + Math.sin(a) * (r2 - 3), 0.12);
+    // the gimbals: equator, a ticked ecliptic precessing round the pole, and a meridian turning on its own
+    ring([0, 1, 0], 1.14, 0.5);
+    ring([Math.sin(TILT) * Math.cos(t * 0.09), Math.cos(TILT), Math.sin(TILT) * Math.sin(t * 0.09)], 1.2, 0.62, 0.03, 5);
+    ring([Math.cos(t * 0.07), 0, Math.sin(t * 0.07)], 1.26, 0.36);
 
-    // the lodestar itself, light running out along its rays
-    const S = star / 15, pulse = 0.88 + 0.12 * Math.sin(t * 1.1);
+    // the pole axis, through the star
+    for (let h = -1.45; h <= 1.45; h += 0.025) {
+      if (Math.abs(h) < 0.3) continue;
+      const [x, y, d] = project([0, h, 0]);
+      put(x, y, (Math.abs(h) > 1.3 ? 0.6 : 0.26) * shade(d));
+    }
+
+    // the astrolabe round it all, in the plane of the page
+    const R2 = Rs * 1.5;
+    for (let deg = 0; deg < 360; deg += 1.5) {
+      const a = (deg * Math.PI) / 180 - yaw * 0.25, major = deg % 30 === 0, minor = deg % 7.5 === 0;
+      const len = major ? 4 : minor ? 2 : 0.6;
+      for (let k = 0; k <= len; k += 0.8) put(cx + Math.cos(a) * (R2 + k), cy + Math.sin(a) * (R2 + k), major ? 0.42 : 0.16);
+    }
+
+    // the lodestar at the core, light running out along its rays
+    const star = Rs * 0.4, S = star / 15, pulse = 0.85 + 0.15 * Math.sin(t * 1.1);
     for (let dy = -Math.ceil(star); dy <= star; dy++)
       for (let dx = -Math.ceil(star); dx <= star; dx++) {
         const x = dx / S, y = dy / S, r = Math.hypot(x, y);
-        if (r > 12 && r < 13.6) continue; // the mark's own ring: the astrolabe stands in for it
-        let b = compassStar(x, y);
+        if (r > 11.5) continue; // without its ring: the sphere stands in for it
+        const b = compassStar(x, y);
         if (b < 0.06) continue;
-        b *= pulse * (0.82 + 0.18 * Math.sin(r * 0.9 - t * 3.2));
-        put(cx + dx, cy + dy, b);
+        put(cx + dx, cy + dy, b * pulse * (0.8 + 0.2 * Math.sin(r * 0.9 - t * 3.2)));
       }
 
     ctx.fillStyle = getComputedStyle(canvas).color;
@@ -113,7 +176,7 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
     raf = 0;
     if (!seen || document.hidden) return;
     raf = requestAnimationFrame(tick);
-    if (now - last < 45) return; // ~22 fps
+    if (now - last < 40) return; // ~25 fps
     last = now;
     draw((now - t0) / 1000);
   };
