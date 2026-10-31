@@ -15,6 +15,7 @@ import { RecipeBox } from "../steer/RecipeBox";
 import { addItems, replaceRecipe } from "../steer/recipe";
 import { newChat, PROMPTS, send, submit } from "../steer/refine";
 import { Thread } from "../steer/Thread";
+import { HERE } from "../lib/platform";
 
 const cancel = () => api("/api/cancel", {});
 const n3 = { "--n": 3 } as CSSProperties;
@@ -213,7 +214,7 @@ function Step3() {
           <div className="export-line status-line">{exp.line}</div>
         </div>
         <div id="st-saved" className="saved-model" hidden={!saved}>
-          <div><b>{saved?.name}</b><span>On this Mac</span></div>
+          <div><b>{saved?.name}</b><span>On {HERE}</span></div>
           <button className="btn" id="st-load" onClick={() => saved && loadModel(saved.dst)}>Load it</button>
         </div>
       </div>

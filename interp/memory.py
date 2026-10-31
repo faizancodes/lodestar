@@ -1,8 +1,9 @@
-"""How much memory the Mac has, what's using it, and whether a model will fit next to it.
+"""How much memory the computer has, what's using it, and whether a model will fit next to it.
 
-A loaded model's weights live in GPU memory, which a process's resident size doesn't count: a Python process holding
-an 8B model shows ~50 MB resident but ~18 GB of footprint. So everything here reads the footprint (what Activity
-Monitor's Memory column shows), through libproc.
+On a Mac the GPU shares the RAM, and a loaded model's weights live in GPU memory, which a process's resident size
+doesn't count: a Python process holding an 8B model shows ~50 MB resident but ~18 GB of footprint. So there everything
+reads the footprint (what Activity Monitor's Memory column shows), through libproc. On Windows a process's private
+bytes stand in for it, and with an NVIDIA GPU the weights go to the card's own memory, so that's what a model must fit.
 """
 import ctypes
 import os
@@ -11,6 +12,7 @@ import time
 from pathlib import Path
 
 import psutil
+import torch
 
 GB = 1024 ** 3
 BIG = 6 * GB  # a process this size is holding a model, or something as heavy
@@ -29,7 +31,11 @@ class _Rusage(ctypes.Structure):  # rusage_info_v0, enough to reach ri_phys_foot
 def footprint(pid):
     """A process's memory footprint in bytes, or None when it can't be read (another user's process, or gone)."""
     if _libproc is None:
-        return None
+        try:
+            m = psutil.Process(pid).memory_info()
+        except (psutil.Error, OSError):
+            return None
+        return getattr(m, "private", 0) or m.rss  # private bytes on Windows (Task Manager's Memory column)
 
     ru = _Rusage()
     return ru.phys_footprint if _libproc.proc_pid_rusage(pid, 0, ctypes.byref(ru)) == 0 else None
@@ -67,7 +73,10 @@ def _others(min_bytes=256 * 1024 ** 2):
 
 
 def _pressure():
-    """macOS's own verdict: 1 normal, 2 warning, 4 critical."""
+    """macOS's own verdict: 1 normal, 2 warning, 4 critical. Elsewhere, judged from how full the RAM is."""
+    if _libproc is None:
+        pct = psutil.virtual_memory().percent
+        return "critical" if pct >= 95 else "warn" if pct >= 85 else "normal"
     try:
         r = subprocess.run(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"], capture_output=True, text=True,
                            timeout=2)
@@ -131,6 +140,12 @@ def fit(model, hf_cache, loaded_bytes=0):
     # activations, caches and the Python runtime come on top
     need = disk * (2 if disk < 5e9 else 1) * 1.08 + 0.8 * GB
 
+    if gpu_memory():  # an NVIDIA card: the weights go to its own memory, which nothing else here is counted in
+        free, total = torch.cuda.mem_get_info()
+        free += loaded_bytes
+        return {"known": True, "fits": need <= free, "need": need, "free": free, "total": total, "used": total - free,
+                "others": [], "gpu": True}
+
     # Footprints count memory that's been compressed or swapped out, so summing every process overshoots the Mac's
     # RAM. What decides whether a model fits is the other heavy processes (another model, mostly): count those, and
     # set aside a quarter of the RAM for macOS and the everyday apps.
@@ -142,3 +157,15 @@ def fit(model, hf_cache, loaded_bytes=0):
 
     return {"known": True, "fits": need <= free, "need": need, "free": max(free, 0), "total": total,
             "used": used, "others": heavy[:3]}
+
+
+def gpu_memory():
+    """Whether models load into a GPU's own memory (CUDA) rather than the RAM it shares (Apple silicon) or the CPU's."""
+    return not torch.backends.mps.is_available() and torch.cuda.is_available()
+
+
+def loaded():
+    """What the loaded model holds, which comes free when another one replaces it."""
+    if gpu_memory():
+        return torch.cuda.memory_reserved()
+    return max((footprint(os.getpid()) or 0) - GB, 0)  # all but the runtime's ~1 GB

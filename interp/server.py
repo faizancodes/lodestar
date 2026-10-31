@@ -23,12 +23,12 @@ from . import abl as abl_mod
 from . import directions as dir_mod
 from . import discover
 from . import memory
+from . import places
 from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
 UI = ROOT / "web" / "dist"  # the React build: `pnpm build` in web/ (scripts/build_app.sh does it)
-# the data folder keeps the app's first name, so models, recipes and directions saved before the rename stay put
-DATA = Path(os.environ.get("AUTO_INTERP_DATA", Path.home() / "Library" / "Application Support" / "Auto Interp"))
+DATA = places.data_dir()
 DATA.mkdir(parents=True, exist_ok=True)
 RECIPES = DATA / "recipes.json"
 ABL_FILE = DATA / "abl.json"  # saved refusal directions + state, keyed by model id
@@ -158,7 +158,7 @@ LOADING = {"bytes": None}  # the size of the weights being loaded, when known (i
 
 @app.get("/api/status")
 def status():
-    last = LAST_MODEL.read_text().strip() if LAST_MODEL.exists() else None
+    last = LAST_MODEL.read_text(encoding="utf-8").strip() if LAST_MODEL.exists() else None
     out = {**eng.info(), "progress": eng.progress, "last": last}
 
     if eng.load_state:  # for the loading scene: the stage, and how much of each layer has arrived
@@ -167,7 +167,7 @@ def status():
     return out
 
 
-# Copies of drive models on this Mac's internal disk. A USB 3 stick reads at ~0.4 GB/s against ~3 GB/s for
+# Copies of drive models on this computer's own disk. A USB 3 stick reads at ~0.4 GB/s against ~3 GB/s for
 # the internal SSD, and reading the weights is nearly all of a big model's load time.
 COPIES = DATA / "models"
 copy_job = {"src": None, "name": None, "done": 0, "total": 0, "status": "idle", "cancel": False}
@@ -186,7 +186,7 @@ def _generates(snap):
     """Whether a downloaded model writes text, rather than only classifying it (a zero-shot or a rejection
     classifier, which other tools leave in the same cache)."""
     try:
-        archs = json.loads((snap / "config.json").read_text()).get("architectures") or []
+        archs = json.loads((snap / "config.json").read_text(encoding="utf-8")).get("architectures") or []
     except (OSError, ValueError):
         return True  # can't tell: list it, and let loading say if it doesn't work
 
@@ -202,14 +202,14 @@ def models():
             if snaps and _generates(snaps[-1]):
                 cached.append(d.name[len("models--"):].replace("--", "/"))
 
-    # models saved as plain folders on external drives: /Volumes/<drive>/models/<name>
+    # models saved as plain folders on external drives: <drive>/models/<name> (/Volumes/<drive> on a Mac, D:\ on Windows)
     copies = [{"path": str(d), "name": d.name, "size": _folder_size(d)}
               for d in sorted(COPIES.glob("*")) if d.is_dir() and not d.name.endswith(".partial")
               and (d / "config.json").exists()]
 
     copied = {c["name"] for c in copies}
-    local = [{"path": str(d), "name": d.name, "drive": d.parent.parent.name, "size": _folder_size(d), "copied": d.name in copied}
-             for d in sorted(Path("/Volumes").glob("*/models/*"))
+    local = [{"path": str(d), "name": d.name, "drive": places.drive_name(root), "size": _folder_size(d), "copied": d.name in copied}
+             for root in places.drives() for d in sorted(root.glob("models/*"))
              if (d / "config.json").exists() and any(d.glob("*.safetensors"))]
 
     return {"presets": PRESETS, "cached": cached, "local": local, "copies": copies}
@@ -225,7 +225,7 @@ async def copy_model(req: Request):
     body = await req.json()
     src = Path(body["path"])
 
-    if not (src.is_dir() and str(src).startswith("/Volumes/") and (src / "config.json").exists()):
+    if not (src.is_dir() and places.drive_of(src) and (src / "config.json").exists()):
         raise HTTPException(400, "That isn't a model folder on an external drive.")
     if copy_job["status"] == "copying":
         raise HTTPException(409, f"Already copying {copy_job['name']}.")
@@ -237,7 +237,7 @@ async def copy_model(req: Request):
     free = shutil.disk_usage(COPIES).free
     margin = 10e9  # leave room for the system and swap
     if free < total + margin:
-        raise HTTPException(400, f"Not enough space: the copy needs {total / 1e9:.1f} GB and this Mac has {free / 1e9:.1f} GB free.")
+        raise HTTPException(400, f"Not enough space: the copy needs {total / 1e9:.1f} GB and this computer has {free / 1e9:.1f} GB free.")
 
     copy_job.update(src=str(src), name=src.name, done=0, total=total, status="copying", cancel=False)
 
@@ -302,7 +302,7 @@ async def load(req: Request):
             eng.load(mid)
             restore_for(mid)
             dirs.load()
-            LAST_MODEL.write_text(mid)
+            LAST_MODEL.write_text(mid, encoding="utf-8")
         except Exception as e:
             traceback.print_exc()
             eng.status = f"error: {e}"
@@ -339,10 +339,8 @@ async def memory_fit(req: Request):
     """Whether a model fits beside what's already running, asked before loading it."""
     mid = (await req.json())["model"].strip()
 
-    # loading a different model unloads this one first, so what it holds (all but the runtime's ~1 GB) comes free
-    loaded = 0
-    if eng.model is not None and eng.model_id != mid:
-        loaded = max((memory.footprint(os.getpid()) or 0) - memory.GB, 0)
+    # loading a different model unloads this one first, so what it holds comes free
+    loaded = memory.loaded() if eng.model is not None and eng.model_id != mid else 0
 
     return memory.fit(mid, HF_CACHE, loaded)
 
@@ -517,17 +515,17 @@ async def chat(req: Request):
 
 # ------------------------------------------------------------------ abliterate
 def _probes():
-    custom = json.loads(PROBES_FILE.read_text()) if PROBES_FILE.exists() else {}
+    custom = json.loads(PROBES_FILE.read_text(encoding="utf-8")) if PROBES_FILE.exists() else {}
     return {"harmful": custom.get("harmful") or abl_mod.DEFAULT_HARMFUL,
             "harmless": custom.get("harmless") or abl_mod.DEFAULT_HARMLESS}
 
 
 def _abl_all():
-    return json.loads(ABL_FILE.read_text()) if ABL_FILE.exists() else {}
+    return json.loads(ABL_FILE.read_text(encoding="utf-8")) if ABL_FILE.exists() else {}
 
 
 def _abl_save(all_d):
-    ABL_FILE.write_text(json.dumps(all_d, indent=1))
+    ABL_FILE.write_text(json.dumps(all_d, indent=1), encoding="utf-8")
 
 
 def abl_now():
@@ -556,10 +554,10 @@ def abl_info():
 @app.post("/api/abl/probes")
 async def abl_probes(req: Request):
     body = await req.json()
-    merger = json.loads(PROBES_FILE.read_text()) if PROBES_FILE.exists() else {}
+    merger = json.loads(PROBES_FILE.read_text(encoding="utf-8")) if PROBES_FILE.exists() else {}
     merger.update({k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()]
                    for k in ("harmful", "harmless")})
-    PROBES_FILE.write_text(json.dumps(merger, indent=1))
+    PROBES_FILE.write_text(json.dumps(merger, indent=1), encoding="utf-8")
     return _probes()
 
 
@@ -858,7 +856,7 @@ def directions_delete(did: str):
 
 # ------------------------------------------------------------------ recipes
 def _recipes():
-    return json.loads(RECIPES.read_text()) if RECIPES.exists() else []
+    return json.loads(RECIPES.read_text(encoding="utf-8")) if RECIPES.exists() else []
 
 
 @app.get("/api/recipes")
@@ -874,13 +872,13 @@ async def save_recipe(req: Request):
     r.setdefault("model", eng.model_id)
 
     allr = [x for x in _recipes() if x["id"] != r["id"]] + [r]
-    RECIPES.write_text(json.dumps(allr, indent=1))
+    RECIPES.write_text(json.dumps(allr, indent=1), encoding="utf-8")
     return r
 
 
 @app.delete("/api/recipes/{rid}")
 def delete_recipe(rid: str):
-    RECIPES.write_text(json.dumps([x for x in _recipes() if x["id"] != rid], indent=1))
+    RECIPES.write_text(json.dumps([x for x in _recipes() if x["id"] != rid], indent=1), encoding="utf-8")
     return {"ok": True}
 
 
@@ -901,7 +899,7 @@ def chats():
     out = []
     for f in CHATS.glob("*.json"):
         try:
-            out.append(_summary(json.loads(f.read_text())))
+            out.append(_summary(json.loads(f.read_text(encoding="utf-8"))))
         except (ValueError, KeyError):
             continue
 
@@ -913,7 +911,7 @@ def chat_get(cid: str):
     f = _chat_file(cid)
     if not f.exists():
         raise HTTPException(404, "That chat is gone.")
-    return json.loads(f.read_text())
+    return json.loads(f.read_text(encoding="utf-8"))
 
 
 @app.post("/api/chats")
@@ -927,7 +925,7 @@ async def chat_save(req: Request):
 
     CHATS.mkdir(exist_ok=True)
     tmp = f.with_suffix(".tmp")
-    tmp.write_text(json.dumps(c, ensure_ascii=False))
+    tmp.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
     tmp.replace(f)  # a crash mid-write leaves the old copy, not half a file
     return _summary(c)
 

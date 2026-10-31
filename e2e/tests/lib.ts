@@ -2,6 +2,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { audit, AUDIT } from "./audit";
 
 export const RECORD = process.env.MODE === "record";
+// the goldens are WebKit on macOS; elsewhere (the Windows CI run) the flows still run but the pixels are left alone
+const NO_SNAP = !!process.env.E2E_NO_SNAP;
 // how long to wait for the engine: minutes against a real model; against the mock, the longest replay (describe's
 // ~1,400 events, 12 ms apart) with room for a busy machine
 export const T = RECORD ? 30 * 60_000 : 60_000;
@@ -23,7 +25,7 @@ export async function scenario(page: Page, name: string) {
 
 /** Compare against a golden; skipped while recording, where output and timing come from a live model. */
 export async function snap(target: Page | Locator, name: string) {
-  if (RECORD) return;
+  if (RECORD || NO_SNAP) return;
 
   const page = "page" in target ? target.page() : target;
   if (AUDIT) return audit(page, name);

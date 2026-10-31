@@ -2,8 +2,9 @@ import { useState } from "react";
 import { gb } from "../lib/format";
 import { cancelCopy, removeCopy, startCopy, type Choice } from "../shell/engine";
 import { useApp } from "../store/app";
+import { MAC } from "../lib/platform";
 
-// the action beside a model: copy a drive model onto this Mac (or stop that copy), or remove a copy
+// the action beside a model: copy a drive model onto this computer (or stop that copy), or remove a copy
 export function CopyAction({ x }: { x: Choice }) {
   const copy = useApp((s) => s.copy);
   const [sure, setSure] = useState(false);
@@ -14,7 +15,7 @@ export function CopyAction({ x }: { x: Choice }) {
     if (busy && copy!.src === x.id) return <button className="mact" data-act="stop" onClick={act(cancelCopy)}>Stop copy</button>;
     return busy ? null : (
       <button className="mact" data-act="copy" title="The internal disk reads about 8× faster than a USB drive" onClick={act(() => startCopy(x.id))}>
-        Copy to Mac · {gb(x.drive.size)}
+        Copy to {MAC ? "Mac" : "PC"} · {gb(x.drive.size)}
       </button>
     );
   }

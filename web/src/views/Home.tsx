@@ -6,11 +6,12 @@ import { setTab } from "../shell/engine";
 import { ablActive, useApp } from "../store/app";
 import { useChat } from "../store/chat";
 import { ICONS } from "../components/Sidebar";
+import { MOD } from "../lib/platform";
 
 const CARDS: { go: HomeArt; title: string; text: string; key: string }[] = [
-  { go: "abliterate", title: "Abliterate", text: "Find the direction it refuses along, erase it, and save the result as a new model.", key: "⌘1" },
-  { go: "steer", title: "Steer", text: "Push individual neurons to change how it talks, then save what works as recipes.", key: "⌘2" },
-  { go: "chat", title: "Chat", text: "Talk to it with your steering and erased refusals switched on or off.", key: "⌘3" },
+  { go: "abliterate", title: "Abliterate", text: "Find the direction it refuses along, erase it, and save the result as a new model.", key: `${MOD}1` },
+  { go: "steer", title: "Steer", text: "Push individual neurons to change how it talks, then save what works as recipes.", key: `${MOD}2` },
+  { go: "chat", title: "Chat", text: "Talk to it with your steering and erased refusals switched on or off.", key: `${MOD}3` },
 ];
 
 // Home: the loaded model, and a card for each page with what it's for and where it stands.
@@ -27,7 +28,7 @@ export function Home({ hidden }: { hidden: boolean }) {
     return () => cancelAnimationFrame(raf);
   }, [shown, s?.model, cur, mine]);
 
-  const dev = s?.device && ({ mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device);
+  const dev = s?.device && ({ mps: "Apple GPU", cuda: "NVIDIA GPU", cpu: "CPU" }[s.device] || s.device);
   const specs: [string, unknown][] = [["Parameters", s?.params && `${(s.params / 1e9).toFixed(1)}B`], ["Layers", s?.layers], ["Runs on", dev], ["Precision", s?.dtype]];
   const status: Record<HomeArt, JSX.Element | string> = {
     abliterate: cur?.active ? <><i className="hc-on" />Refusals erased at layer {cur.layer}</> : cur ? "Direction saved, switched off" : "",

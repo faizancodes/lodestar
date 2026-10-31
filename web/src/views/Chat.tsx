@@ -10,6 +10,7 @@ import { patchAt, removeAt } from "../steer/recipe";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
 import { useChat, type ColKey, type Mods, type Reading } from "../store/chat";
+import { MOD } from "../lib/platform";
 
 const cancel = () => api("/api/cancel", {});
 
@@ -393,7 +394,7 @@ export function Chat({ hidden }: { hidden: boolean }) {
             <CompareSwitch />
             <GaugesPick />
             <NeuronsButton />
-            <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
+            <button id="chat-new" className="btn ghost sm" title={`New chat (${MOD}K)`} onClick={newChat}>New chat</button>
           </div>
         </header>
         <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>

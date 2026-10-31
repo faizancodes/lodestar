@@ -130,11 +130,11 @@ class Library:
 
     def index(self):
         f = self.dir / "index.json"
-        return json.loads(f.read_text()) if f.exists() else []
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
 
     def _write_index(self, idx):
         self.dir.mkdir(parents=True, exist_ok=True)
-        (self.dir / "index.json").write_text(json.dumps(idx, indent=1, ensure_ascii=False))
+        (self.dir / "index.json").write_text(json.dumps(idx, indent=1, ensure_ascii=False), encoding="utf-8")
 
     def load(self):
         """Put every saved direction for the loaded model on the device (eng.dirs)."""

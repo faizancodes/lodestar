@@ -31,7 +31,7 @@ export type Memory = {
   swapping: boolean; // pages went out to swap in the last few seconds
 };
 /** POST /api/memory/fit: whether a model fits beside the heavy processes already running */
-export type Fit = { known: boolean; fits: boolean; need?: number; free?: number; total?: number; used?: number; others?: MemProc[] };
+export type Fit = { known: boolean; fits: boolean; need?: number; free?: number; total?: number; used?: number; others?: MemProc[]; gpu?: boolean };
 
 type Preset = { id: string; size: string; note: string };
 type DriveModel = { path: string; name: string; drive: string; size: number; copied: boolean };

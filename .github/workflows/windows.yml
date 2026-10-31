@@ -1,0 +1,67 @@
+# Lodestar on Windows. GitHub's runners have no GPU, so this checks that everything installs and runs there, with a
+# small model on the CPU through the CUDA build of torch; it can't say how fast or how well it runs on an NVIDIA card.
+name: windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.13.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Torch
+        run: uv run python -c "import torch; print(torch.__version__, 'cuda', torch.version.cuda, 'available', torch.cuda.is_available())"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-qwen3-0.6b
+
+      - name: Server smoke test (load a model on the CPU, reply, trace)
+        run: uv run python scripts/smoke.py Qwen/Qwen3-0.6B
+
+      - name: Web unit tests and build
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm build
+
+      - name: e2e flows (replayed; the pixel goldens are macOS-only, so no screenshots)
+        working-directory: e2e
+        env:
+          E2E_NO_SNAP: "1"
+        run: |
+          npm ci
+          npx playwright install webkit
+          npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results
+          path: e2e/test-results
