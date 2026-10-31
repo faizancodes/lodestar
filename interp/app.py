@@ -10,6 +10,7 @@ import uvicorn
 
 def free_port(preferred=8792):
     with socket.socket() as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # as uvicorn binds, so a restart's TIME_WAIT doesn't push it off
         try:
             s.bind(("127.0.0.1", preferred))
             return preferred
