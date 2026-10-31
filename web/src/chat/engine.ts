@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { setAblActive } from "../abl/engine";
 import { createDecoder } from "../art/decode";
 import { api } from "../lib/api";
-import { cleanReply, isDir, isWord, itemKey, pushes, searchDose } from "../lib/format";
+import { cleanReply, dirReady, isDir, isWord, itemKey, pushes, searchDose } from "../lib/format";
 import { md } from "../lib/markdown";
 import { save } from "../lib/storage";
 import { stream } from "../lib/stream";
@@ -12,7 +12,7 @@ import { ablActive, useApp } from "../store/app";
 import type { ChatSummary, NeuronItem, WordSearch } from "../lib/types";
 import { addItems, removeAt } from "../steer/recipe";
 import { parsePins } from "./parse";
-import { touchChat, useChat, type Col, type ColKey, type Msg, type Reading } from "../store/chat";
+import { touchChat, useChat, type Col, type ColKey, type Mods, type Msg, type Reading } from "../store/chat";
 
 const app = useApp.getState;
 const get = useChat.getState;
@@ -134,6 +134,18 @@ const live0 = (going: ReturnType<typeof parts> | null) => {
   return r ? r.ids.map((id, i) => ({ id, name: r.names[i] })) : [];
 };
 
+/** What the switches put on a reply now: the recipe's neurons and ready directions as they're dosed, and the erasure. */
+function modsNow(): Mods {
+  const { recipe, dirs } = app();
+  const steer = get().steer
+    ? recipe.items.flatMap((it) => isDir(it)
+      ? dirReady(it, dirs) ? [{ label: it.name || it.dir, dose: it.dose, ...(it.op === "erase" && { erase: true }) }] : []
+      : [{ label: `L${it.layer} N${it.neuron}`, dose: it.dose }])
+    : [];
+
+  return { ...(steer.length && { steer }), ...(ablActive(app()) && { abl: true }) };
+}
+
 // a part of a reply that wrote to the length limit before it finished
 const cutParts = (m: Msg) => parts(m).filter((p) => p.cut);
 
@@ -175,6 +187,7 @@ async function reply(more = false) {
   if (!more) live.forEach((p) => (p.read = read.length ? { ids: read, names: reads.map((d) => d.name), toks: [] } : undefined));
   live.forEach((p) => ((p.cut = false), delete p.wps, timing.delete(p))); // its speed is the new stretch's
   m.stopped = false;
+  m.mods = modsNow();
 
   set({ streaming: true });
   decoders = parts(m).map(() => createDecoder());

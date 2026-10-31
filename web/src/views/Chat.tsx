@@ -9,7 +9,7 @@ import { isDir, itemKey, labelOf, lensLabel, modelName } from "../lib/format";
 import { patchAt, removeAt } from "../steer/recipe";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
-import { useChat, type Reading } from "../store/chat";
+import { useChat, type ColKey, type Mods, type Reading } from "../store/chat";
 
 const cancel = () => api("/api/cancel", {});
 
@@ -95,6 +95,22 @@ function Gauges({ read }: { read?: Reading }) {
   );
 }
 
+// What was on for a reply: the neurons and directions pushed with their doses, and the erased refusal direction. In
+// Compare, the steered column shows what it pushed (the erased one's heading already says so).
+function ModsLine({ mods, only }: { mods?: Mods; only?: ColKey }) {
+  const steer = only && only !== "steer" ? undefined : mods?.steer, abl = !only && mods?.abl;
+  if (!steer?.length && !abl) return null;
+
+  return (
+    <div className="msg-mods">
+      {steer?.map((p, k) => (
+        <span key={k} className="msg-mod"><b>{p.label}</b>{p.erase ? " erased" : ` ${p.dose > 0 ? "+" : "−"}${+Math.abs(p.dose).toFixed(2)}`}</span>
+      ))}
+      {abl && <span className="msg-mod"><b>Refusals erased</b></span>}
+    </div>
+  );
+}
+
 // the directions to read as replies are written, picked from the ones the loaded model has
 function GaugesPick() {
   const dirs = (useApp((s) => s.dirs) ?? []).filter((d) => d.ready), on = useChat((s) => s.gauges);
@@ -155,6 +171,7 @@ function Log() {
                 <div className="cmp-h">{c.label}</div>
                 <Md m={c} done={!typing} />
                 <Gauges read={c.read} />
+                <ModsLine mods={m.mods} only={c.key} />
                 <div className="msg-acts">
                   {!typing && !!c.content && <Copy text={c.content} />}
                   <Rate part={c} />
@@ -174,6 +191,7 @@ function Log() {
         <div key={i} className={typing ? "msg bot typing" : "msg bot"} data-i={i}>
           <Md m={m} done={!typing} />
           <Gauges read={m.read} />
+          <ModsLine mods={m.mods} />
           <div className="msg-acts">
             {!typing && <>
               {last && m.cut && <button data-a="continue" className="hint" onClick={continueReply}>Continue</button>}
