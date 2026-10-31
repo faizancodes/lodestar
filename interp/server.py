@@ -429,11 +429,14 @@ def search_word(word: str, k: int = 24, skip_last: int = 0):
 # ------------------------------------------------------------------ steering
 @app.post("/api/steer")
 async def steer(req: Request):
-    """Side by side: the pushes as given, the unsteered model, and (optionally) every push reversed."""
+    """Side by side: the pushes as given, the unsteered model, and (optionally) every push reversed. With `history`,
+    the conversation so far (user and assistant turns) comes before the prompt."""
     need_model()
     body = await req.json()
     pushes = pushes_of(body)
-    pid = eng.chat_ids(body["prompt"])
+    history = [{"role": m["role"], "content": str(m["content"])} for m in body.get("history") or []
+               if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()]
+    pid = eng.messages_ids(history + [{"role": "user", "content": body["prompt"]}]) if history else eng.chat_ids(body["prompt"])
 
     cols = body.get("columns", ["up", "base", "down"])
     inv = [q for q in map(_reverse, pushes) if q is not None]

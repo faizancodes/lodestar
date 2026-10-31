@@ -35,26 +35,31 @@ export type Plan = {
 
 type Results = { n: number; word?: (NeuronRow & { score: number; dose: number })[]; plan?: Plan };
 
-/** One answer to the thread's question, with the recipe that was on for it and how it came about. */
+/** One reply to a question, with the recipe that was on for it and how it came about. */
 export type Version = {
   items: Item[];
   out: Sink;
   fix: { feedback: string; lines: ReactNode[] } | null; // the fix that made it
-  note: string; // or why it's here otherwise ("Went back to v2")
-  open: boolean; // an older answer, unfolded
+  note: string; // or why it's here otherwise ("Asked again")
 };
 
-/** Try it and refine: one question, and its answers as the recipe is fixed. */
-export type Thread = {
-  id: number; // panels opened under its answers are named by it, so a new thread starts with none
+/** A question and its replies: each fix or retry adds a version, and the arrows switch between them. */
+export type Turn = {
   prompt: string;
-  normal: Sink; // the model as it normally is, shown on request
-  other: Sink; // the one-off answer when no recipe is on: normal, or with refusals erased
-  abl: boolean;
   versions: Version[];
-  asking: boolean; // the box asks a new question instead of taking a fix
-  fixing: string | null; // the fix being made
+  shown: number;
+  normal: Sink; // the model as it normally is, made alongside the first reply when neurons are on
+  abl: boolean; // refusals were erased for it
+};
+
+/** Try it and refine: a conversation with the model as the recipe steers it. Every turn stays, and the model sees
+ *  the ones before it. */
+export type Thread = {
+  id: number; // panels opened under its replies are named by it, so a new conversation starts with none
+  turns: Turn[];
+  fixing: string | null; // the fix being made to the latest reply
   fixLive: Live;
+  other: boolean; // the box for saying what else is wrong is open
   streaming: Set<"main" | "normal">;
 };
 
@@ -82,7 +87,8 @@ type Steer = {
   note: string; // #c-status
   results: Results | null;
   prompts: string; // Options → Test questions
-  tInput: string; // the box under the thread: a question, or what should change
+  tInput: string; // the box under the conversation
+  fixInput: string; // what else is wrong with the latest reply
   tl: Thread | null;
   compare: boolean; // the normal answer shows under the latest one (here and on Abliterate)
   dn: Dn;
@@ -98,6 +104,7 @@ export const useSteer = create<Steer>(() => ({
   results: null,
   prompts: "",
   tInput: "",
+  fixInput: "",
   tl: null,
   compare: load("tl-compare") === "1",
   dn: { open: false, typing: false, kind: "persona", name: "", pos: "", neg: "", path: "", live: null, result: null, made: null },

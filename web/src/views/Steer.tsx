@@ -13,7 +13,7 @@ import { LiveLine, Out, SEND } from "../steer/Live";
 import { Plan } from "../steer/Plan";
 import { RecipeBox } from "../steer/RecipeBox";
 import { addItems, replaceRecipe } from "../steer/recipe";
-import { FIX_CHIPS, newQuestion, PROMPTS, send, submit, tlMode } from "../steer/refine";
+import { newChat, PROMPTS, send, submit } from "../steer/refine";
 import { Thread } from "../steer/Thread";
 
 const cancel = () => api("/api/cancel", {});
@@ -169,33 +169,22 @@ function Step1() {
 }
 
 function Step2() {
-  const input = useSteer((s) => s.tInput), tl = useSteer((s) => s.tl);
-  useSteer((s) => s.v);
-  const fix = tlMode(tl) === "fix", box = useRef<HTMLInputElement>(null);
-
-  // a fix chip adds to what's written; a question chip asks it
-  const chip = (c: string) => {
-    if (!fix) return send(c);
-
-    const t = input.trim();
-    useSteer.setState({ tInput: t ? `${t.replace(/[.\s]*$/, "")}. ${c}.` : `${c}.` });
-    box.current!.focus();
-  };
+  const input = useSteer((s) => s.tInput), started = useSteer((s) => !!s.tl?.turns.length);
 
   return (
     <div className="step" id="st-s2">
       <div className="step-h"><span className="num">02</span><div><h3>Try it and refine</h3>
-        <p className="step-sub">Ask it something. If the answer isn’t right, say what should change and it tries again.</p></div></div>
+        <p className="step-sub">Talk to it with the changes on. If a reply isn’t right, say what’s wrong under it and it retunes and tries again.</p></div></div>
       <Thread />
       <form id="tl-form" className="tl-comp" autoComplete="off" onSubmit={(e) => (e.preventDefault(), submit())}>
         <div className="composer">
-          <input id="t-prompt" ref={box} spellCheck="false" placeholder={fix ? "What should change?" : "Ask it something"} value={input}
+          <input id="t-prompt" spellCheck="false" placeholder={started ? "Reply" : "Ask it something"} value={input}
             onChange={(e) => useSteer.setState({ tInput: e.target.value })} />
-          <button type="button" className="tl-newq" id="tl-newq" hidden={!tl?.versions.length} onClick={newQuestion}>{fix ? "New question" : "Cancel"}</button>
+          <button type="button" className="tl-newq" id="tl-new" hidden={!started} onClick={newChat}>New chat</button>
           <button type="button" className="send stop" id="tl-stop" aria-label="Stop" onClick={cancel}><i /></button>
           <button type="submit" className="send" id="t-go" aria-label="Send">{SEND}</button>
         </div>
-        <div className="tl-sugg" id="t-chips">{(fix ? FIX_CHIPS : PROMPTS).map((p) => <button key={p} type="button" className="chip" onClick={() => chip(p)}>{p}</button>)}</div>
+        {!started && <div className="tl-sugg" id="t-chips">{PROMPTS.map((p) => <button key={p} type="button" className="chip" onClick={() => send(p)}>{p}</button>)}</div>}
       </form>
     </div>
   );
