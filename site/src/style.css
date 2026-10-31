@@ -54,8 +54,6 @@ p { margin: 0; }
 }
 .btn:hover { background: var(--accent-hi); }
 .btn:active { transform: translateY(1px); }
-.btn.ghost { background: var(--panel-2); border-color: var(--rule-2); color: var(--text); }
-.btn.ghost:hover { background: #222; border-color: rgba(255, 255, 255, 0.22); }
 .btn.lg { padding: 12px 22px; font-size: 14px; font-weight: 600; }
 
 /* ------------------------------------------------------------ brand */
