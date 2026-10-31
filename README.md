@@ -51,8 +51,8 @@ changes, so any OpenAI client can talk to it.
 
 On an Apple silicon Mac:
 
-    git clone https://github.com/faizancodes/auto-interp
-    cd auto-interp && uv sync
+    git clone https://github.com/faizancodes/lodestar
+    cd lodestar && uv sync
     ./scripts/build_app.sh          # builds the UI and makes dist/Lodestar.app; drag it to /Applications or the Dock
     open dist/Lodestar.app
 
