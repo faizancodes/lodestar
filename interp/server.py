@@ -73,23 +73,56 @@ cancel = threading.Event()
 app = FastAPI()
 
 
+streams = {"latest": 0}
+
+
 def sse(gen):
-    """Wraps an event generator as a text/event-stream; errors and cancellations become events."""
-    def run():
-        cancel.clear()
+    """Wraps an event generator as a text/event-stream; errors and cancellations become events.
 
+    The generator runs on a thread of its own, start to finish. The engine's lock belongs to the thread that took
+    it, and Starlette steps a plain generator on whichever pool thread is free, so the lock would be taken on one
+    thread and released on another, which fails and leaves it held for good. A client that goes away stops the
+    thread at its next event (and cancels the work, unless a newer stream has started)."""
+    streams["latest"] += 1
+    me, gone = streams["latest"], threading.Event()
+
+    async def events():
+        loop, q = asyncio.get_running_loop(), asyncio.Queue()
+        put = lambda ev: loop.call_soon_threadsafe(q.put_nowait, ev)
+
+        def work():
+            cancel.clear()
+
+            try:
+                for ev in gen:
+                    if gone.is_set():
+                        break
+                    put(f"data: {json.dumps(_finite(ev), default=_np)}\n\n")
+            except Cancelled:
+                put(f"data: {json.dumps({'type': 'cancelled'})}\n\n")
+            except Exception as e:  # surface the message in the UI rather than a dead stream
+                traceback.print_exc()
+                put(f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n")
+            finally:
+                if hasattr(gen, "close"):
+                    gen.close()  # on this thread, so a lock it holds is released by its owner
+
+            put(f"data: {json.dumps({'type': 'end'})}\n\n")
+            put(None)
+
+        threading.Thread(target=work, daemon=True).start()
+        done = False
         try:
-            for ev in gen:
-                yield f"data: {json.dumps(_finite(ev), default=_np)}\n\n"
-        except Cancelled:
-            yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
-        except Exception as e:  # surface the message in the UI rather than a dead stream
-            traceback.print_exc()
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            while (x := await q.get()) is not None:
+                yield x
+            done = True
+        finally:
+            if not done:
+                gone.set()
+                if streams["latest"] == me:
+                    cancel.set()
 
-        yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
-    return StreamingResponse(run(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 def _finite(o):
