@@ -389,10 +389,12 @@ export function Chat({ hidden }: { hidden: boolean }) {
         <header className="chat-h">
           <div className="chat-title"><b id="chat-model">{model}</b></div>
           <Mods />
-          <CompareSwitch />
-          <GaugesPick />
-          <NeuronsButton />
-          <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
+          <div className="chat-acts">
+            <CompareSwitch />
+            <GaugesPick />
+            <NeuronsButton />
+            <button id="chat-new" className="btn ghost sm" title="New chat (⌘K)" onClick={newChat}>New chat</button>
+          </div>
         </header>
         <div className="chat-scroll" id="chat-scroll" onScroll={onScroll}>
           <Log />
