@@ -1,0 +1,193 @@
+/* Lodestar's site, in the app's own design: night and ASCII. A near-black ground, panels lifted a step at a time
+   with hairline rules, and the ASCII scenes as the one source of light, in pale periwinkle. Geist for headings,
+   text and controls; Geist Mono only for data and code. Tokens are the app's (web/src/styles/style.css). */
+:root {
+  --bg: #0a0a0a;
+  --night: #070707;
+  --panel: #111111;
+  --panel-2: #1a1a1a;
+  --text: #ededed;
+  --text-2: rgba(237, 237, 237, 0.7);
+  --muted: rgba(237, 237, 237, 0.45);
+  --accent: #f2f2f2;
+  --accent-hi: #ffffff;
+  --ascii: #c3cff5;
+  --good: #3ddc84;
+  --g-pos: #f0b45a;
+  --g-neg: #7aa2f7;
+  --rule: rgba(255, 255, 255, 0.08);
+  --rule-2: rgba(255, 255, 255, 0.14);
+  --wash: rgba(255, 255, 255, 0.05);
+  --well: rgba(255, 255, 255, 0.03);
+  --sans: "Geist", -apple-system, system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 6px;
+  --r-sm: 4px;
+  --w: 1120px;
+  --gut: clamp(16px, 4vw, 40px);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: var(--ascii); color: var(--bg); }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.035em; }
+p { margin: 0; }
+.art { display: block; color: var(--ascii); }
+
+/* ------------------------------------------------------------ buttons, as in the app */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 18px; border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: var(--accent); color: var(--bg); font: 500 13px/1.2 var(--sans); cursor: pointer;
+  transition: transform 0.08s, background 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--accent-hi); }
+.btn:active { transform: translateY(1px); }
+.btn.lg { padding: 12px 22px; font-size: 14px; font-weight: 600; }
+
+/* ------------------------------------------------------------ brand */
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand b { font-size: 18px; font-weight: 600; letter-spacing: -0.035em; }
+.brand-mark { display: flex; color: var(--ascii); }
+.brand.crest { display: inline-flex; margin-bottom: clamp(22px, 3vh, 32px); }
+
+/* ------------------------------------------------------------ hero: the lodestar's sky, framed like a viewfinder */
+.hero { position: relative; height: clamp(560px, 80vh, 820px); overflow: hidden; }
+.hero #hero-art {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+.hero::after { /* shade under the words */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 62% 90% at 8% 72%, rgba(10, 10, 10, 0.97) 35%, rgba(10, 10, 10, 0.6) 60%, transparent 85%);
+}
+.hud { position: absolute; inset: clamp(16px, 3vw, 32px); z-index: 1; pointer-events: none; }
+.hud::before { /* the frame's corners */
+  content: ""; position: absolute; inset: 0;
+  --c: rgba(195, 207, 245, 0.35); --l: 18px;
+  background:
+    linear-gradient(var(--c), var(--c)) 0 0 / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 0 0 / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 0 / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 100% 0 / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 0 100% / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 0 100% / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) 100% 100% / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) 100% 100% / 1px var(--l) no-repeat;
+}
+.hud-c { position: absolute; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+.hud-c.tr { top: 14px; right: 16px; }
+.hud-c.br { bottom: 14px; right: 16px; color: var(--ascii); }
+.hero-copy { position: absolute; z-index: 2; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%; transform: translateY(-50%); max-width: 780px; }
+.hero h1 { white-space: pre-line; font-size: clamp(44px, 7.2vw, 84px); line-height: 0.96; letter-spacing: -0.055em; color: #fff; text-shadow: 0 0 32px var(--bg), 0 0 12px var(--bg); }
+.lede { margin-top: 22px; font-size: clamp(16px, 1.5vw, 19px); color: rgba(237, 237, 237, 0.8); }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+
+/* ------------------------------------------------------------ features: one pinned stage, scrolled through */
+.seq { position: relative; --step: 100vh; height: calc((var(--steps) + 1) * 100vh); margin-top: clamp(60px, 10vh, 120px); }
+.seq-mark { position: absolute; left: 0; width: 1px; height: 1px; }
+.stage { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.seq-art {
+  position: absolute; top: 0; right: 120px; width: calc(66% - 80px); height: 100%; cursor: crosshair;
+  -webkit-mask-image: radial-gradient(ellipse 58% 62% at 52% 50%, #000 48%, transparent 100%);
+  mask-image: radial-gradient(ellipse 58% 62% at 52% 50%, #000 48%, transparent 100%);
+}
+.seq-copy {
+  position: absolute; left: max(var(--gut), calc((100vw - var(--w)) / 2 + var(--gut))); top: 50%;
+  width: min(400px, 36vw); height: 300px; transform: translateY(-50%); pointer-events: none;
+}
+.step {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+  opacity: 0; transform: translateY(18px); filter: blur(6px);
+  transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.5s ease;
+}
+.step.on { opacity: 1; transform: none; filter: none; pointer-events: auto; transition-delay: 0.08s; }
+.step-n { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--muted); letter-spacing: 0.04em; }
+.step-n::after { content: " / 05"; color: rgba(237, 237, 237, 0.22); }
+.kicker { display: block; margin: 22px 0 12px; font-size: 13px; font-weight: 600; color: var(--ascii); }
+.step h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; text-wrap: balance; }
+.step p { margin-top: 18px; max-width: 340px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
+.step code { padding: 1px 6px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--well); font-family: var(--mono); font-size: 13px; color: var(--text); }
+.dc { position: relative; color: transparent; }
+.dc::after { content: attr(data-g); position: absolute; left: 50%; top: 0; transform: translateX(-50%); font-family: var(--mono); font-weight: 600; color: var(--ascii); }
+.dc.w::after, .dc.r::after { content: none; }
+
+/* the rail: where you are in the sequence */
+.rail {
+  position: absolute; right: var(--gut); top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 22px; padding-right: 14px;
+}
+.rail-line { position: absolute; right: 0; top: 4px; bottom: 4px; width: 1px; background: var(--rule-2); }
+.rail-fill { position: absolute; inset: 0; background: var(--ascii); transform-origin: top; transform: scaleY(0); }
+.rail a { position: relative; display: flex; align-items: center; justify-content: flex-end; font-size: 12px; font-weight: 500; color: var(--muted); transition: color 0.3s; }
+.rail a:hover { color: var(--text-2); }
+.rail a.on { color: var(--text); }
+.rail a i { position: absolute; right: -17px; width: 7px; height: 7px; border: 1px solid var(--rule-2); border-radius: 50%; background: var(--bg); transition: background 0.3s, border-color 0.3s, box-shadow 0.3s; }
+.rail a.on i { background: var(--ascii); border-color: var(--ascii); box-shadow: 0 0 0 4px rgba(195, 207, 245, 0.12); }
+
+/* get it: framed like the hero, the commands in a terminal panel */
+.get { position: relative; padding: clamp(110px, 18vh, 180px) var(--gut); }
+.get .hud { inset: clamp(16px, 3vw, 32px) clamp(16px, 3vw, 32px); }
+.get-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: clamp(32px, 5vw, 72px); max-width: var(--w); margin: 0 auto; }
+#get-art { width: 100%; height: clamp(460px, 64vh, 620px); }
+.get-side { display: flex; flex-direction: column; gap: 40px; }
+.get h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; }
+.get p { margin-top: 18px; max-width: 380px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
+.get .cta { margin-top: 30px; }
+.term { margin: 0; padding: 6px; list-style: none; border: 1px solid var(--rule-2); border-radius: 12px; background: var(--panel); box-shadow: 0 30px 80px -30px rgba(195, 207, 245, 0.12); }
+.term li { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 0 6px 0 14px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+.term li + li { box-shadow: 0 -1px 0 var(--rule); }
+.term li:hover { background: var(--panel-2); box-shadow: none; }
+.term li:hover + li { box-shadow: none; }
+.term .n { flex: none; width: 14px; font: 500 11.5px/1 var(--mono); color: var(--ascii); opacity: 0.7; }
+.term code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font: 13px/1.5 var(--mono); color: var(--text); }
+.term code::-webkit-scrollbar { display: none; }
+.cp { flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--muted); cursor: pointer; opacity: 0.55; transition: opacity 0.15s, color 0.15s, background 0.15s; }
+.cp::before { content: ""; width: 14px; height: 14px; background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4'%3E%3Crect x='5.5' y='5.5' width='8' height='8' rx='1.6'/%3E%3Cpath d='M10.5 3.5v-.4A1.6 1.6 0 0 0 8.9 1.5H3.1A1.6 1.6 0 0 0 1.5 3.1v5.8a1.6 1.6 0 0 0 1.6 1.6h.4'/%3E%3C/svg%3E"); }
+.cp.done::before { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5l3.2 3L13 4.5'/%3E%3C/svg%3E"); }
+.term li:hover .cp, .cp:focus-visible, .cp.done { opacity: 1; }
+.cp:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.cp.done { color: var(--ascii); }
+
+.foot { position: relative; border-top: 1px solid var(--rule); }
+#foot-art { width: 100%; height: clamp(300px, 54vw, 680px); }
+
+/* things arrive as they come into view */
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ------------------------------------------------------------ narrow */
+@media (max-width: 900px) {
+  .get-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  #get-art { height: min(100vw, 480px); }
+  .hero { height: auto; min-height: 0; padding-top: min(84vw, 560px); }
+  .hero #hero-art { bottom: auto; height: min(96vw, 640px); }
+  .hero-copy { position: relative; left: auto; top: auto; transform: none; padding: 40px var(--gut) 56px; }
+  .hero::after { content: none; }
+  .seq-art { right: 0; width: 100%; height: 62%; -webkit-mask-image: radial-gradient(ellipse 62% 56% at 50% 50%, #000 45%, transparent 100%); mask-image: radial-gradient(ellipse 62% 56% at 50% 50%, #000 45%, transparent 100%); }
+  .seq-copy { left: var(--gut); right: calc(var(--gut) + 28px); top: auto; bottom: 4vh; width: auto; height: 34vh; transform: none; }
+  .step { justify-content: flex-start; }
+  .kicker { margin: 12px 0 8px; }
+  .step h2 { font-size: clamp(30px, 8vw, 40px); }
+  .step p { margin-top: 12px; font-size: 15px; }
+  .rail span:not(.rail-line):not(.rail-fill) { display: none; }
+  .rail { top: auto; bottom: 8vh; transform: none; gap: 16px; }
+}
+@media (max-width: 640px) {
+  .hud-c { display: none; }
+  .term code { font-size: 12px; }
+  .term li { gap: 10px; padding-left: 10px; }
+}
