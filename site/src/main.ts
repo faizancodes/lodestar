@@ -51,12 +51,15 @@ function hero() {
 
 // ---------------------------------------------------------------- the rest
 function copyInstall() {
-  const btn = $("#get .term-copy"), code = $("#get .term code");
-  btn.addEventListener("click", async () => {
-    const text = code.textContent!.split("\n").map((l) => l.replace(/^\$ /, "")).join("\n");
-    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; } catch { btn.textContent = "Select to copy"; }
-    setTimeout(() => (btn.textContent = "Copy"), 1600);
-  });
+  for (const btn of document.querySelectorAll<HTMLButtonElement>("#get .cp")) {
+    const code = btn.previousElementSibling!.textContent!;
+    btn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(code); } catch { return; }
+      btn.classList.add("done");
+      btn.setAttribute("aria-label", "Copied");
+      setTimeout(() => (btn.classList.remove("done"), btn.setAttribute("aria-label", "Copy")), 1400);
+    });
+  }
 }
 
 function reveal() {
