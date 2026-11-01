@@ -15,6 +15,7 @@ import torch
 LENS_K = 3
 MAX_TOKENS = 192
 REPLY_TOKENS = 96
+LIVE_LENS = 8  # layers the logit lens reads at each token while the model writes
 
 
 def _cfg(eng):
@@ -216,3 +217,78 @@ def neuron_trace(eng, l, n):
     if f is None:
         return None
     return [round(float(x), 3) for x in f["acts"][l, :, n].astype(np.float32)]
+
+
+class Live:
+    """While the model writes: hooks that keep, at the newest position of each forward pass, what every layer did,
+    on the device; frame() reads the last pass out in a few transfers. The first pass (the whole prompt) reads its
+    last position, the one that chose the reply's first token."""
+
+    def __init__(self, eng, k=32):
+        self.eng, self.k, self.handles = eng, k, []
+        L = len(eng.layers)
+        self.heads, self.attn, self.mlp, self.acts = [None] * L, [None] * L, [None] * L, [None] * L
+
+    def __enter__(self):
+        eng = self.eng
+        eng.lock.acquire()
+        kinds = eng.arch()["attention"]
+
+        def keep(store, l, last):
+            return lambda mod, inp, out=None: store.__setitem__(l, last(inp, out))
+
+        for l, layer in enumerate(eng.layers):
+            _, amod, out = attention_of(layer)
+            if out is not None:
+                hd = _head_dim(eng, amod, kinds[l])
+                if hd:
+                    self.handles.append(out.register_forward_pre_hook(
+                        keep(self.heads, l, lambda i, o, hd=hd: i[0][0, -1].float().view(-1, hd).norm(dim=-1))))
+                self.handles.append(out.register_forward_hook(
+                    keep(self.attn, l, lambda i, o: (o[0] if isinstance(o, tuple) else o)[0, -1].float().norm())))
+            down = layer.mlp.down_proj
+            self.handles.append(down.register_forward_pre_hook(keep(self.acts, l, lambda i, o: i[0][0, -1].float())))
+            self.handles.append(down.register_forward_hook(keep(self.mlp, l, lambda i, o: o[0, -1].float().norm())))
+        eng._cap_resid = {}
+        return self
+
+    def __exit__(self, *exc):
+        for h in self.handles:
+            h.remove()
+        self.eng._cap_resid = None
+        self.eng.lock.release()
+
+    def frame(self):
+        """What the last pass did: the stream's size and what attention and the MLP wrote at each layer, each head's
+        output, each layer's strongest neurons (impact relative to the layer's peak), and the logit lens's top word on
+        a few layers spread through the model (each reading costs a pass through the unembedding)."""
+        eng, L = self.eng, len(self.eng.layers)
+        with torch.inference_mode():
+            imp = torch.stack(self.acts) * (eng.dnorm / eng.resid_p50[:, None]).float()  # [L, N]
+            peak = imp.abs().amax(dim=1).clamp(min=1e-8)
+            idx = imp.abs().topk(self.k, dim=1).indices
+            val = imp.gather(1, idx) / peak[:, None]
+            resid = torch.stack([eng._cap_resid[l][-1] for l in range(L)])  # [L, H]
+            lens_at = sorted({round(i * (L - 1) / (LIVE_LENS - 1)) for i in range(LIVE_LENS)})
+            lens = eng.lm_head(eng.final_norm(resid[lens_at])).argmax(dim=-1)
+            zero = torch.zeros((), device=eng.dev)
+            heads = [h for h in self.heads if h is not None]
+            sizes = [0 if h is None else h.numel() for h in self.heads]
+            flat = torch.cat([val.flatten(), peak, resid.float().norm(dim=-1),
+                              torch.stack([zero if a is None else a for a in self.attn]), torch.stack(self.mlp), *heads])
+            flat, idx, lens = flat.cpu().tolist(), idx.cpu().tolist(), lens.cpu().tolist()
+
+        k, at = self.k, 0
+        def take(n):
+            nonlocal at
+            at += n
+            return flat[at - n:at]
+        val, peak, rn, attn, mlp = take(L * k), take(L), take(L), take(L), take(L)
+        r2 = lambda xs: [round(x, 2) for x in xs]
+        words = dict(zip(lens_at, (eng.tok.decode([t]) for t in lens)))
+        return {
+            "resid": r2(rn), "attn": r2(attn), "mlp": r2(mlp), "heads": [r2(take(n)) for n in sizes],
+            "top": [[[n, round(v, 3)] for n, v in zip(idx[l], val[l * k:(l + 1) * k])] for l in range(L)],
+            "peak": [round(p, 4) for p in peak],
+            "lens": [words.get(l) for l in range(L)],
+        }

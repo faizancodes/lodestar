@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
 import { stream } from "../lib/stream";
-import type { ArchActs, ArchDetail, ArchNeuron, ArchRun } from "../lib/types";
+import type { ArchActs, ArchDetail, ArchLive, ArchNeuron, ArchRun } from "../lib/types";
 import { setTab } from "../shell/engine";
 import { useApp } from "../store/app";
 import type { Focus, Part, Pick, Scene } from "./scene";
@@ -134,13 +134,21 @@ export async function runText() {
   let run: ArchRun | null = null;
   try {
     await stream("/api/arch/run", { text }, (ev) => {
-      if (ev.type === "delta") set({ reply: (get().reply ?? "") + String(ev.text) });
+      if (ev.type === "delta") {
+        set({ reply: (get().reply ?? "") + String(ev.text) });
+        if (ev.frame) scene?.liveFrame(ev.frame as ArchLive, String(ev.text));
+      }
       if (ev.type === "run") run = ev as unknown as ArchRun;
     });
   } finally {
     set({ running: false, reply: null });
   }
-  if (!run) return;
+  if (!run) { // stopped: back to the last full run, or to none
+    const prev = get().run;
+    scene?.setRun(prev);
+    if (prev) void pickToken(get().token);
+    return;
+  }
   const r: ArchRun = run;
   set({ run: r, acts: null });
   scene?.setRun(r);
