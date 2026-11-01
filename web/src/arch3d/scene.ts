@@ -549,14 +549,16 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
   }
 
   // ---------------------------------------------------------------- live, while the model writes
-  // Each token it writes arrives as a frame of what every layer did to choose it. The frame sets where each head and
-  // neuron is heading, and every animation frame eases them there, so the view flows from token to token rather than
-  // jumping. A pulse runs down the stream for each token, flaring each layer as it passes, and the token itself
-  // appears at the unembedding.
+  // Each token it writes arrives as a frame of what every layer did to choose it. A pulse carries the frame down the
+  // stream: as it reaches a layer, that layer's heads and neurons head to their new values (eased every animation
+  // frame, so the view flows rather than jumps), it flares, and its lens word updates. When the pulse reaches the
+  // unembedding the token itself appears there.
   const liveN = layers.map(() => new Map<number, number>()); // neuron -> where its impact is heading
   const liveH = layers.map((ly) => new Float32Array(ly.heads.n));
   let live = false, radiusT = radius.slice();
-  const pulses: number[] = [], TRAVEL = 0.55; // seconds from the embedding to the unembedding
+  const pulses: number[] = [], TRAVEL = 1.1; // seconds from the embedding to the unembedding
+  const reach = (l: number) => (l + 1) / (L + 1) * TRAVEL * 1000; // ms until the pulse reaches layer l
+  let pend: { f: ArchLive; t0: number; next: number; gp: number; hm: number; rm: number } | null = null;
   const outTok = document.createElement("span");
   outTok.className = "a3-out";
   labels.append(outTok);
@@ -564,6 +566,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
   function liveStart() {
     live = true;
     run = null;
+    pend = null;
     toU("run", G.uRun, 1, 400);
     layers.forEach((ly, l) => {
       ly.mlp.a.fill(0);
@@ -578,40 +581,50 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     outTok.textContent = "";
   }
 
+  /** Sends one token down the model; resolves once it has come out at the unembedding. */
   function liveFrame(f: ArchLive, text: string) {
     if (!live) liveStart();
-    const rm = Math.max(1e-6, ...f.resid);
-    radiusT = f.resid.map((r) => r / rm);
-    const gp = Math.max(1e-6, ...f.peak), hm = Math.max(1e-6, ...f.heads.flat());
+    while (pend && pend.next < L) arrive(pend.next++);
+    const rm = Math.max(1e-6, ...f.resid), gp = Math.max(1e-6, ...f.peak), hm = Math.max(1e-6, ...f.heads.flat());
     const t0 = performance.now();
+    pend = { f, t0, next: 0, gp, hm, rm };
     layers.forEach((ly, l) => {
-      (f.heads[l] || []).forEach((v, h) => (liveH[l][h] = Math.sqrt(v / hm)));
-      const want = liveN[l], s = Math.sqrt(f.peak[l] / gp);
-      for (const k of want.keys()) want.set(k, 0);
-      for (const [n, v] of f.top[l]) want.set(n, Math.sign(v) * Math.sqrt(Math.abs(v)) * s);
-      if (f.lens[l] != null) ly.lens.textContent = JSON.stringify(f.lens[l]).slice(1, -1);
-      // flare as the pulse passes
-      const at = (l + 1) / (L + 1) * TRAVEL * 1000;
-      for (const p of allParts(ly)) tween(`f${p.obj.id}`, 0.55, 0, 380, (v) => (p.u.uHover.value = Math.max(v, hoverObjs.includes(p) ? 1 : 0)), at);
+      for (const p of allParts(ly)) tween(`f${p.obj.id}`, 0.6, 0, 520, (v) => (p.u.uHover.value = Math.max(v, hoverObjs.includes(p) ? 1 : 0)), reach(l));
     });
     pulses.push(t0);
     const word = text.trim() ? text : JSON.stringify(text).slice(1, -1);
-    setTimeout(() => {
-      outTok.textContent = word;
-      outTok.classList.remove("pop");
-      void outTok.offsetWidth;
-      outTok.classList.add("pop");
-    }, TRAVEL * 1000);
+    return new Promise<void>((done) => setTimeout(() => {
+      if (live) {
+        outTok.textContent = word;
+        outTok.classList.remove("pop");
+        void outTok.offsetWidth;
+        outTok.classList.add("pop");
+      }
+      done();
+    }, TRAVEL * 1000));
+  }
+
+  function arrive(l: number) {
+    if (!pend) return;
+    const { f, gp, hm, rm } = pend, ly = layers[l];
+    radiusT[l] = f.resid[l] / rm;
+    (f.heads[l] || []).forEach((v, h) => (liveH[l][h] = Math.sqrt(v / hm)));
+    const want = liveN[l], s = Math.sqrt(f.peak[l] / gp);
+    for (const k of want.keys()) want.set(k, 0);
+    for (const [n, v] of f.top[l]) want.set(n, Math.sign(v) * Math.sqrt(Math.abs(v)) * s);
+    if (f.lens[l] != null) ly.lens.textContent = JSON.stringify(f.lens[l]).slice(1, -1);
   }
 
   function liveEnd() {
     live = false;
+    pend = null;
     outTok.textContent = "";
   }
 
   function liveStep(dt: number) {
     if (!live) return;
-    const k = 1 - Math.exp(-dt * 12);
+    while (pend && pend.next < L && performance.now() - pend.t0 >= reach(pend.next)) arrive(pend.next++);
+    const k = 1 - Math.exp(-dt * 10);
     for (let l = 0; l < L; l++) radius[l] += (radiusT[l] - radius[l]) * k;
     shapeStream();
     layers.forEach((ly, l) => {
@@ -723,7 +736,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
 
     liveStep(dt);
 
-    // a slow pulse along the stream, so the model reads as running; while it writes, one quick pulse per token
+    // a slow pulse along the stream, so the model reads as running; while it writes, one pulse per token
     const pulse = (now / 1000) * 0.18 % 1;
     while (pulses.length && now - pulses[0] > TRAVEL * 1300) pulses.shift();
     const fronts = pulses.map((p) => (now - p) / 1000 / TRAVEL);
