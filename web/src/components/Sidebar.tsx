@@ -12,7 +12,7 @@ const MARK = markSVG(36, 15);
 // drawn rather than typed: a "×" sits on the font's baseline, off the centre of its round button
 const CROSS = <svg viewBox="0 0 10 10" aria-hidden="true"><path d="m2.5 2.5 5 5m0-5-5 5" /></svg>;
 
-export const ICONS: Record<Exclude<Tab, "home">, JSX.Element> = {
+export const ICONS: Record<Exclude<Tab, "home" | "arch">, JSX.Element> = {
   abliterate: (
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 3.8 12 2.5l7 2.6v6.2c0 1.6-.35 3-1 4.25M15.9 19.1A13 13 0 0 1 12 21.5c-4.3-1.7-7-5.3-7-10.2V5.6" /><path d="m3 3 18 18" /></svg>
   ),
@@ -24,7 +24,7 @@ export const ICONS: Record<Exclude<Tab, "home">, JSX.Element> = {
   ),
 };
 
-function TabButton({ tab, label, children }: { tab: Exclude<Tab, "home">; label: string; children?: JSX.Element }) {
+function TabButton({ tab, label, children }: { tab: Exclude<Tab, "home" | "arch">; label: string; children?: JSX.Element }) {
   const loaded = useApp((s) => !!s.info?.loaded);
   const on = useApp((s) => loaded && s.tab === tab), want = useApp((s) => !loaded && s.want === tab);
   const cls = on ? "tab on" : want ? "tab idle want" : loaded ? "tab" : "tab idle";

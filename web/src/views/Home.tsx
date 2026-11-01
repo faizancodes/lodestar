@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { startArch } from "../art/arch";
+import { loadDetail, useArch } from "../arch3d/state";
 import { drawHomeArt, type HomeArt } from "../art/home";
 import { api } from "../lib/api";
 import { isDir, modelName } from "../lib/format";
@@ -64,12 +64,27 @@ export function Home({ hidden }: { hidden: boolean }) {
 
 const num = (n: number) => n.toLocaleString("en-US");
 
-// The loaded model drawn from embedding to unembedding, with the numbers that set its shape underneath.
+// The loaded model in 3D, turning slowly while hovered; it opens the Architecture page, which flies in from here.
 function Architecture() {
   const s = useApp((a) => a.info)!, a = s.arch!;
-  const box = useRef<HTMLDivElement>(null), art = useRef<HTMLCanvasElement>(null);
+  const stage = useRef<HTMLButtonElement>(null);
+  const d = useArch((x) => x.detail);
 
-  useEffect(() => startArch(art.current!, box.current!, { layers: s.layers!, hidden: s.hidden!, neurons: s.neurons!, arch: a }), [s.model]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void loadDetail(); }, [s.model]);
+  useEffect(() => {
+    if (!d || !stage.current) return;
+    let gone = false, dispose = () => {};
+    const box = stage.current;
+    void import("../arch3d/scene").then(({ createScene }) => {
+      if (gone) return;
+      const sc = createScene(box, d, {}, true);
+      const on = () => sc.setSpin(true), off = () => sc.setSpin(false);
+      box.addEventListener("mouseenter", on);
+      box.addEventListener("mouseleave", off);
+      dispose = () => (box.removeEventListener("mouseenter", on), box.removeEventListener("mouseleave", off), sc.dispose());
+    });
+    return () => ((gone = true), dispose());
+  }, [d]);
 
   const lin = a.attention.filter((t) => t === "linear").length;
   const facts: [string, string][] = [
@@ -83,10 +98,9 @@ function Architecture() {
 
   return (
     <section className="step arch" id="home-arch">
-      <div className="step-h"><div><h3>Architecture</h3></div></div>
-      <div className="arch-box" ref={box}>
-        <canvas className="arch-art" ref={art} aria-hidden="true" />
-        <div className="arch-ends" aria-hidden="true"><span>Embedding</span><span>{s.layers} layers</span><span>Unembedding</span></div>
+      <div className="step-h"><div><h3>Architecture</h3></div><button className="btn ghost sm" onClick={() => setTab("arch")}>Open</button></div>
+      <div className="arch-box">
+        <button className="arch-3d" ref={stage} onClick={() => setTab("arch")} aria-label="Open the architecture" />
         <dl className="arch-facts">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       </div>
     </section>

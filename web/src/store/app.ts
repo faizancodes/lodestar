@@ -3,11 +3,11 @@ import { load, save } from "../lib/storage";
 import type { Abl, CopyJob, Direction, Example, Fit, JLensJob, Memory, Models, Probes, Recipe, Status } from "../lib/types";
 
 export const TABS = ["abliterate", "steer", "chat"] as const;
-export type Tab = (typeof TABS)[number] | "home";
+export type Tab = (typeof TABS)[number] | "home" | "arch";
 
 function remembered(): Tab {
   const t = load("tab");
-  return TABS.includes(t as never) || t === "home" ? (t as Tab) : "steer";
+  return TABS.includes(t as never) || t === "home" || t === "arch" ? (t as Tab) : "steer";
 }
 
 type Toast = { msg: string; err: boolean; n: number }; // n changes on every toast, so a repeat shows again

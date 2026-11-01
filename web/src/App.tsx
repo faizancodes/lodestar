@@ -7,6 +7,7 @@ import { boot, setTab, toggleModelMenu } from "./shell/engine";
 import { TABS, useApp } from "./store/app";
 import { newChat } from "./chat/engine";
 import { Abliterate } from "./views/Abliterate";
+import { Arch, archBack } from "./views/Arch";
 import { Chat } from "./views/Chat";
 import { Home } from "./views/Home";
 import { Start } from "./views/Start";
@@ -20,6 +21,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (fitWarn) useApp.setState({ fitWarn: null });
     else if (menu.open) toggleModelMenu(false);
+    else if (tab === "arch") archBack();
     else closeLast();
     return;
   }
@@ -45,9 +47,10 @@ export function App() {
   return (
     <>
       <Sidebar />
-      <main id="main" className={loaded && tab === "chat" ? "is-chat" : undefined}>
+      <main id="main" className={loaded && tab === "chat" ? "is-chat" : loaded && tab === "arch" ? "is-arch" : undefined}>
         <Start />
         <Home hidden={hidden("home")} />
+        <Arch hidden={hidden("arch")} />
         <Abliterate hidden={hidden("abliterate")} />
         <Steer hidden={hidden("steer")} />
         <Chat hidden={hidden("chat")} />

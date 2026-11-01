@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import abl as abl_mod
+from . import archview
 from . import directions as dir_mod
 from . import discover
 from . import jlens as jlens_mod
@@ -475,6 +476,57 @@ def jlens_stop():
         _jlens_mark_stopped(jlens_job["model"], True)
     jlens_cancel.set()
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ architecture
+# The Architecture page: the model's real structure (described once per model), and text run through it.
+arch_cache = {}
+
+
+@app.get("/api/arch")
+def arch_detail():
+    need_model()
+    if eng.model_id not in arch_cache:
+        arch_cache.clear()
+        arch_cache[eng.model_id] = archview.structure(eng)
+    return arch_cache[eng.model_id]
+
+
+@app.get("/api/arch/neurons")
+def arch_neurons(layer: int):
+    need_model()
+    if not 0 <= layer < len(eng.layers):
+        raise HTTPException(400, f"layer must be 0..{len(eng.layers) - 1}")
+    return {"layer": layer, "norms": archview.neuron_norms(eng, layer)}
+
+
+@app.post("/api/arch/run")
+async def arch_run(req: Request):
+    need_model()
+    text = (await req.json()).get("text", "")
+    ids = eng.encode(text)
+    if not ids:
+        raise HTTPException(400, "Type some text to run through the model.")
+    return await run_in_threadpool(archview.run, eng, ids)
+
+
+@app.get("/api/arch/acts")
+def arch_acts(t: int):
+    need_model()
+    out = archview.acts(eng, t)
+    if out is None:
+        raise HTTPException(404, "no run")
+    return out
+
+
+@app.get("/api/arch/neuron")
+def arch_neuron(layer: int, n: int):
+    need_model()
+    L, N = eng.dnorm.shape
+    if not (0 <= layer < L and 0 <= n < N):
+        raise HTTPException(400, f"layer must be 0..{L - 1}, neuron 0..{N - 1}")
+    return {"layer": layer, "neuron": n, "norm": round(float(eng.dnorm[layer, n]), 4), "lens": eng.lens(layer, n, 10),
+            "acts": archview.neuron_trace(eng, layer, n)}
 
 
 # ------------------------------------------------------------------ neurons
