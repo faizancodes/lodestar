@@ -6,6 +6,7 @@ menu bar.
 
   uv run --with pillow python scripts/make_icon.py out.icns
   uv run --with pillow python scripts/make_icon.py preview.png 512     # one size, as a png
+  uv run --with pillow python scripts/make_icon.py --favicons site/public   # the site's favicons
 """
 import math
 import subprocess
@@ -85,11 +86,13 @@ def compass_star(x, y):
     return max(_star(x, y, 15.5, 8, 8, 6.5), ring, ticks)
 
 
-def draw(px):
+def draw(px, margin=0.1, corner=True):
+    """The icon at px square. margin: the empty edge round the tile (Apple's grid is 10%); corner=False gives a square
+    tile to the edge, for platforms that cut their own shape (iOS home screens)."""
     ss = 2 if px >= 256 else 4
     s = px * ss
     small = px <= 64
-    inset = s * 0.1  # Apple's grid: the tile sits inside a 10% margin
+    inset = s * margin
     tile = s - 2 * inset
 
     # the sky: a vertical fall from blue-black to black, lifted around the star
@@ -148,8 +151,51 @@ def draw(px):
     edge.putalpha(ImageChops.multiply(rim, fade))
     out.alpha_composite(edge)
 
-    out.putalpha(mask)
+    if corner:
+        out.putalpha(mask)
     return out.resize((px, px), Image.Resampling.LANCZOS)
+
+
+def favicon_svg(n=11):
+    """The tab icon as SVG: the mark on a dark rounded tile, each cell one of the app's marks, so browsers draw it sharp
+    at any size. The cells are markSVG's (web/src/art/mark.ts), on a coarser grid and without the faintest dots, which
+    at 16px would only blur the star."""
+    k, out = SPAN / n, []
+    for j in range(n):
+        for i in range(n):
+            b = min(1.0, max(compass_star((i + (u + 0.5) / 3) * k - SPAN / 2, (j + (v + 0.5) / 3) * k - SPAN / 2)
+                             for u in range(3) for v in range(3)))
+            if b < 0.2:
+                continue
+            cx, cy, a = i + 0.5, j + 0.5, 0.42
+            if b < 0.3:
+                h = (0.18 + 0.5 * b) / 2
+                out.append(f'<rect x="{cx - h:.3f}" y="{cy - h:.3f}" width="{2 * h:.3f}" height="{2 * h:.3f}" stroke="none"/>')
+            elif b < 0.55:
+                out.append(f'<path d="M{cx - a:.2f} {cy}h{2 * a}M{cx} {cy - a:.2f}v{2 * a}" stroke-width=".26" opacity=".85"/>')
+            elif b < 0.8:
+                q = a * 0.75
+                out.append(f'<path d="M{cx - q:.3f} {cy - q:.3f}l{2 * q:.3f} {2 * q:.3f}M{cx - q:.3f} {cy + q:.3f}l{2 * q:.3f} {-2 * q:.3f}" stroke-width=".3"/>')
+            else:
+                out.append(f'<rect x="{cx - 0.42:.2f}" y="{cy - 0.42:.2f}" width=".84" height=".84" stroke="none"/>')
+    ink = "#%02x%02x%02x" % INK
+    pad = 0.9  # tile edge to the ring's outer cells
+    w = n + 2 * pad
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{-pad} {-pad} {w} {w}">'
+            f'<rect x="{-pad}" y="{-pad}" width="{w}" height="{w}" rx="{w * 0.22:.2f}" fill="#0e1018"/>'
+            f'<g fill="{ink}" stroke="{ink}" stroke-linecap="square">{"".join(out)}</g></svg>\n')
+
+
+def favicons(d):
+    """The site's icons: an SVG for browsers that take one, a .ico for those that don't, a full-bleed tile for iOS home
+    screens, and two sizes for the web manifest."""
+    d = Path(d)
+    (d / "favicon.svg").write_text(favicon_svg())
+    ico = [draw(px, margin=0.02) for px in (48, 32, 16)]  # each size drawn for itself, not shrunk from the largest
+    ico[0].save(d / "favicon.ico", sizes=[im.size for im in ico], append_images=ico[1:])
+    draw(180, margin=0, corner=False).convert("RGB").save(d / "apple-touch-icon.png")
+    for px in (192, 512):
+        draw(px, margin=0, corner=False).convert("RGB").save(d / f"icon-{px}.png")
 
 
 def main(out):
@@ -169,7 +215,9 @@ def main(out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2:
+    if sys.argv[1] == "--favicons":
+        favicons(sys.argv[2])
+    elif len(sys.argv) > 2:
         draw(int(sys.argv[2])).save(sys.argv[1])
     else:
         main(sys.argv[1])

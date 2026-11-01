@@ -871,12 +871,13 @@ body.busy .tl-comp .send.stop { display: grid; }
 main.is-chat { padding: 0; overflow: hidden; }
 .chat { position: relative; display: flex; height: 100%; }
 .chat-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.chat-h {
-  display: flex; flex: none; align-items: center; gap: 16px; height: 64px; padding: 0 28px;
+.chat-h { /* the controls drop to a second row when a side panel leaves too little room */
+  display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-height: 64px; padding: 12px 28px;
   border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--bg) 88%, transparent);
 }
-.chat-title b { font-size: 15px; letter-spacing: -0.02em; color: var(--accent); }
-.chat-mods { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.chat-title b { font-size: 15px; letter-spacing: -0.02em; color: var(--accent); white-space: nowrap; }
+.chat-mods { flex: 1 1 auto; display: flex; gap: 6px; }
+.chat-acts { display: flex; align-items: center; gap: 16px; margin-left: auto; }
 .mod {
   padding: 3px 11px; border: 1px dashed var(--rule-2); border-radius: var(--r-sm); background: transparent;
   font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s;

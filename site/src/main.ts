@@ -70,10 +70,8 @@ function reveal() {
 }
 
 function get() {
-  const model = $("#get-model"), layers = $("#get-layers");
-  startAssembly($<HTMLCanvasElement>("#get-art"), {
-    status: (m, n) => { model.textContent = m.name; layers.textContent = `${n} / ${m.layers} layers`; },
-  });
+  const model = $("#get-model");
+  startAssembly($<HTMLCanvasElement>("#get-art"), { status: (m) => { model.textContent = m.name; } });
 }
 
 reveal();
