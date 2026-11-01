@@ -7,12 +7,14 @@ run(eng, ids) sends text through and keeps, for every layer and token, how big t
 attention and the MLP each write into it, how much each head writes, every neuron's activation, and the logit lens.
 """
 import base64
+import re
 
 import numpy as np
 import torch
 
 LENS_K = 3
-MAX_TOKENS = 96
+MAX_TOKENS = 192
+REPLY_TOKENS = 96
 
 
 def _cfg(eng):
@@ -114,10 +116,14 @@ def neuron_norms(eng, l):
     return [round(float(x), 4) for x in eng.dnorm[l].cpu()]
 
 
-def run(eng, ids):
-    """One forward pass over ids, keeping what each layer did at every token. Returns the summary sent to the page;
-    the neuron activations stay on eng.flow for acts()."""
-    ids = list(ids)[:MAX_TOKENS]
+def run(eng, ids, n_prompt=None):
+    """One forward pass over ids (the prompt, then n_prompt onward the model's reply to it), keeping what each layer
+    did at every token. Returns the summary sent to the page; the neuron activations stay on eng.flow for acts()."""
+    ids = list(ids)
+    n_prompt = len(ids) if n_prompt is None else n_prompt
+    if len(ids) > MAX_TOKENS:  # keep the end: the reply, and as much of the prompt before it as fits
+        n_prompt = max(0, n_prompt - (len(ids) - MAX_TOKENS))
+        ids = ids[-MAX_TOKENS:]
     L = len(eng.layers)
     heads, attn_w, mlp_w, handles = {}, {}, {}, []
 
@@ -173,6 +179,8 @@ def run(eng, ids):
 
     return {
         "tokens": tokens,
+        "n_prompt": n_prompt,
+        "special": [i in eng.tok.all_special_ids or bool(re.fullmatch(r"<\|?/?\w+\|?>", t)) for i, t in zip(ids, tokens)],
         "resid": [r2(x) for x in resid],
         "attn": [r2(attn_w[l]) if l in attn_w else [] for l in range(L)],
         "mlp": [r2(mlp_w[l]) for l in range(L)],

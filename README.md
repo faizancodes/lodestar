@@ -31,8 +31,8 @@ logit lens showing what each layer would say next and which neurons push hardest
 
 **Fly through the model.** Home's Architecture opens the loaded model in 3D: every layer's attention heads and
 MLP neurons as points along the residual stream, with each weight tensor's shape beside it. Open a layer, then a
-block, then a single head or neuron. Run text through it to light each head and neuron by what it did at any token,
-and to see what the logit lens reads at every layer.
+block, then a single head or neuron. Ask it something and it writes a reply; every head and neuron then lights by
+what it did at any token of your message or the reply, and the logit lens shows what each layer would say next.
 
 **Turn a concept up or down.** Raise or lower a neuron or a direction while the model writes. Stack them into
 recipes, or describe a behaviour and let the app search for the neurons that produce it.

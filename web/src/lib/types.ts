@@ -148,7 +148,7 @@ export type ArchDetail = {
   embedding: ArchPart; final_norm: ArchPart; unembedding: ArchPart; layers: ArchLayer[];
 };
 export type LensTok = { tok: string; p: number };
-/** Text run through the model: per layer, per token. */
-export type ArchRun = { tokens: string[]; resid: number[][]; attn: number[][]; mlp: number[][]; heads: number[][][]; lens: LensTok[][][] };
+/** Text run through the model as a chat message, then the reply it wrote (from n_prompt on): per layer, per token. */
+export type ArchRun = { tokens: string[]; n_prompt: number; special: boolean[]; resid: number[][]; attn: number[][]; mlp: number[][]; heads: number[][][]; lens: LensTok[][][] };
 export type ArchActs = { layers: number; neurons: number; peak: number[]; q: string; top: { layer: number; neuron: number; impact: number; act: number }[] };
 export type ArchNeuron = { layer: number; neuron: number; norm: number; lens: { up: string[]; down: string[] }; acts: number[] | null };

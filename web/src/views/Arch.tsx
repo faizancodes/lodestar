@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { Part } from "../arch3d/scene";
-import { PART_NAMES, attach, back, clearRun, clicked, go, layerTop, loadDetail, openNeuron, pickHead, pickToken, runText, step, useArch } from "../arch3d/state";
+import { PART_NAMES, attach, back, clearRun, stopRun, clicked, go, layerTop, loadDetail, openNeuron, pickHead, pickToken, runText, step, useArch } from "../arch3d/state";
 import { modelName } from "../lib/format";
-import type { ArchBlock, ArchDetail, ArchTensor } from "../lib/types";
+import type { ArchBlock, ArchDetail, ArchRun, ArchTensor } from "../lib/types";
 import { addItems } from "../steer/recipe";
 import { useApp } from "../store/app";
 
@@ -81,8 +81,9 @@ function Top() {
       </nav>
       <form className="a3-run" onSubmit={(e) => (e.preventDefault(), void runText())}>
         <input value={text} onChange={(e) => useArch.setState({ text: e.target.value })} spellCheck={false} aria-label="Text to run" />
-        <button className="btn sm" disabled={running || !text.trim()}>{running ? "Running…" : "Run"}</button>
-        {run && <button type="button" className="btn ghost sm" onClick={clearRun}>Clear</button>}
+        {running ? <button type="button" className="btn ghost sm" onClick={() => void stopRun()}>Stop</button>
+          : <button className="btn sm" disabled={!text.trim()}>Run</button>}
+        {run && !running && <button type="button" className="btn ghost sm" onClick={clearRun}>Clear</button>}
       </form>
     </div>
   );
@@ -115,19 +116,14 @@ function Tip() {
 }
 
 function Bottom({ d }: { d: ArchDetail }) {
-  const f = useArch((s) => s.focus), run = useArch((s) => s.run), t = useArch((s) => s.token);
+  const f = useArch((s) => s.focus), run = useArch((s) => s.run), t = useArch((s) => s.token), reply = useArch((s) => s.reply);
   const open = f.level === "layer" || f.level === "part" ? f.layer : -1;
   const w = run ? d.layers.map((_, l) => (run.attn[l][t] ?? 0) + (run.mlp[l][t] ?? 0)) : null;
   const wm = w ? Math.max(...w) : 1;
   return (
     <div className="a3-bottom">
-      {run && (
-        <div className="a3-tokens">
-          {run.tokens.map((x, i) => (
-            <button key={i} className={i === t ? "on" : undefined} onClick={() => void pickToken(i)}>{tok(x)}</button>
-          ))}
-        </div>
-      )}
+      {reply != null && <div className="a3-reply">{reply || "…"}</div>}
+      {run && reply == null && <Tokens run={run} t={t} />}
       <div className="a3-strip">
         <button className={`a3-end-c${f.level === "end" && f.end === "embed" ? " on" : ""}`} onClick={() => go({ level: "end", end: "embed" })}>Emb</button>
         {d.layers.map((ly, l) => (
@@ -139,6 +135,20 @@ function Bottom({ d }: { d: ArchDetail }) {
         ))}
         <button className={`a3-end-c${f.level === "end" && f.end === "unembed" ? " on" : ""}`} onClick={() => go({ level: "end", end: "unembed" })}>Out</button>
       </div>
+    </div>
+  );
+}
+
+// the prompt's tokens as the model saw them (the chat template's own, faint), then the reply it wrote
+function Tokens({ run, t }: { run: ArchRun; t: number }) {
+  const chip = (i: number) => (
+    <button key={i} className={[i === t && "on", run.special[i] && "sp"].filter(Boolean).join(" ") || undefined} onClick={() => void pickToken(i)}>{tok(run.tokens[i])}</button>
+  );
+  const ids = [...run.tokens.keys()];
+  return (
+    <div className="a3-tokens">
+      {ids.slice(0, run.n_prompt).map(chip)}
+      {run.n_prompt < run.tokens.length && <span className="a3-reply-toks">{ids.slice(run.n_prompt).map(chip)}</span>}
     </div>
   );
 }
