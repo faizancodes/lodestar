@@ -124,6 +124,11 @@ last layer with that layer's Jacobian, averaged over prompts and positions, and 
 put into words. On Qwen3-0.6B, at "The currency used in" (asked about the country whose capital is Tokyo), the middle
 layers read *countries, nations* and then *Japanese*, where the logit lens reads *following* and *most*.
 
+Once a model has its lens, neuron labels and Steer's word search use it too. A neuron is labelled by what the later
+layers make of its push, and a word is carried back to each layer before neurons are matched against it, so the search
+finds middle-layer neurons that hold the concept rather than only late ones that say the word. On Qwen3-0.6B, "music"
+finds a layer-10 neuron labelled *音乐, music, musical* that the plain search ranks nowhere.
+
 The Jacobians are computed once per model, one backward pass per residual dimension (about 2 minutes on Qwen3-0.6B),
 and saved in the data folder under `jlens/`.
 
