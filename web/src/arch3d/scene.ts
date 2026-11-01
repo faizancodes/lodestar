@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { ArchDetail, ArchRun } from "../lib/types";
+import type { ArchDetail, ArchLive, ArchRun } from "../lib/types";
 
 // The Architecture page's model in 3D, set in the same marks as every other scene in the app (a dot where it's faint,
 // then a plus, an ×, a block) but as points in space: every neuron of every MLP and every attention head is one.
@@ -506,6 +506,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
 
   let run: ArchRun | null = null, swept = false;
   function setRun(r: ArchRun | null) {
+    liveEnd();
     run = r;
     swept = false;
     toU("run", G.uRun, r ? 1 : 0, 500);
@@ -545,6 +546,89 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
       }
     });
     swept = true;
+  }
+
+  // ---------------------------------------------------------------- live, while the model writes
+  // Each token it writes arrives as a frame of what every layer did to choose it. The frame sets where each head and
+  // neuron is heading, and every animation frame eases them there, so the view flows from token to token rather than
+  // jumping. A pulse runs down the stream for each token, flaring each layer as it passes, and the token itself
+  // appears at the unembedding.
+  const liveN = layers.map(() => new Map<number, number>()); // neuron -> where its impact is heading
+  const liveH = layers.map((ly) => new Float32Array(ly.heads.n));
+  let live = false, radiusT = radius.slice();
+  const pulses: number[] = [], TRAVEL = 0.55; // seconds from the embedding to the unembedding
+  const outTok = document.createElement("span");
+  outTok.className = "a3-out";
+  labels.append(outTok);
+
+  function liveStart() {
+    live = true;
+    run = null;
+    toU("run", G.uRun, 1, 400);
+    layers.forEach((ly, l) => {
+      ly.mlp.a.fill(0);
+      ly.attn.a.fill(0);
+      (ly.mlp.geo.attributes.a as THREE.BufferAttribute).needsUpdate = true;
+      (ly.attn.geo.attributes.a as THREE.BufferAttribute).needsUpdate = true;
+      allParts(ly).forEach((p) => (p.u.uReveal.value = 1));
+      liveN[l].clear();
+      liveH[l].fill(0);
+      ly.lens.textContent = "";
+    });
+    outTok.textContent = "";
+  }
+
+  function liveFrame(f: ArchLive, text: string) {
+    if (!live) liveStart();
+    const rm = Math.max(1e-6, ...f.resid);
+    radiusT = f.resid.map((r) => r / rm);
+    const gp = Math.max(1e-6, ...f.peak), hm = Math.max(1e-6, ...f.heads.flat());
+    const t0 = performance.now();
+    layers.forEach((ly, l) => {
+      (f.heads[l] || []).forEach((v, h) => (liveH[l][h] = Math.sqrt(v / hm)));
+      const want = liveN[l], s = Math.sqrt(f.peak[l] / gp);
+      for (const k of want.keys()) want.set(k, 0);
+      for (const [n, v] of f.top[l]) want.set(n, Math.sign(v) * Math.sqrt(Math.abs(v)) * s);
+      if (f.lens[l] != null) ly.lens.textContent = JSON.stringify(f.lens[l]).slice(1, -1);
+      // flare as the pulse passes
+      const at = (l + 1) / (L + 1) * TRAVEL * 1000;
+      for (const p of allParts(ly)) tween(`f${p.obj.id}`, 0.55, 0, 380, (v) => (p.u.uHover.value = Math.max(v, hoverObjs.includes(p) ? 1 : 0)), at);
+    });
+    pulses.push(t0);
+    const word = text.trim() ? text : JSON.stringify(text).slice(1, -1);
+    setTimeout(() => {
+      outTok.textContent = word;
+      outTok.classList.remove("pop");
+      void outTok.offsetWidth;
+      outTok.classList.add("pop");
+    }, TRAVEL * 1000);
+  }
+
+  function liveEnd() {
+    live = false;
+    outTok.textContent = "";
+  }
+
+  function liveStep(dt: number) {
+    if (!live) return;
+    const k = 1 - Math.exp(-dt * 12);
+    for (let l = 0; l < L; l++) radius[l] += (radiusT[l] - radius[l]) * k;
+    shapeStream();
+    layers.forEach((ly, l) => {
+      ly.heads.ranges.forEach(([i0, i1], h) => {
+        const cur = ly.attn.a[i0];
+        ly.attn.a.fill(cur + (liveH[l][h] - cur) * k, i0, i1);
+      });
+      (ly.attn.geo.attributes.a as THREE.BufferAttribute).needsUpdate = true;
+      const want = liveN[l];
+      if (!want.size) return;
+      for (const [n, t] of want) {
+        const v = ly.mlp.a[n] + (t - ly.mlp.a[n]) * k;
+        ly.mlp.a[n] = v;
+        if (t === 0 && Math.abs(v) < 0.01) ((ly.mlp.a[n] = 0), want.delete(n));
+      }
+      (ly.mlp.geo.attributes.a as THREE.BufferAttribute).needsUpdate = true;
+    });
   }
 
   // ---------------------------------------------------------------- frame
@@ -587,7 +671,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
         if (ok) lastX = sx;
         ly.num.classList.toggle("on", l === open);
       }
-      const ls = place(ly.lens, x + OFF.attn, ly.heads.top + 0.14, 0, !!run && dim && focus.level !== "part");
+      const ls = place(ly.lens, x + OFF.attn, ly.heads.top + 0.14, 0, (!!run || live) && !!ly.lens.textContent && dim && focus.level !== "part");
       if (ls !== null) {
         const wd = ly.lens.offsetWidth;
         const ok = ls - wd / 2 > lastLens + 4 || l === open;
@@ -597,6 +681,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     });
     place(endLabels[0], warpX(X0), -1.78, 0, focus.level !== "part");
     place(endLabels[1], warpX(X1), -1.78, 0, focus.level !== "part");
+    place(outTok, warpX(X1), 1.95, 0, live && !!outTok.textContent);
     partLabels.forEach(({ p, e }) => {
       if (open < 0) return place(e, 0, 0, 0, false);
       const ly = layers[open], x = warpX(ly.x + OFF[p]);
@@ -636,12 +721,18 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     }
     controls?.update();
 
-    // a slow pulse along the stream, so the model reads as running
+    liveStep(dt);
+
+    // a slow pulse along the stream, so the model reads as running; while it writes, one quick pulse per token
     const pulse = (now / 1000) * 0.18 % 1;
+    while (pulses.length && now - pulses[0] > TRAVEL * 1300) pulses.shift();
+    const fronts = pulses.map((p) => (now - p) / 1000 / TRAVEL);
     const sb = stream.b;
     for (let i = 0; i < sb.length; i++) {
       const f = (streamX[i] - X0) / len;
-      sb[i] = 0.3 + 0.38 * Math.exp(-(((f - pulse) * 14) ** 2));
+      let b = live ? 0.3 : 0.3 + 0.38 * Math.exp(-(((f - pulse) * 14) ** 2));
+      for (const p of fronts) b = Math.max(b, 0.35 + 0.65 * Math.exp(-(((f - p) * 22) ** 2)));
+      sb[i] = b;
     }
     (stream.geo.attributes.b as THREE.BufferAttribute).needsUpdate = true;
 
@@ -668,6 +759,9 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     setNorms,
     setRun,
     setToken,
+    liveStart,
+    liveFrame,
+    liveEnd,
     select,
     setSpin: (on: boolean) => (spinning = on),
     /** Re-centres the camera on what's in focus, after the user has orbited away. */
