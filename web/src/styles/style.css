@@ -254,12 +254,14 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .hc-on { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px rgba(61, 220, 132, 0.6); }
 /* the model's architecture, under the cards */
 .arch-box { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
-.arch-art { display: block; width: 100%; height: 200px; background: var(--night); color: var(--ascii); opacity: 0.8; transition: opacity 0.2s; }
-.arch-box:hover .arch-art { opacity: 1; }
-.arch-ends {
-  display: flex; justify-content: space-between; padding: 8px 14px; background: var(--night); border-bottom: 1px solid var(--rule);
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--muted);
+.arch .step-h .btn { margin-left: auto; }
+.arch-3d {
+  position: relative; display: block; width: 100%; height: 260px; padding: 0; border: 0; border-bottom: 1px solid var(--rule);
+  background: radial-gradient(ellipse at 50% 60%, rgba(195, 207, 245, 0.06), transparent 70%), var(--night);
+  color: var(--ascii); cursor: pointer; overflow: hidden; opacity: 0.85; transition: opacity 0.25s;
 }
+.arch-3d:hover, .arch-3d:focus-visible { opacity: 1; outline: none; }
+.arch-3d .a3-gl { position: absolute; inset: 0; pointer-events: none; }
 .arch-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 24px; margin: 0; padding: 18px 20px; }
 .arch-facts dt { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
 .arch-facts dd { margin: 5px 0 0; font-size: 14px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -1149,3 +1151,126 @@ textarea, input:not([type]) { font-size: 14px; }
 .rc-row .seg button { padding: 2px 8px; font-size: 11px; }
 @media (max-width: 720px) { .dn-poles { grid-template-columns: 1fr; } }
 .chip.dir-chip .del { opacity: 0.5; } .chip.dir-chip .del:hover { opacity: 1; color: var(--bad); }
+
+/* ------------------------------------------------------------ the Architecture page */
+main.is-arch { padding: 0; overflow: hidden; }
+.a3 { display: flex; height: 100%; min-height: 0; }
+.a3-main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.a3-top { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
+.a3-crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 13.5px; }
+.a3-crumbs i { margin: 0 6px; font-style: normal; color: var(--muted); }
+.a3-crumbs button { padding: 3px 6px; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-2); cursor: pointer; }
+.a3-crumbs button:hover { background: var(--wash); color: var(--text); }
+.a3-crumbs b { padding: 3px 6px; font-weight: 600; color: var(--text); }
+.a3-run { display: flex; gap: 8px; margin-left: auto; flex: 0 1 380px; min-width: 200px; }
+.a3-run input { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--panel); font-size: 13px; }
+.a3-run input:focus { outline: none; border-color: rgba(195, 207, 245, 0.5); }
+
+.a3-stage {
+  position: relative; flex: 1; min-height: 0; overflow: hidden; color: var(--ascii);
+  background: radial-gradient(ellipse at 45% 45%, rgba(195, 207, 245, 0.05), transparent 65%), var(--bg);
+}
+.a3-stage .a3-gl { position: absolute; inset: 0; display: block; cursor: grab; touch-action: none; }
+.a3-stage .a3-gl:active { cursor: grabbing; }
+.a3-wait { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+.a3-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.a3-labels > span {
+  position: absolute; left: 0; top: 0; white-space: nowrap; translate: -50% -50%;
+  transition: opacity 0.25s; will-change: transform;
+}
+.a3-num { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.a3-num.on { color: var(--text); font-weight: 600; }
+.a3-lens {
+  padding: 1px 6px; border: 1px solid var(--rule-2); border-radius: 3px; background: rgba(10, 10, 10, 0.7);
+  font-family: var(--mono); font-size: 11px; color: var(--text); opacity: var(--p);
+}
+.a3-end { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.a3-part { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.a3-part:empty { display: none; }
+.a3-tip {
+  position: absolute; left: 0; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 1px; max-width: 280px;
+  padding: 6px 10px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: rgba(17, 17, 17, 0.94);
+  pointer-events: none; font-size: 12.5px; color: var(--text);
+}
+.a3-tip span { font-size: 11.5px; color: var(--text-2); }
+
+.a3-bottom { display: flex; flex-direction: column; gap: 8px; padding: 10px 18px 14px; border-top: 1px solid var(--rule); }
+.a3-tokens { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 2px; }
+.a3-tokens button, .a3-tokacts button {
+  flex: none; padding: 2px 6px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel);
+  font-family: var(--mono); font-size: 11.5px; white-space: pre; color: var(--text-2); cursor: pointer;
+}
+.a3-tokens button:hover { border-color: var(--rule-2); color: var(--text); }
+.a3-tokens button.on { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+.a3-strip { display: flex; align-items: stretch; gap: 2px; height: 40px; }
+.a3-cell, .a3-end-c {
+  position: relative; flex: 1; min-width: 0; padding: 0; border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--panel); cursor: pointer; overflow: hidden;
+}
+.a3-end-c { flex: none; width: 38px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.a3-cell i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: var(--dotfill); opacity: 0.55; transition: height 0.5s ease; }
+.a3-cell.lin i { opacity: 0.25; }
+.a3-cell span { position: absolute; left: 0; right: 0; bottom: 2px; font-family: var(--mono); font-size: 9.5px; color: var(--muted); }
+.a3-cell:hover, .a3-end-c:hover { border-color: rgba(195, 207, 245, 0.45); }
+.a3-cell.on, .a3-end-c.on { border-color: var(--accent); }
+.a3-cell.on span { color: var(--text); }
+
+.a3-side { flex: none; width: 340px; overflow-y: auto; padding: 22px 20px 40px; border-left: 1px solid var(--rule); background: var(--panel); }
+.a3-h h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.a3-h p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.a3-sec { margin-top: 22px; }
+.a3-sec-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.a3-sec-h h3 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.a3-at { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-2); white-space: pre; }
+.a3-dim { color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.a3-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; }
+.a3-facts dt { font-size: 11.5px; color: var(--muted); }
+.a3-facts dd { margin: 2px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.a3-bar { display: block; flex: 1; height: 7px; min-width: 40px; border-radius: 2px; background: var(--well); overflow: hidden; }
+.a3-bar i { display: block; height: 100%; background: var(--dotfill); transition: width 0.4s ease; }
+.a3-bar.pos i { background: radial-gradient(var(--g-pos) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
+.a3-bar.neg i { background: radial-gradient(var(--g-neg) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
+.a3-split > div, .a3-lensl > div { display: grid; grid-template-columns: 96px 1fr 58px; align-items: center; gap: 10px; padding: 3px 0; font-size: 12.5px; }
+.a3-split .mono, .a3-lensl > div > .mono:last-child { text-align: right; font-size: 11.5px; color: var(--text-2); }
+.a3-lensl { margin-top: 12px; }
+.a3-lensl > div > .mono:first-child { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.a3-list { display: flex; flex-direction: column; gap: 1px; }
+.a3-list button, .a3-heads button {
+  display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; padding: 5px 6px; border: 0;
+  border-radius: 3px; background: none; font-size: 12px; text-align: left; color: var(--text-2); cursor: pointer;
+}
+.a3-list button:hover, .a3-heads button:hover { background: var(--wash); color: var(--text); }
+.a3-heads { display: flex; flex-direction: column; gap: 1px; }
+.a3-heads-h, .a3-heads button { display: grid; grid-template-columns: 56px 1fr 1fr; gap: 10px; }
+.a3-heads-h { padding: 0 6px 6px; font-size: 11px; color: var(--muted); }
+.a3-heads button.on { background: var(--panel-2); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+.a3-heads .mono i { margin-left: 6px; font-style: normal; font-size: 10px; color: var(--muted); }
+.a3-blocks { display: flex; flex-direction: column; gap: 6px; }
+.a3-block { border: 1px solid var(--rule); border-radius: var(--r-sm); background: var(--bg); }
+.a3-block summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; list-style: none; }
+.a3-block summary::-webkit-details-marker { display: none; }
+.a3-block summary > span:first-child { font-weight: 600; }
+.a3-block summary .a3-dim { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+.a3-block summary .mono { margin-left: auto; font-size: 11.5px; color: var(--text-2); }
+.a3-block .a3-tensors { margin: 0 10px 10px; width: calc(100% - 20px); }
+.a3-tensors { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.a3-tensors td { padding: 4px 0; border-top: 1px solid var(--rule); vertical-align: top; word-break: break-all; }
+.a3-tensors td:nth-child(2) { padding: 4px 8px; white-space: nowrap; word-break: normal; color: var(--text); }
+.a3-tensors td:last-child { text-align: right; white-space: nowrap; }
+.a3-sec .a3-tensors + .a3-facts { margin-top: 14px; }
+.a3-hist { display: flex; align-items: flex-end; gap: 2px; height: 64px; }
+.a3-hist i { flex: 1; min-height: 1px; background: var(--dotfill); }
+.a3-hist-x { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10.5px; color: var(--muted); }
+.a3-toks { display: flex; flex-wrap: wrap; gap: 4px; }
+.a3-toks span {
+  padding: 2px 7px; border: 1px solid rgba(240, 180, 90, 0.4); border-radius: 3px;
+  font-family: var(--mono); font-size: 11.5px; white-space: pre; color: var(--g-pos);
+}
+.a3-toks.neg span { border-color: rgba(122, 162, 247, 0.4); color: var(--g-neg); }
+.a3-toks:empty::before { content: "…"; color: var(--muted); }
+.a3-tokacts { display: flex; flex-wrap: wrap; gap: 3px; }
+.a3-tokacts button { position: relative; color: var(--text); background: color-mix(in srgb, var(--c) calc(var(--v) * 55%), var(--panel)); }
+.a3-tokacts button.on { border-color: var(--accent); }
+.a3-actions { margin-top: 22px; }
+@media (max-width: 1000px) { .a3-side { width: 290px; } }
