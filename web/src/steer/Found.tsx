@@ -9,6 +9,7 @@ import type { Body } from "../store/steer";
 import { PanelSlot, RevealBox } from "./Panel";
 import { alive, closeWhere, openPanel, setBody } from "./panels";
 import { addItems, redrawn } from "./recipe";
+import { computeJlens, jlensLeft, stopJlens, watchJlens } from "../shell/engine";
 
 const recipeHas = (l: number, n: number) => (s: ReturnType<typeof useApp.getState>) =>
   s.recipe.items.some((i) => !isDir(i) && i.layer === l && i.neuron === n);
@@ -154,7 +155,6 @@ async function wordDetail(t: number) {
   );
 }
 
-type JobState = { ready: boolean; status: string; done: number; total: number; elapsed: number };
 let lensMode: "logit" | "j" | null = null; // the reader's last pick, kept from word to word
 
 /** Each layer read through the logit lens (what it expects next) or the J-lens (what it holds ready to say). */
@@ -183,38 +183,25 @@ function LayerLens({ t, lens, jlens: j0 }: { t: number; lens: TokenDetail["lens"
 }
 
 function JLensSetup({ onReady }: { onReady: () => void }) {
-  const [job, setJob] = useState<JobState | null>(null);
-  const [err, setErr] = useState("");
+  const job = useApp((s) => s.jlens);
 
-  useEffect(() => {
-    let live = true, timer = 0;
-    const poll = async () => {
-      const s = await api<JobState>("/api/jlens").catch(() => null);
-      if (!live || !s) return;
-      setJob(s);
-      if (s.ready) return onReady();
-      if (s.status.startsWith("error")) setErr(s.status.slice(7));
-      if (s.status === "computing") timer = window.setTimeout(poll, 1000);
-    };
-    poll();
-    return () => { live = false; clearTimeout(timer); };
-  }, [job?.status === "computing"]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { watchJlens(); }, []);
+  useEffect(() => { if (job?.ready) onReady(); }, [job?.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const start = () => api<JobState>("/api/jlens/compute", {}).then(setJob).catch((e) => setErr(e.message));
-  const left = job && job.done ? (job.elapsed / job.done) * (job.total - job.done) : 0;
-
-  if (job?.status === "computing") return (
-    <div className="jl-setup">
-      <div className="bar wide"><i style={{ width: `${(100 * job.done) / Math.max(1, job.total)}%` }} /></div>
-      <div className="jl-note">{job.done ? `About ${Math.max(1, Math.round(left / 60))} min left` : "Starting…"}</div>
-      <button className="btn ghost sm" onClick={() => api("/api/jlens/cancel", {})}>Stop</button>
-    </div>
-  );
+  if (job?.status === "computing") {
+    const left = jlensLeft(job);
+    return (
+      <div className="jl-setup">
+        <div className="bar wide"><i style={{ width: `${(100 * job.done) / Math.max(1, job.total)}%` }} /></div>
+        <div className="jl-note">{left ? `About ${left} min left` : "Starting…"}</div>
+        <button className="btn ghost sm" onClick={stopJlens}>Stop</button>
+      </div>
+    );
+  }
   return (
     <div className="jl-setup">
       <p className="jl-note">Computed once per model: a few minutes on a small model, longer on a large one.</p>
-      <button className="btn sm" onClick={start}>Compute J-lens</button>
-      {err && <div className="jl-note bad">{err}</div>}
+      <button className="btn sm" onClick={computeJlens}>Compute J-lens</button>
     </div>
   );
 }
