@@ -306,6 +306,8 @@ async def load(req: Request):
             dirs.load()
             eng.jlens = jlens_mod.load(jlens_mod.path_for(JLENS, mid), eng)
             LAST_MODEL.write_text(mid)
+            if eng.jlens is None and mid not in _jlens_stopped():
+                _jlens_start()
         except Exception as e:
             traceback.print_exc()
             eng.status = f"error: {e}"
@@ -397,22 +399,36 @@ def trace_token(t: int, k: int = 24):
 
 
 # ------------------------------------------------------------------ J-lens
+# Each model's lens is computed once, in the background, the first time the model loads; Stop is remembered (in
+# JLENS/stopped.json) so it doesn't start again on every load, and Inspect's Compute starts it by hand.
 jlens_job = {"model": None, "status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
 jlens_cancel = threading.Event()
+jlens_thread = None
+JLENS_STOPPED = JLENS / "stopped.json"
 
 
-@app.get("/api/jlens")
-def jlens_status():
-    job = jlens_job if jlens_job["model"] == eng.model_id else {"status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
-    return {"ready": eng.jlens is not None, **{k: v for k, v in job.items() if k != "model"}}
+def _jlens_stopped():
+    try:
+        return set(json.loads(JLENS_STOPPED.read_text()))
+    except (OSError, ValueError):
+        return set()
 
 
-@app.post("/api/jlens/compute")
-def jlens_compute():
-    """Computes the loaded model's J-lens in the background (minutes; see interp/jlens.py) and saves it."""
-    need_model()
-    if jlens_job["status"] == "computing":
-        raise HTTPException(409, "Already computing a J-lens.")
+def _jlens_mark_stopped(mid, stopped):
+    ids = _jlens_stopped() - {mid} | ({mid} if stopped else set())
+    JLENS.mkdir(parents=True, exist_ok=True)
+    JLENS_STOPPED.write_text(json.dumps(sorted(ids)))
+
+
+def _jlens_start():
+    """Computes the loaded model's J-lens in a background thread (minutes; see interp/jlens.py) and saves it. A
+    job for a model that has since been unloaded is let finish cancelling first."""
+    global jlens_thread
+    if jlens_thread is not None and jlens_thread.is_alive():
+        if jlens_job["model"] == eng.model_id:
+            return
+        jlens_cancel.set()
+        jlens_thread.join()
 
     mid = eng.model_id
     jlens_cancel.clear()
@@ -433,13 +449,30 @@ def jlens_compute():
         except Exception as e:
             traceback.print_exc()
             jlens_job["status"] = f"error: {e}"
+            _jlens_mark_stopped(mid, True)  # don't try again on every load
 
-    threading.Thread(target=work, daemon=True).start()
+    jlens_thread = threading.Thread(target=work, daemon=True)
+    jlens_thread.start()
+
+
+@app.get("/api/jlens")
+def jlens_status():
+    job = jlens_job if jlens_job["model"] == eng.model_id else {"status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
+    return {"ready": eng.jlens is not None, **{k: v for k, v in job.items() if k != "model"}}
+
+
+@app.post("/api/jlens/compute")
+def jlens_compute():
+    need_model()
+    _jlens_mark_stopped(eng.model_id, False)
+    _jlens_start()
     return jlens_status()
 
 
 @app.post("/api/jlens/cancel")
 def jlens_stop():
+    if jlens_job["status"] == "computing":
+        _jlens_mark_stopped(jlens_job["model"], True)
     jlens_cancel.set()
     return {"ok": True}
 

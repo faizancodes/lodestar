@@ -129,8 +129,10 @@ layers make of its push, and a word is carried back to each layer before neurons
 finds middle-layer neurons that hold the concept rather than only late ones that say the word. On Qwen3-0.6B, "music"
 finds a layer-10 neuron labelled *音乐, music, musical* that the plain search ranks nowhere.
 
-The Jacobians are computed once per model, one backward pass per residual dimension (about 2 minutes on Qwen3-0.6B),
-and saved in the data folder under `jlens/`.
+The Jacobians are computed once per model, in the background the first time it loads (the model card shows how far
+along it is, with a Stop), one backward pass per residual dimension: about 2 minutes on Qwen3-0.6B. They're saved in
+the data folder under `jlens/` and load with the model after that. A stopped model isn't started again on its own;
+Inspect's J-lens view offers to compute it.
 
 ## The site and these animations
 

@@ -164,6 +164,12 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .mem-rest { background: radial-gradient(rgba(237, 237, 237, 0.5) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
 .mem-n { flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; color: rgba(237, 237, 237, 0.5); }
 .mem.tight .mem-l, .mem.tight .mem-n { color: var(--warn); }
+.mem.jl + .mem { border-top: 0; padding-top: 2px; }
+.jl-stop {
+  flex: none; margin: -3px -2px -3px 0; padding: 2px 6px; border: 0; border-radius: 4px; background: transparent;
+  font: inherit; font-size: 11px; color: rgba(237, 237, 237, 0.55); cursor: pointer;
+}
+.jl-stop:hover { background: rgba(237, 237, 237, 0.1); color: var(--on-night); }
 .mem.tight .mem-app { background: radial-gradient(var(--warn) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
 .mem.tight .mem-rest { background: radial-gradient(rgba(240, 180, 90, 0.45) 0.8px, transparent 1.15px) 0 0 / 3px 3px; }
 

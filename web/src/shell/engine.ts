@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { finishScene, setLayers, setProgress, startScene, stopScene, wake } from "../art/loader";
 import { api } from "../lib/api";
 import { modelName, sleep } from "../lib/format";
-import type { Abl, CopyJob, Directions, Example, ExportJob, Fit, Memory, Models, Recipe, Status } from "../lib/types";
+import type { Abl, CopyJob, Directions, Example, ExportJob, Fit, JLensJob, Memory, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
 import { onChatShown, refreshChats } from "../chat/engine";
 import { useChat } from "../store/chat";
@@ -333,8 +333,42 @@ async function onModelReady() {
   refreshSaved();
   refreshAbl();
   refreshDirs();
+  watchJlens();
   set({ examples: await api<Example[]>("/api/examples").catch((): Example[] => []) });
 }
+
+// ------------------------------------------------------------------ J-lens
+// The server starts computing a model's J-lens the first time it loads (interp/server.py); this follows it for the
+// model card and Inspect until it's done or stopped.
+let watching = false;
+export async function watchJlens() {
+  if (watching) return;
+  watching = true;
+
+  try {
+    for (let was = ""; ; await sleep(1000)) {
+      const j = await api<JLensJob>("/api/jlens").catch(() => null);
+      if (!j) return set({ jlens: null });
+      set({ jlens: j });
+      if (j.status.startsWith("error")) toast(j.status.replace(/^error: /, "Couldn’t compute the J-lens: "), true);
+      if (was === "computing" && j.ready) toast("J-lens ready");
+      if (j.status !== "computing") return;
+      was = j.status;
+    }
+  } finally {
+    watching = false;
+  }
+}
+
+export async function computeJlens() {
+  try { set({ jlens: await api<JLensJob>("/api/jlens/compute", {}) }); } catch (e) { return toast((e as Error).message, true); }
+  watchJlens();
+}
+
+export const stopJlens = () => api("/api/jlens/cancel", {}).catch(() => {});
+
+/** Minutes left on the J-lens job, from its pace so far. */
+export const jlensLeft = (j: JLensJob) => (j.done ? Math.max(1, Math.round((j.elapsed / j.done) * (j.total - j.done) / 60)) : null);
 
 export async function refreshSaved() {
   try { set({ saved: await api<Recipe[]>("/api/recipes") }); } catch { return; }

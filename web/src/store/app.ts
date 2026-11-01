@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { load, save } from "../lib/storage";
-import type { Abl, CopyJob, Direction, Example, Fit, Memory, Models, Probes, Recipe, Status } from "../lib/types";
+import type { Abl, CopyJob, Direction, Example, Fit, JLensJob, Memory, Models, Probes, Recipe, Status } from "../lib/types";
 
 export const TABS = ["abliterate", "steer", "chat"] as const;
 export type Tab = (typeof TABS)[number] | "home";
@@ -35,6 +35,7 @@ type App = {
   start: Start;
   menu: Menu;
   memory: Memory | null;
+  jlens: JLensJob | null; // the loaded model's J-lens, computed in the background the first time it loads
   fitWarn: { id: string; fit: Fit } | null; // a model that may not fit, waiting on Load anyway or Cancel
   want: Tab | null; // a tab picked before any model was loaded: where the model opens once it's ready
   nudge: number; // counts those picks, so the start screen can point at the models again each time
@@ -62,6 +63,7 @@ export const useApp = create<App>((set) => ({
   start: { loading: false, leaving: false, picked: null, status: "" },
   menu: { open: false, left: 0, bottom: 0, maxHeight: 0 },
   memory: null,
+  jlens: null,
   fitWarn: null,
   want: null,
   nudge: 0,
