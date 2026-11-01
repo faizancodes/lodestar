@@ -22,6 +22,23 @@ const clamp = (x: number) => Math.max(0, Math.min(1, x));
 const ease = (x: number) => { x = clamp(x); return x * x * (3 - 2 * x); };
 type V = [number, number, number];
 
+// how far the scene reaches from its centre, in units of its scale: up to the ring, down to the bottom plate's near
+// corner, out to the gimbal rings, for the widest model at either end of the pointer's tilt. The view fits to this.
+const REACH = (() => {
+  const H = Math.max(...MODELS.map((m) => 0.22 + (m.width - 3) * 0.05));
+  let up = 0, down = 0, side = 0;
+  for (const pitch of [0.26, 0.46])
+    for (const [y, r] of [[-1, H * 1.6], [0.84, H * 1.6], [1.22, H * 0.84]])
+      for (let deg = 0; deg < 360; deg += 10) {
+        const x = Math.cos((deg * Math.PI) / 180) * r, z = Math.sin((deg * Math.PI) / 180) * r;
+        const y3 = y * Math.cos(pitch) - z * Math.sin(pitch), k = 4 / (4 - (y * Math.sin(pitch) + z * Math.cos(pitch)));
+        up = Math.max(up, y3 * k);
+        down = Math.max(down, -y3 * k);
+        side = Math.max(side, Math.abs(x) * k);
+      }
+  return { up, down, side };
+})();
+
 /** status: called with the model on the tower and how many of its layers are in, whenever either changes. */
 export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Model, loaded: number) => void } = {}) {
   let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
@@ -69,7 +86,8 @@ export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Mo
     py += (ty - py) * 0.05;
     const yaw = t * 0.16 + px * 0.5, cy_ = Math.cos(yaw), sy = Math.sin(yaw);
     const pitch = 0.36 + py * 0.1, cp = Math.cos(pitch), sp = Math.sin(pitch);
-    const S = Math.min(rows * 0.37, cols * 0.5), cx = cols / 2, cy = rows * 0.55;
+    const S = Math.min((rows * 0.92) / (REACH.up + REACH.down), (cols * 0.48) / REACH.side);
+    const cx = cols / 2, cy = rows / 2 + ((REACH.up - REACH.down) / 2) * S;
     const project = (v: V): [number, number, number] => {
       const x2 = v[0] * cy_ + v[2] * sy, z2 = -v[0] * sy + v[2] * cy_;
       const y3 = v[1] * cp - z2 * sp, z3 = v[1] * sp + z2 * cp;

@@ -35,6 +35,7 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
     if (!w || !h) return false;
+    if (canvas.width === Math.round(w * dpr) && canvas.height === Math.round(h * dpr)) return false;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     ctx = canvas.getContext("2d")!;
@@ -199,6 +200,7 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
   if (size()) run();
   new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(canvas);
   document.addEventListener("visibilitychange", () => !document.hidden && run());
-  let rt: ReturnType<typeof setTimeout> | undefined;
-  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => size() && (still ? draw(4) : run()), 150); });
+  // resize the bitmap whenever the canvas's box changes, not just on a window resize: on a phone the box settles after
+  // the first frame (the viewport units shift as the browser's bars appear), and a stale bitmap draws stretched
+  new ResizeObserver(() => size() && (still ? draw(4) : lastT >= 0 ? draw(lastT) : run())).observe(canvas);
 }
