@@ -9,6 +9,7 @@ import type { Body } from "../store/steer";
 import { PanelSlot, RevealBox } from "./Panel";
 import { alive, closeWhere, openPanel, setBody } from "./panels";
 import { addItems, redrawn } from "./recipe";
+import { computeJlens, jlensLeft, stopJlens, watchJlens } from "../shell/engine";
 
 const recipeHas = (l: number, n: number) => (s: ReturnType<typeof useApp.getState>) =>
   s.recipe.items.some((i) => !isDir(i) && i.layer === l && i.neuron === n);
@@ -145,14 +146,62 @@ function InspectBody({ tr, first }: { tr: Trace; first: JSX.Element }) {
 async function wordDetail(t: number) {
   const d = await api<TokenDetail>(`/api/trace/token?t=${t}`);
   const rows = d.neurons.slice(0, 12).map((x) => ({ ...x, dose: ((x.act as number) >= 0 ? 1 : -1) * 0.8 }));
-  const every = d.lens.length > 24 ? 2 : 1; // keep the layer table short on deep models
 
   return (
     <div className="in-cols">
       <div><h4>Neurons most active here</h4><div className="found">{rows.map((x, i) => <FoundRow key={i} x={x} scope="in" />)}</div></div>
-      <div><h4>What each layer expects next</h4><table className="guess"><tbody>{d.lens.map((row, l) => l % every && l !== d.lens.length - 1 ? null : (
-        <tr key={l}><td className="l">{l}</td><td className="t">{showTok(row[0].tok)}</td><td><div className="bar"><i data-w={`${Math.round(row[0].p * 100)}%`} /></div></td></tr>
-      ))}</tbody></table></div>
+      <LayerLens t={t} lens={d.lens} jlens={d.jlens} />
+    </div>
+  );
+}
+
+let lensMode: "logit" | "j" | null = null; // the reader's last pick, kept from word to word
+
+/** Each layer read through the logit lens (what it expects next) or the J-lens (what it holds ready to say). */
+function LayerLens({ t, lens, jlens: j0 }: { t: number; lens: TokenDetail["lens"]; jlens: TokenDetail["jlens"] }) {
+  const [jlens, setJ] = useState(j0);
+  const [mode, setMode] = useState<"logit" | "j">(lensMode ?? (j0 ? "j" : "logit"));
+  const [moved, setMoved] = useState(false); // after a switch, bars take their width at once
+  const pick = (m: "logit" | "j") => { lensMode = m; setMode(m); setMoved(true); };
+  const rows = mode === "j" ? jlens : lens;
+  const every = lens.length > 24 ? 2 : 1; // keep the layer table short on deep models
+
+  return (
+    <div>
+      <div className="lens-h">
+        <h4>{mode === "j" ? "What each layer holds" : "What each layer expects next"}</h4>
+        <div className="seg"><button className={mode === "logit" ? "on" : ""} onClick={() => pick("logit")}>Logit lens</button>
+          <button className={mode === "j" ? "on" : ""} onClick={() => pick("j")}>J-lens</button></div>
+      </div>
+      {rows ? <table className="guess"><tbody>{rows.map((row, l) => l % every && l !== rows.length - 1 ? null : (
+        <tr key={l}><td className="l">{l}</td><td className="t">{showTok(row[0].tok)}</td>
+          {mode === "j" && <td className="more">{row.slice(1, 3).map((x) => showTok(x.tok)).join("  ")}</td>}
+          <td><div className="bar"><i data-w={`${Math.round(row[0].p * 100)}%`} style={moved ? { width: `${Math.round(row[0].p * 100)}%` } : undefined} /></div></td></tr>
+      ))}</tbody></table> : <JLensSetup onReady={async () => setJ((await api<TokenDetail>(`/api/trace/token?t=${t}`)).jlens)} />}
+    </div>
+  );
+}
+
+function JLensSetup({ onReady }: { onReady: () => void }) {
+  const job = useApp((s) => s.jlens);
+
+  useEffect(() => { watchJlens(); }, []);
+  useEffect(() => { if (job?.ready) onReady(); }, [job?.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (job?.status === "computing") {
+    const left = jlensLeft(job);
+    return (
+      <div className="jl-setup">
+        <div className="bar wide"><i style={{ width: `${(100 * job.done) / Math.max(1, job.total)}%` }} /></div>
+        <div className="jl-note">{left ? `About ${left} min left` : "Starting…"}</div>
+        <button className="btn ghost sm" onClick={stopJlens}>Stop</button>
+      </div>
+    );
+  }
+  return (
+    <div className="jl-setup">
+      <p className="jl-note">Computed once per model: a few minutes on a small model, longer on a large one.</p>
+      <button className="btn sm" onClick={computeJlens}>Compute J-lens</button>
     </div>
   );
 }

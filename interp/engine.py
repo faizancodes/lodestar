@@ -71,6 +71,7 @@ class Engine:
         # how far along it is and how much of each layer's weights has arrived, for the loading scene
         self.load_state = None
         self.trace = None
+        self.jlens = None  # [L, H, H] on the device once computed or loaded (interp/jlens.py)
 
         self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None), "dir": {layer: [B, H]}, "erase": [...]}
         self.dirs = {}  # direction id -> {"unit": [L, H] float32 on device, "mag": [L] list, "band": [layers],
@@ -250,6 +251,7 @@ class Engine:
         self.model = self.tok = None
         self.model_id = None
         self.trace = None
+        self.jlens = None
         self.dirs = {}
         self.abl_vec = self._abl_mask = None
         self._abl_any = False
@@ -679,6 +681,7 @@ class Engine:
                         del lg, p
 
                 acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
+                resid = torch.stack([self._cap_resid[l] for l in range(L)]).half().cpu()  # [L, T, H], for the J-lens
             finally:
                 self._cap_acts = self._cap_resid = None
                 self._push_state = None
@@ -688,10 +691,19 @@ class Engine:
             impact_scale = (self.dnorm / self.resid_p50[:, None]).cpu().numpy().astype(np.float32)  # [L, N]
             self.trace = {
                 "ids": ids, "n_prompt": len(prompt_ids), "tokens": self.token_strs(ids), "acts": acts,
-                "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p),
+                "impact_scale": impact_scale, "lens_ids": np.stack(lens_ids), "lens_p": np.stack(lens_p), "resid": resid,
             }
 
             return self.trace
+
+    def trace_jlens(self, t, k=5):
+        """The J-lens at token t of the trace, every layer: (ids [L, k], p [L, k]), or None without a lens."""
+        if self.jlens is None or self.trace is None:
+            return None
+        from . import jlens
+        with self.lock:
+            ids, p = jlens.read(self, self.jlens, self.trace["resid"][:, t : t + 1].to(self.dev), k)
+        return ids[:, 0], p[:, 0]
 
     def trace_top_neurons(self, t=None, k=40, response_only=True):
         """Neurons with the largest impact (|activation| x down-column norm / layer residual median) at token t, or
@@ -730,10 +742,13 @@ class Engine:
 
     # ---------------------------------------------------------------- neuron views
     def lens(self, layer, n, k=12):
-        """Tokens the neuron's down column pushes up (+) and down (-) through the final norm and unembedding."""
+        """Tokens the neuron's down column pushes up (+) and down (-): through the layer's J-lens when the model has one
+        (what the later layers make of the push), else straight through the final norm and unembedding."""
         with self.lock, torch.inference_mode():
             d = self.layers[layer].mlp.down_proj.weight[:, n]
             vecs = torch.stack([d, -d])[:, None] * (self.resid_p50[layer] / d.float().norm()).to(d.dtype)
+            if self.jlens is not None:
+                vecs = vecs.to(self.jlens.dtype) @ self.jlens[layer].T
             logits = self.lm_head(self.final_norm(vecs))[:, 0].float()
             up = logits[0].topk(k).indices.tolist()
             down = logits[1].topk(k).indices.tolist()
@@ -875,7 +890,9 @@ class Engine:
         """Neurons whose push most directly raises (or, pushed negative, raises) the logit of `word`: the word's
         unembedding row (centred on the vocabulary mean, through the final norm's gain) against each neuron's down
         column, per unit dose. Returns [(layer, neuron, signed score)], strongest first; a negative score means the
-        neuron must be turned down to favour the word. Direct effect only: later layers dominate."""
+        neuron must be turned down to favour the word. With a J-lens the word is first carried back to each layer
+        (J_l^T u), so a neuron scores by what the later layers make of its push, not only its direct effect; without
+        one, later layers dominate."""
         with self.lock, torch.inference_mode():
             # only spellings that are one whole token; a fragment like "P" from " pirate" would match noise
             ids, partial = set(), False
@@ -900,7 +917,8 @@ class Engine:
             best = []
             for l, layer in enumerate(self.layers[: len(self.layers) - skip_last]):
                 D = layer.mlp.down_proj.weight
-                sc = (u.to(D.dtype) @ D).float() / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
+                ul = u if self.jlens is None else (u.to(self.jlens.dtype) @ self.jlens[l]).float()
+                sc = (ul.to(D.dtype) @ D).float() / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
                 top = sc.abs().topk(k)
                 best += [(l, int(n), float(sc[n])) for n in top.indices.tolist()]
 
