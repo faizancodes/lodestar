@@ -125,25 +125,50 @@ function marks() {
   ]);
 }
 
-/** Sends the text as a chat message: the reply streams in, then the prompt and reply come back traced. Opens on
- *  the prompt's last token, where the model chose the reply's first word. */
+/** Sends the text as a chat message: the reply streams in, then the prompt and reply come back traced. The model
+ *  writes faster than anyone can follow, so its tokens queue up and play through the view at a steady pace, the reply
+ *  growing as each one comes out. Opens on the prompt's last token, where the model chose the reply's first word. */
+let stopped = false;
+const HOLD = 450; // ms each token rests at the unembedding before the next one sets off
+
 export async function runText() {
   const text = get().text.trim();
   if (!text || get().running) return;
   set({ running: true, reply: "" });
+  stopped = false;
+  const queue: { text: string; frame?: ArchLive }[] = [];
+  let ended = false, wake: (() => void) | null = null;
+  const nudge = () => (wake?.(), (wake = null));
+  const play = (async () => {
+    for (;;) {
+      if (stopped) return;
+      const next = queue.shift();
+      if (!next) {
+        if (ended) return;
+        await new Promise<void>((r) => (wake = r));
+        continue;
+      }
+      if (next.frame && scene) {
+        await scene.liveFrame(next.frame, next.text);
+        if (stopped) return;
+        set({ reply: (get().reply ?? "") + next.text });
+        await new Promise((r) => setTimeout(r, HOLD));
+      } else set({ reply: (get().reply ?? "") + next.text });
+    }
+  })();
   let run: ArchRun | null = null;
   try {
     await stream("/api/arch/run", { text }, (ev) => {
-      if (ev.type === "delta") {
-        set({ reply: (get().reply ?? "") + String(ev.text) });
-        if (ev.frame) scene?.liveFrame(ev.frame as ArchLive, String(ev.text));
-      }
+      if (ev.type === "delta") (queue.push({ text: String(ev.text), frame: ev.frame as ArchLive | undefined }), nudge());
       if (ev.type === "run") run = ev as unknown as ArchRun;
     });
   } finally {
+    ended = true;
+    nudge();
+    await play;
     set({ running: false, reply: null });
   }
-  if (!run) { // stopped: back to the last full run, or to none
+  if (!run) { // stopped while writing: back to the last full run, or to none
     const prev = get().run;
     scene?.setRun(prev);
     if (prev) void pickToken(get().token);
@@ -157,7 +182,11 @@ export async function runText() {
   if (n) void openNeuron(n.layer, n.neuron); // its activations over the new text
 }
 
-export const stopRun = () => api("/api/cancel", {});
+/** Stops the model writing, and the view playing what it already wrote. */
+export function stopRun() {
+  stopped = true;
+  return api("/api/cancel", {});
+}
 
 export function clearRun() {
   set({ run: null, acts: null });
