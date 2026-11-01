@@ -502,8 +502,8 @@ def arch_neurons(layer: int):
 
 @app.post("/api/arch/run")
 async def arch_run(req: Request):
-    """The text as a chat message: the model's reply streams in as it's written, then the prompt and the reply go
-    through once more to record what every layer did at each token."""
+    """The text as a chat message: the model's reply streams in as it's written, each piece with a frame of what every
+    layer did to choose it, then the prompt and the reply go through once more to record every layer at each token."""
     need_model()
     text = (await req.json()).get("text", "").strip()
     if not text:
@@ -512,11 +512,12 @@ async def arch_run(req: Request):
 
     def gen():
         reply = []
-        for r, x in eng.generate([(pid, [])], max_new=archview.REPLY_TOKENS, cancel=cancel):
-            if r is None:
-                reply = x[0]
-            else:
-                yield {"type": "delta", "text": x}
+        with archview.Live(eng) as live:  # each piece of text comes with what every layer did to choose it
+            for r, x in eng.generate([(pid, [])], max_new=archview.REPLY_TOKENS, cancel=cancel):
+                if r is None:
+                    reply = x[0]
+                else:
+                    yield {"type": "delta", "text": x, "frame": live.frame()}
         yield {"type": "run", **archview.run(eng, pid + reply, len(pid))}
 
     return sse(gen())
