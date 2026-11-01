@@ -2,6 +2,7 @@
 // what's picked. The scene itself lives in scene.ts (loaded with three.js only when the page first opens).
 import { create } from "zustand";
 import { api } from "../lib/api";
+import { stream } from "../lib/stream";
 import type { ArchActs, ArchDetail, ArchNeuron, ArchRun } from "../lib/types";
 import { setTab } from "../shell/engine";
 import { useApp } from "../store/app";
@@ -16,6 +17,7 @@ type State = {
   focus: Focus;
   text: string;
   running: boolean;
+  reply: string | null; // the reply as it's written, until the run that traces it arrives
   run: ArchRun | null;
   token: number;
   acts: Acts | null;
@@ -26,8 +28,8 @@ type State = {
 
 export const useArch = create<State>(() => ({
   model: null, detail: null, norms: [], focus: { level: "model" },
-  text: "The capital of France is Paris, and the capital of Japan is",
-  running: false, run: null, token: 0, acts: null, neuron: null, head: null, hover: null,
+  text: "What is the capital of Japan?",
+  running: false, reply: null, run: null, token: 0, acts: null, neuron: null, head: null, hover: null,
 }));
 
 const get = useArch.getState, set = useArch.setState;
@@ -123,23 +125,31 @@ function marks() {
   ]);
 }
 
+/** Sends the text as a chat message: the reply streams in, then the prompt and reply come back traced. Opens on
+ *  the prompt's last token, where the model chose the reply's first word. */
 export async function runText() {
   const text = get().text.trim();
   if (!text || get().running) return;
-  set({ running: true });
+  set({ running: true, reply: "" });
+  let run: ArchRun | null = null;
   try {
-    const run = await api<ArchRun>("/api/arch/run", { text });
-    set({ run, acts: null });
-    scene?.setRun(run);
-    await pickToken(run.tokens.length - 1);
-    const n = get().neuron;
-    if (n) void openNeuron(n.layer, n.neuron); // its activations over the new text
-  } catch (e) {
-    useApp.getState().toastMsg((e as Error).message, true);
+    await stream("/api/arch/run", { text }, (ev) => {
+      if (ev.type === "delta") set({ reply: (get().reply ?? "") + String(ev.text) });
+      if (ev.type === "run") run = ev as unknown as ArchRun;
+    });
   } finally {
-    set({ running: false });
+    set({ running: false, reply: null });
   }
+  if (!run) return;
+  const r: ArchRun = run;
+  set({ run: r, acts: null });
+  scene?.setRun(r);
+  await pickToken(Math.max(0, r.n_prompt - 1));
+  const n = get().neuron;
+  if (n) void openNeuron(n.layer, n.neuron); // its activations over the new text
 }
+
+export const stopRun = () => api("/api/cancel", {});
 
 export function clearRun() {
   set({ run: null, acts: null });

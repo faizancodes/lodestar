@@ -502,12 +502,24 @@ def arch_neurons(layer: int):
 
 @app.post("/api/arch/run")
 async def arch_run(req: Request):
+    """The text as a chat message: the model's reply streams in as it's written, then the prompt and the reply go
+    through once more to record what every layer did at each token."""
     need_model()
-    text = (await req.json()).get("text", "")
-    ids = eng.encode(text)
-    if not ids:
+    text = (await req.json()).get("text", "").strip()
+    if not text:
         raise HTTPException(400, "Type some text to run through the model.")
-    return await run_in_threadpool(archview.run, eng, ids)
+    pid = eng.chat_ids(text)
+
+    def gen():
+        reply = []
+        for r, x in eng.generate([(pid, [])], max_new=archview.REPLY_TOKENS, cancel=cancel):
+            if r is None:
+                reply = x[0]
+            else:
+                yield {"type": "delta", "text": x}
+        yield {"type": "run", **archview.run(eng, pid + reply, len(pid))}
+
+    return sse(gen())
 
 
 @app.get("/api/arch/acts")
