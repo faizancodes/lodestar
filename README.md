@@ -115,6 +115,25 @@ What to expect: small models spread most personas over many neurons, so a 0.6B r
 than it produces a full character. The neuron-zoo results used a 4B model. Raise `max neurons`, loosen the fluency
 budget, or load Qwen3-1.7B/4B for stronger single-neuron levers.
 
+## The J-lens
+
+Inspect reads each layer two ways. The logit lens sends a layer's residual straight through the final norm and
+unembedding, so middle layers mostly read as noise. The J-lens, from Anthropic's
+[global workspace paper](https://transformer-circuits.pub/2026/workspace/index.html), first maps the residual to the
+last layer with that layer's Jacobian, averaged over prompts and positions, and reads what the layer holds ready to
+put into words. On Qwen3-0.6B, at "The currency used in" (asked about the country whose capital is Tokyo), the middle
+layers read *countries, nations* and then *Japanese*, where the logit lens reads *following* and *most*.
+
+Once a model has its lens, neuron labels and Steer's word search use it too. A neuron is labelled by what the later
+layers make of its push, and a word is carried back to each layer before neurons are matched against it, so the search
+finds middle-layer neurons that hold the concept rather than only late ones that say the word. On Qwen3-0.6B, "music"
+finds a layer-10 neuron labelled *音乐, music, musical* that the plain search ranks nowhere.
+
+The Jacobians are computed once per model, in the background the first time it loads (the model card shows how far
+along it is, with a Stop), one backward pass per residual dimension: about 2 minutes on Qwen3-0.6B. They're saved in
+the data folder under `jlens/` and load with the model after that. A stopped model isn't started again on its own;
+Inspect's J-lens view offers to compute it.
+
 ## The site and these animations
 
 The landing page is in `site/` (`pnpm install && pnpm dev` there; `pnpm build` writes a static site to `site/dist`
@@ -127,6 +146,7 @@ frame by frame in headless Chrome and writes them to `docs/media/`.
     interp/engine.py     model, hooks, generation, tracing, lens, scoring, gradient attribution
     interp/discover.py   the Tune search
     interp/abl.py        abliteration: probe lists, direction analysis, weight baking
+    interp/jlens.py      the J-lens: per-layer Jacobians, computed once per model
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
     web/                 the interface (React + TypeScript, Vite)

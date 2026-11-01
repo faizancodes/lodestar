@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { startSideArt } from "../art/glyphs";
 import { markSVG } from "../art/mark";
 import { modelName, ram } from "../lib/format";
-import { deleteSaved, openSaved, setTab, statusLine, toggleModelMenu } from "../shell/engine";
+import { deleteSaved, jlensLeft, openSaved, setTab, statusLine, stopJlens, toggleModelMenu } from "../shell/engine";
 import { deleteChat, openChat } from "../chat/engine";
 import { ablActive, useApp, type Tab } from "../store/app";
 import { useChat } from "../store/chat";
@@ -102,6 +102,22 @@ function MemoryMeter() {
   );
 }
 
+// The J-lens being computed in the background, the first time a model loads: how far along, and a way to stop it.
+function JLensMeter() {
+  const j = useApp((s) => s.jlens);
+  if (j?.status !== "computing") return null;
+  const left = jlensLeft(j);
+
+  return (
+    <div className="mem jl" title="Computed once per model, then saved. Neuron labels, word search and Inspect read through it.">
+      <span className="mem-l">J-lens</span>
+      <div className="mem-bar"><i className="mem-app" style={{ width: `${(100 * j.done) / Math.max(1, j.total)}%` }} /></div>
+      <span className="mem-n">{left ? `${left} min` : "…"}</span>
+      <button className="jl-stop" onClick={stopJlens}>Stop</button>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const art = useRef<HTMLCanvasElement>(null);
   const info = useApp((s) => s.info);
@@ -142,6 +158,7 @@ export function Sidebar() {
           </span>
           <span className="mp-caret" aria-hidden="true" />
         </button>
+        <JLensMeter />
         <MemoryMeter />
       </div>
     </aside>

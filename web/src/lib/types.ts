@@ -72,8 +72,13 @@ export type NeuronDetail = {
 /** GET /api/trace/token */
 export type TokenDetail = {
   lens: { tok: string; p: number }[][];
+  jlens: { tok: string; p: number }[][] | null; // null until the model's J-lens is computed
   neurons: NeuronRow[];
 };
+
+/** GET /api/jlens: the loaded model's J-lens, and the job computing it (status "idle", "computing", "done" or
+ *  "error: …"). */
+export type JLensJob = { ready: boolean; status: string; done: number; total: number; elapsed: number };
 
 /** One line of a recipe: a neuron pushed by `dose`, or a direction pushed along or erased over `layers`. */
 export type NeuronItem = { kind?: undefined; layer: number; neuron: number; dose: number; label?: string; lens?: string[]; mode?: string };
