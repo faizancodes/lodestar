@@ -134,3 +134,21 @@ export type ChatSummary = { id: string; title: string; model: string | null; upd
 /** One event of a stream. `error`, `cancelled` and `end` never reach a handler (see stream.ts). The streams that
  * carry text send deltas; the planning and analysis streams send richer events, typed where their views use them. */
 export type StreamEvent = { type: string; [k: string]: unknown };
+
+// The Architecture page (interp/archview.py)
+export type ArchTensor = { name: string; shape: number[]; params: number; rms: number };
+export type ArchBlock = { name: string; role: "attention" | "mlp" | "norm" | "other"; type: string; params: number; tensors: ArchTensor[] };
+export type ArchLayer = { index: number; attention: "full" | "linear"; heads: number[]; head_dim: number | null; blocks: ArchBlock[]; params: number; resid: number };
+type ArchPart = { tensors: ArchTensor[]; params: number };
+export type ArchDetail = {
+  model: string; type: string; dtype: string; params: number; hidden: number; neurons: number; vocab: number;
+  activation: string | null; context: number | null; rope_theta: number | null; norm_eps: number | null;
+  heads: number | null; kv_heads: number | null; linear_heads: number | null; linear_k_heads: number | null;
+  tied: boolean; experts: number | null;
+  embedding: ArchPart; final_norm: ArchPart; unembedding: ArchPart; layers: ArchLayer[];
+};
+export type LensTok = { tok: string; p: number };
+/** Text run through the model: per layer, per token. */
+export type ArchRun = { tokens: string[]; resid: number[][]; attn: number[][]; mlp: number[][]; heads: number[][][]; lens: LensTok[][][] };
+export type ArchActs = { layers: number; neurons: number; peak: number[]; q: string; top: { layer: number; neuron: number; impact: number; act: number }[] };
+export type ArchNeuron = { layer: number; neuron: number; norm: number; lens: { up: string[]; down: string[] }; acts: number[] | null };

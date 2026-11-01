@@ -71,6 +71,7 @@ class Engine:
         # how far along it is and how much of each layer's weights has arrived, for the loading scene
         self.load_state = None
         self.trace = None
+        self.flow = None  # the Architecture page's last run (interp/archview.py)
         self.jlens = None  # [L, H, H] on the device once computed or loaded (interp/jlens.py)
 
         self._push_state = None  # {layer: (add [B, N] | None, mul [B, N] | None), "dir": {layer: [B, H]}, "erase": [...]}
@@ -250,7 +251,7 @@ class Engine:
 
         self.model = self.tok = None
         self.model_id = None
-        self.trace = None
+        self.trace = self.flow = None
         self.jlens = None
         self.dirs = {}
         self.abl_vec = self._abl_mask = None
