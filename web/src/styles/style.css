@@ -1216,7 +1216,14 @@ main.is-arch { padding: 0; overflow: hidden; }
 .a3-cell.on span { color: var(--text); }
 
 .a3-side { flex: none; width: 340px; overflow-y: auto; padding: 22px 20px 40px; border-left: 1px solid var(--rule); background: var(--panel); }
-.a3-h h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+.a3-h-t { display: flex; align-items: center; gap: 8px; }
+.a3-back {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin-left: -6px; padding: 0;
+  border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--text-2); cursor: pointer;
+}
+.a3-back:hover { border-color: var(--rule-2); background: var(--wash); color: var(--text); }
+.a3-back svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.a3-h h2 { min-width: 0; margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
 .a3-h p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
 .a3-sec { margin-top: 22px; }
 .a3-sec-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
