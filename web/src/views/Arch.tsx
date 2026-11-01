@@ -159,7 +159,18 @@ function Inspector({ d }: { d: ArchDetail }) {
 }
 
 function Head({ title, sub }: { title: string; sub?: string }) {
-  return <header className="a3-h"><h2>{title}</h2>{sub && <p>{sub}</p>}</header>;
+  const up = useArch((s) => s.focus.level !== "model" || !!s.neuron || !!s.head);
+  return (
+    <header className="a3-h">
+      <div className="a3-h-t">
+        {up && <button className="a3-back" onClick={back} aria-label="Back" title="Back (Esc)">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" /></svg>
+        </button>}
+        <h2>{title}</h2>
+      </div>
+      {sub && <p>{sub}</p>}
+    </header>
+  );
 }
 
 function Facts({ rows }: { rows: [string, string | number | null | undefined][] }) {
