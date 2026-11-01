@@ -29,6 +29,11 @@ logit lens showing what each layer would say next and which neurons push hardest
 
 <img src="docs/media/layers.gif" width="600" alt="A stack of layer sheets unfolds, and a token climbs it, lighting neurons and wiring its path from sheet to sheet." />
 
+**Fly through the model.** Home's Architecture opens the loaded model in 3D: every layer's attention heads and
+MLP neurons as points along the residual stream, with each weight tensor's shape beside it. Open a layer, then a
+block, then a single head or neuron. Run text through it to light each head and neuron by what it did at any token,
+and to see what the logit lens reads at every layer.
+
 **Turn a concept up or down.** Raise or lower a neuron or a direction while the model writes. Stack them into
 recipes, or describe a behaviour and let the app search for the neurons that produce it.
 [How the search works.](#how-tune-finds-neurons)
@@ -147,6 +152,7 @@ frame by frame in headless Chrome and writes them to `docs/media/`.
     interp/discover.py   the Tune search
     interp/abl.py        abliteration: probe lists, direction analysis, weight baking
     interp/jlens.py      the J-lens: per-layer Jacobians, computed once per model
+    interp/archview.py   the Architecture page: the model's structure, and text run through it
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
     web/                 the interface (React + TypeScript, Vite)
