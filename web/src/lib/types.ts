@@ -1,6 +1,11 @@
 // What the engine (interp/server.py) sends back, written from the handlers there; they return plain dicts.
 
 /** GET /api/status, and what POST /api/load returns. */
+export type Arch = {
+  heads: number | null; kv_heads: number | null; vocab: number; tied: boolean; experts: number | null;
+  attention: ("full" | "linear")[];
+};
+
 export type Status = {
   loaded: boolean;
   status: string; // "idle", "loading…", "ready", or "error: …"
@@ -11,6 +16,9 @@ export type Status = {
   layers?: number;
   neurons?: number;
   hidden?: number;
+  /** the model's shape: attention heads, the vocabulary, whether the unembedding is the embedding, and each layer's
+   *  attention ("full" over every earlier token, or "linear", a running state) */
+  arch?: Arch;
   progress?: number | null;
   /** while loading: what stage it's at, the model's layer count, how far each layer's weights are in (0..1), and
    * the weights' size on disk (null when they're still to download) */
