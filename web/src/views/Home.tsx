@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { startArch } from "../art/arch";
 import { drawHomeArt, type HomeArt } from "../art/home";
 import { api } from "../lib/api";
 import { isDir, modelName } from "../lib/format";
@@ -55,7 +56,39 @@ export function Home({ hidden }: { hidden: boolean }) {
           </button>
         ))}
       </div>
+      {shown && s?.arch && <Architecture />}
       {shown && <Api />}
+    </section>
+  );
+}
+
+const num = (n: number) => n.toLocaleString("en-US");
+
+// The loaded model drawn from embedding to unembedding, with the numbers that set its shape underneath.
+function Architecture() {
+  const s = useApp((a) => a.info)!, a = s.arch!;
+  const box = useRef<HTMLDivElement>(null), art = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => startArch(art.current!, box.current!, { layers: s.layers!, hidden: s.hidden!, neurons: s.neurons!, arch: a }), [s.model]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const lin = a.attention.filter((t) => t === "linear").length;
+  const facts: [string, string][] = [
+    ["Vocabulary", `${num(a.vocab)} tokens`],
+    ["Hidden size", num(s.hidden!)],
+    ["Attention", lin ? `${a.attention.length - lin} full · ${lin} linear` : "Full, every layer"],
+    ["Heads", a.heads ? `${a.heads}${a.kv_heads && a.kv_heads !== a.heads ? ` · ${a.kv_heads} key/value` : ""}` : "—"],
+    [a.experts ? "Experts" : "Neurons", a.experts ? `${a.experts} a layer` : `${num(s.neurons!)} a layer`],
+    ["Unembedding", a.tied ? "The embedding, reused" : "Its own weights"],
+  ];
+
+  return (
+    <section className="step arch" id="home-arch">
+      <div className="step-h"><div><h3>Architecture</h3></div></div>
+      <div className="arch-box" ref={box}>
+        <canvas className="arch-art" ref={art} aria-hidden="true" />
+        <div className="arch-ends" aria-hidden="true"><span>Embedding</span><span>{s.layers} layers</span><span>Unembedding</span></div>
+        <dl className="arch-facts">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      </div>
     </section>
   );
 }
