@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { createDecoder } from "../art/decode";
 import type { Part } from "../arch3d/scene";
 import { PART_NAMES, attach, back, clearRun, stopRun, clicked, go, layerTop, loadDetail, openNeuron, pickHead, pickToken, runText, step, useArch } from "../arch3d/state";
-import { modelName } from "../lib/format";
+import { cleanReply, modelName } from "../lib/format";
+import { md } from "../lib/markdown";
 import type { ArchBlock, ArchDetail, ArchRun, ArchTensor } from "../lib/types";
 import { addItems } from "../steer/recipe";
 import { useApp } from "../store/app";
@@ -122,7 +124,7 @@ function Bottom({ d }: { d: ArchDetail }) {
   const wm = w ? Math.max(...w) : 1;
   return (
     <div className="a3-bottom">
-      {reply != null && <div className="a3-reply">{reply || "…"}</div>}
+      {reply != null && <Reply text={reply} />}
       {run && reply == null && <Tokens run={run} t={t} />}
       <div className="a3-strip">
         <button className={`a3-end-c${f.level === "end" && f.end === "embed" ? " on" : ""}`} onClick={() => go({ level: "end", end: "embed" })}>Emb</button>
@@ -137,6 +139,18 @@ function Bottom({ d }: { d: ArchDetail }) {
       </div>
     </div>
   );
+}
+
+// the reply as it's written, decoding in mark by mark like Chat's
+function Reply({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null), dec = useRef(createDecoder());
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    el.innerHTML = text ? md(cleanReply(text)) : `<span class="dots"><i></i><i></i><i></i></span>`;
+    if (text) dec.current.update(el);
+    el.scrollTop = el.scrollHeight;
+  }, [text]);
+  return <div className="a3-reply md" ref={ref} />;
 }
 
 // the prompt's tokens as the model saw them (the chat template's own, faint), then the reply it wrote
