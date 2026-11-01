@@ -742,10 +742,13 @@ class Engine:
 
     # ---------------------------------------------------------------- neuron views
     def lens(self, layer, n, k=12):
-        """Tokens the neuron's down column pushes up (+) and down (-) through the final norm and unembedding."""
+        """Tokens the neuron's down column pushes up (+) and down (-): through the layer's J-lens when the model has one
+        (what the later layers make of the push), else straight through the final norm and unembedding."""
         with self.lock, torch.inference_mode():
             d = self.layers[layer].mlp.down_proj.weight[:, n]
             vecs = torch.stack([d, -d])[:, None] * (self.resid_p50[layer] / d.float().norm()).to(d.dtype)
+            if self.jlens is not None:
+                vecs = vecs.to(self.jlens.dtype) @ self.jlens[layer].T
             logits = self.lm_head(self.final_norm(vecs))[:, 0].float()
             up = logits[0].topk(k).indices.tolist()
             down = logits[1].topk(k).indices.tolist()
@@ -887,7 +890,9 @@ class Engine:
         """Neurons whose push most directly raises (or, pushed negative, raises) the logit of `word`: the word's
         unembedding row (centred on the vocabulary mean, through the final norm's gain) against each neuron's down
         column, per unit dose. Returns [(layer, neuron, signed score)], strongest first; a negative score means the
-        neuron must be turned down to favour the word. Direct effect only: later layers dominate."""
+        neuron must be turned down to favour the word. With a J-lens the word is first carried back to each layer
+        (J_l^T u), so a neuron scores by what the later layers make of its push, not only its direct effect; without
+        one, later layers dominate."""
         with self.lock, torch.inference_mode():
             # only spellings that are one whole token; a fragment like "P" from " pirate" would match noise
             ids, partial = set(), False
@@ -912,7 +917,8 @@ class Engine:
             best = []
             for l, layer in enumerate(self.layers[: len(self.layers) - skip_last]):
                 D = layer.mlp.down_proj.weight
-                sc = (u.to(D.dtype) @ D).float() / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
+                ul = u if self.jlens is None else (u.to(self.jlens.dtype) @ self.jlens[l]).float()
+                sc = (ul.to(D.dtype) @ D).float() / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
                 top = sc.abs().topk(k)
                 best += [(l, int(n), float(sc[n])) for n in top.indices.tolist()]
 
