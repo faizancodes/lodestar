@@ -302,7 +302,21 @@ class Engine:
         return {"loaded": True, "status": self.status, "model": self.model_id, "device": self.dev,
                 "dtype": str(self.model.dtype).replace("torch.", ""), "params": self.n_params,
                 "layers": len(self.layers), "neurons": int(self.dnorm.shape[1]),
-                "hidden": int(self.layers[0].mlp.down_proj.out_features)}
+                "hidden": int(self.layers[0].mlp.down_proj.out_features), "arch": self.arch()}
+
+    def arch(self):
+        """The shape of the loaded model, for the home screen's diagram: attention heads, the vocabulary, and which
+        layers attend over every earlier token ("full") or keep a running state instead ("linear", as in Qwen3.5)."""
+        c = self.model.config
+        c = c.get_text_config() if hasattr(c, "get_text_config") else c
+        L = len(self.layers)
+        types = getattr(c, "layer_types", None) or ["full_attention"] * L
+        return {
+            "heads": getattr(c, "num_attention_heads", None), "kv_heads": getattr(c, "num_key_value_heads", None),
+            "vocab": int(self.lm_head.weight.shape[0]), "tied": bool(getattr(c, "tie_word_embeddings", False)),
+            "experts": getattr(c, "num_experts", None) or None,
+            "attention": ["linear" if "linear" in str(t) else "full" for t in types[:L]],
+        }
 
     def abl_of(self, vec, coef, layer=None):
         """Store the unit refusal direction to erase (raw residual coords), as a tensor on the model's device."""

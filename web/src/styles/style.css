@@ -252,6 +252,19 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .hc-f kbd { margin: 0; padding: 1px 6px; border: 1px solid var(--rule-2); border-radius: var(--r-sm); opacity: 1; font-size: 11px; color: var(--text-2); }
 .hc-s { display: inline-flex; align-items: center; gap: 6px; }
 .hc-on { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px rgba(61, 220, 132, 0.6); }
+/* the model's architecture, under the cards */
+.arch-box { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+.arch-art { display: block; width: 100%; height: 200px; background: var(--night); color: var(--ascii); opacity: 0.8; transition: opacity 0.2s; }
+.arch-box:hover .arch-art { opacity: 1; }
+.arch-ends {
+  display: flex; justify-content: space-between; padding: 8px 14px; background: var(--night); border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--muted);
+}
+.arch-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 24px; margin: 0; padding: 18px 20px; }
+.arch-facts dt { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.arch-facts dd { margin: 5px 0 0; font-size: 14px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .arch-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* the OpenAI-compatible API, under the cards */
 .api .step-sub { margin: 4px 0 0; }
 .api #api-url { font-family: var(--mono); font-size: 13px; }
