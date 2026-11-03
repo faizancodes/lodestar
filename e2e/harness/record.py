@@ -16,6 +16,9 @@ import uvicorn
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 FIXTURES = ROOT / "e2e" / "fixtures"
+# what the mock always answers with a stand-in (see harness/mock.py), so a recording leaves it out: this Mac's memory
+# at the moment, and saved chats, whose ids come from the clock
+STANDS_IN = ("/api/memory", "/api/chats")
 
 from interp.server import app as real_app  # noqa: E402  (after sys.path)
 
@@ -59,7 +62,7 @@ class Recorder:
             return await self.app(scope, receive, send)
         if scope["path"].startswith("/__fixture/"):
             return await self._control(scope, send)
-        if not scope["path"].startswith("/api/") or not self.name:
+        if not scope["path"].startswith("/api/") or not self.name or scope["path"].startswith(STANDS_IN):
             return await self.app(scope, receive, send)
 
         # read the whole request body, then hand it on in one message; after that, the real receive, so a

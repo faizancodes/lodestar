@@ -77,20 +77,42 @@ app = FastAPI()
 
 
 def sse(gen):
-    """Wraps an event generator as a text/event-stream; errors and cancellations become events."""
-    def run():
+    """Wraps an event generator as a text/event-stream; errors and cancellations become events.
+
+    The generator runs start to finish on one thread of its own. Starlette would step a plain generator through its
+    thread pool, a different thread for any step, and the engine's generators hold its lock across their yields: a
+    lock taken on one thread and let go on another is never released, and every later request for the model waits
+    on it for good."""
+    loop, out = asyncio.get_running_loop(), asyncio.Queue()
+    gone = threading.Event()  # the client went away: stop at the next event
+    put = lambda x: loop.call_soon_threadsafe(out.put_nowait, x)
+    send = lambda ev: put(f"data: {json.dumps(_finite(ev), default=_np)}\n\n")
+
+    def work():
         cancel.clear()
 
         try:
             for ev in gen:
-                yield f"data: {json.dumps(_finite(ev), default=_np)}\n\n"
+                if gone.is_set():
+                    break
+                send(ev)
         except Cancelled:
-            yield f"data: {json.dumps({'type': 'cancelled'})}\n\n"
+            send({"type": "cancelled"})
         except Exception as e:  # surface the message in the UI rather than a dead stream
             traceback.print_exc()
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            send({"type": "error", "message": str(e)})
+        finally:
+            getattr(gen, "close", lambda: None)()  # on this thread, so any lock it holds is let go by the thread that took it
+            send({"type": "end"})
+            put(None)
 
-        yield f"data: {json.dumps({'type': 'end'})}\n\n"
+    async def run():
+        threading.Thread(target=work, daemon=True).start()
+        try:
+            while (chunk := await out.get()) is not None:
+                yield chunk
+        finally:
+            gone.set()
 
     return StreamingResponse(run(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 

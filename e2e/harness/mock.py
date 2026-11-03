@@ -7,9 +7,10 @@ Each method + path + query has a queue of recorded responses, served in order; t
 runs out (a poll that runs longer). A request whose body differs from the recorded one is logged as a mismatch, and
 one with no recording at all as unrecorded: GET /__fixture/log returns both, and the tests fail on either.
 
-Two kinds of request have stand-ins when a recording doesn't have them, since they aren't about the model: the
-machine's memory (a fixed, roomy Mac, so the meter looks the same everywhere) and saved chats (kept in memory for the
-scenario, so saving, listing and reopening work as they would).
+A few kinds of request have stand-ins when a recording doesn't have them, since they aren't what a scenario is about:
+the machine's memory (a fixed, roomy Mac, so the meter looks the same everywhere), saved chats (kept in memory for the
+scenario, so saving, listing and reopening work as they would), and the J-lens status (computed, as it is by the time
+any scenario after the first load runs; the assembled recordings predate it).
 """
 import asyncio
 import json
@@ -82,7 +83,11 @@ async def api(req: Request):
     k = key(req.method, req.url.path, req.url.query)
     S["requests"].append({"key": k, "body": body})
 
-    q = S["queues"].get(k)
+    q = None if req.method == "POST" and req.url.path == "/api/serve" else S["queues"].get(k)
+    if not q and req.url.path == "/api/arch/neurons":
+        # Home fetches every layer's neuron sizes in the background, one after another; how far it gets before a
+        # scenario moves on is down to timing, so a layer the recording didn't reach gets one it did
+        q = next((v for kk, v in S["queues"].items() if kk.startswith("GET /api/arch/neurons")), None)
     if not q:
         standin = stand_in(req.method, req.url.path, body)
         if standin is not None:
@@ -95,6 +100,8 @@ async def api(req: Request):
     if req.method != "GET" and not same(body, e["body"]):
         S["mismatches"].append({"key": k, "sent": body, "recorded": e["body"]})
 
+    if req.url.path == "/api/serve":  # the models it lists as recorded; who called it, the stand-in's fixed log
+        return JSONResponse({**e["response"], "log": stand_in("GET", "/api/serve", None)["log"]})
     if e["type"] != "sse":
         return JSONResponse(e["response"], status_code=e["status"] or 200)
 
@@ -110,6 +117,8 @@ def stand_in(method, path, body):
     """The answer for a request that isn't about the model (see the top), or None."""
     if path == "/api/memory":
         return MEMORY
+    if path == "/api/jlens" and method == "GET":
+        return {"ready": True, "status": "done", "done": 1024, "total": 1024, "elapsed": 284.2}
     if path == "/api/memory/fit":
         return {"known": True, "fits": True}
     if path == "/api/serve":  # the OpenAI-compatible API's state: what the window steers with, and who's asked

@@ -8,11 +8,12 @@ export const T = RECORD ? 30 * 60_000 : 60_000;
 export const MODEL = "Qwen/Qwen3-0.6B";
 
 // What moves on its own and isn't the UI's layout: canvases (the scenes, spinners, art), the plan clock and load
-// timer, and toasts (checked by text instead). Everything else must match pixel for pixel.
+// timer, the J-lens's progress while it computes after a load, and toasts (checked by text instead). Everything else
+// must match pixel for pixel.
 const STILL = `
   canvas { visibility: hidden !important; }
   .toast { display: none !important; }
-  .plan-clock, #start-status, .msg-rate { visibility: hidden !important; }
+  .plan-clock, #start-status, .msg-rate, .mem.jl .mem-bar i, .mem.jl .mem-n { visibility: hidden !important; }
 `;
 
 /** Start recording a scenario (record mode) or load its recording into the mock (replay). */
