@@ -728,6 +728,12 @@ body.busy .tl-comp .send.stop { display: grid; }
 .abl-res-n { font-size: 13px; color: var(--text-2); }
 .abl-res-n b { margin-right: 3px; font-family: var(--mono); font-weight: 500; color: var(--text); }
 .abl-res-row[data-row="now"] .abl-res-l { color: var(--text); }
+.abl-cat-res { margin-top: 18px; }
+.abl-cat-res .abl-res-h:not(:first-child) { margin-top: 10px; }
+.abl-res-h .opt { margin-left: 4px; color: var(--muted); }
+#abl-scat .abl-find { margin-top: 4px; }
+#abl-scat .plan-now:not(:empty) { margin-top: 14px; }
+#abl-scope { align-self: flex-start; }
 .abl-q { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--text-2); }
 .abl-q b { margin-right: 2px; font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); }
 .link { padding: 0; border: 0; background: none; font-size: 13px; font-weight: 500; color: var(--text); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; cursor: pointer; }

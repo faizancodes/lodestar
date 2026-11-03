@@ -284,6 +284,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
     lo, hi = max(1, round(0.2 * L)), round(0.85 * L)  # too early to carry the decision, too late to undo it
     trials = {}
     prev = (eng.abl_vec_f.tolist(), eng.abl_coef, eng.abl_layer) if eng.abl_vec is not None else None
+    gate, eng.abl_gate = eng.abl_gate, None  # the search erases for every request
 
     try:
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
@@ -370,6 +371,7 @@ def analyze(eng, harmful, harmless, cancel=None, example_max_new=140):
             eng.abl_of(*prev)
         else:
             eng.clear_abl()
+        eng.abl_gate = gate
 
     verdicts = refused(texts)
     examples = [{"prompt": p, "before": texts[2 * i].strip(), "after": texts[2 * i + 1].strip(),
@@ -602,3 +604,178 @@ def bake(eng, dst, progress, cancel=None, abl=None, steer=None, fit_prompts=None
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
     progress(total, total, "done")
+
+
+# ------------------------------------------------------------------ one category
+# The refusal direction is shared: every kind of bad request ends up on it, so erasing it unlocks them all. To erase
+# refusals for one category only, the erase gets a gate (after Lee et al. 2024, "Programming Refusal with Conditional
+# Activation Steering", which reads a condition from the prompt's hidden state and steers only when it holds): a
+# direction that tells the category's requests apart from every other request, bad or harmless, and a threshold on
+# it. The gate reads the request's own words, averaged. Read where the prompt ends, as the refusal direction is, it
+# mostly saw how bad a request was, which every category shares: on Qwen3-1.7B it let shoplifting and counterfeiting
+# through for a security category and kept out the hacking requests it should have opened for. A prompt past the threshold gets the refusal direction erased for its whole
+# reply; any other prompt gets the model as it is. A gate needs this app to run it, so the search also tries a
+# version that lives in the weights: erasing, from every layer, a direction that carries the category itself, so the
+# model can no longer see that a request belongs to it. That one is experimental: whatever the category shares with
+# other bad requests goes with it, and so can some of the model's grip on the subject.
+
+MIN_INSIDE = 12
+
+
+def _feats(states):
+    """[n, L+1, P, H] prompt-end states -> [n, L+1, H] float32, averaged over the ending tokens."""
+    return states.astype(np.float32).mean(2)
+
+
+def _fit_gate(pos, neg):
+    """A direction and threshold that put `pos` above and `neg` below: [n, H] each. The direction is the difference in
+    means; the threshold the one with the best balanced accuracy, in the middle of the gap when there is one.
+    Returns (unit [H], bias, balanced accuracy, separation in pooled standard deviations)."""
+    u, _ = _unit(pos.mean(0) - neg.mean(0))
+    sp, sn = pos @ u, neg @ u
+    cuts = np.sort(np.concatenate([sp, sn]))
+    cuts = np.concatenate([[cuts[0] - 1], (cuts[1:] + cuts[:-1]) / 2, [cuts[-1] + 1]])
+    acc = [((sp > c).mean() + (sn <= c).mean()) / 2 for c in cuts]
+    best = max(acc)
+    ties = [c for c, a in zip(cuts, acc) if a == best]
+    bias = float((ties[0] + ties[-1]) / 2)
+    sep = float((sp.mean() - sn.mean()) / max(np.sqrt((sp.var() + sn.var()) / 2), 1e-6))
+    return u, bias, float(best), sep
+
+
+def _gate_acc(u, bias, pos, neg):
+    return float(((pos @ u > bias).mean() + (neg @ u <= bias).mean()) / 2)
+
+
+def category(eng, inside, harmful, harmless, vec, coef, cancel=None):
+    """Find a gate that erases `vec` (the refusal direction) for `inside` prompts only, and a weight-only version.
+    `harmful` and `harmless` are the probe lists: everything the gate must stay shut for. Yields events like
+    analyze; the `result` event carries {gate, coef, gate_test, weights}."""
+    inside = list(dict.fromkeys(p.strip() for p in inside if p and p.strip()))
+    if len(inside) < MIN_INSIDE:
+        raise ValueError(f"List at least {MIN_INSIDE} requests in the category so the gate can be checked on some "
+                         "it never saw.")
+    taken = set(inside)
+    outside = [p for p in harmful if p.strip() and p.strip() not in taken]
+    harmless = [p for p in harmless if p.strip() and p.strip() not in taken]
+
+    L = len(eng.layers)
+    n_pos = eng.prompt_end_len()
+    # where the prompt ends, for the weight-only version (the place refusal is decided, as in analyze)
+    I = yield from _read_set(eng, inside, "cat-in", "Reading the requests in the category", cancel, n_pos)
+    O = yield from _read_set(eng, outside, "cat-out", "Reading other bad requests", cancel, n_pos)
+    H = yield from _read_set(eng, harmless, "cat-safe", "Reading everyday requests", cancel, n_pos)
+    yield _ev("stage", stage="gate", label="Reading what each request is about")
+    wI, wN = eng.prompt_word_means(inside, cancel), eng.prompt_word_means(outside + harmless, cancel)
+
+    # every third request is kept out of the fit, to check the gate on
+    held = lambda n: np.arange(n) % 3 == 2
+    fI, fO, fH = _feats(I), _feats(O), _feats(H)
+    hI, hN = held(len(fI)), np.concatenate([held(len(fO)), held(len(fH))])
+
+    yield _ev("stage", stage="gate", label="Looking for the layer that tells the category apart")
+    lo, hi = max(1, round(0.15 * L)), round(0.85 * L)
+    gates = {}
+    for l in range(lo, hi + 1):
+        u, b, _, sep = _fit_gate(wI[~hI, l], wN[~hN, l])
+        gates[l] = {"u": u, "bias": b, "sep": sep, "acc": _gate_acc(u, b, wI[hI, l], wN[hN, l])}
+    glayer = max(gates, key=lambda l: (gates[l]["acc"], gates[l]["sep"]))
+    trial_gate = gates[glayer]
+
+    prev = (eng.abl_vec_f.tolist(), eng.abl_coef, eng.abl_layer) if eng.abl_vec is not None else None
+    prev_gate, eng.abl_gate = eng.abl_gate, None
+
+    test_in = [p for p, h in zip(inside, hI) if h]
+    test_out = [p for p in TRIAL_PROMPTS if p not in taken]
+    rows = [(eng.chat_ids(p), []) for p in test_in + test_out]
+    n_in = len(test_in)
+    split = lambda xs: (sum(xs[:n_in]), sum(xs[n_in:]))
+
+    try:
+        nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
+
+        yield _ev("stage", stage="cat-trial", label="Asking the held-out requests of the model as it is")
+        texts, ids = eng.generate_text(rows, max_new=56, cancel=cancel)
+        base = refused(texts)
+        base_in, base_out = split(base)
+
+        def run(gate, v, c):
+            eng.abl_of(v, c)
+            eng.gate_of(gate)
+            texts, _ = eng.generate_text(rows, max_new=56, cancel=cancel, abl=True)
+            opened = eng.last_gate
+            eng.abl_gate = None
+            got = refused(texts)
+            out = {"refused_in": split(got)[0], "refused_out": split(got)[1]}
+            if opened is not None:
+                out["opened_in"], out["opened_out"] = sum(opened[:n_in]), sum(opened[n_in:])
+            return out
+
+        # the gate, fitted without the held-out requests, at the strength the refusal search chose and up from there
+        g = {"layer": glayer, "vec": trial_gate["u"].tolist(), "bias": trial_gate["bias"]}
+        gcoef, gate_test = coef, None
+        for c in [coef] + [s for s in STRENGTHS if s > coef]:
+            yield _ev("stage", stage="cat-trial", label=f"Trying the gate at layer {glayer}"
+                      + (f", strength {c:g}" if c != coef else ""))
+            gate_test, gcoef = run(g, vec, c), c
+            if gate_test["refused_in"] == 0:
+                break
+
+        # the weight-only version: erase the category itself. Three candidates per layer: what sets the category apart
+        # from other bad requests where the prompt ends and in its words, and what sets it apart from everyday ones
+        # less the refusal direction; each layer
+        # is screened on how likely the model still is to open its held-out replies the way it did, which should
+        # drop inside the category and hold outside it
+        r = np.asarray(vec, np.float32)
+        r /= max(np.linalg.norm(r), 1e-9)
+        mI, mO, mH = fI.mean(0), fO.mean(0), fH.mean(0)
+        cands = {}
+        for l in range(lo, hi + 1):
+            cands[("topic", l)] = _unit(mI[l] - mO[l])[0]
+            d = mI[l] - mH[l]
+            cands[("harm", l)] = _unit(d - (d @ r) * r)[0]
+            cands[("words", l)] = _unit(wI[:, l].mean(0) - wN[:len(outside), l].mean(0))[0]
+
+        srows = [(rows[i][0] + [int(t) for t in ids[i][:3]], len(rows[i][0]), []) for i in range(len(rows)) if len(ids[i])]
+        sin = [i for i in range(len(rows)) if len(ids[i]) and i < n_in]
+        keep_in = np.array([i < n_in for i in range(len(rows)) if len(ids[i])])
+        base_lp = eng.score(srows, cancel)
+
+        screen = {}
+        for i, (k, d) in enumerate(cands.items()):
+            yield _ev("stage", stage="cat-screen", label=f"Screening layer {k[1]} for a version in the weights")
+            yield _ev("progress", stage="cat-screen", done=i, total=len(cands))
+            eng.abl_of(d, 1.0)
+            drop = base_lp - eng.score(srows, cancel, abl=True)
+            screen[k] = float(drop[keep_in].mean() - (drop[~keep_in].mean() if (~keep_in).any() else 0)) if sin else 0.0
+
+        cost = lambda t: (t["refused_in"] + max(0, base_out - t["refused_out"])
+                          + (len(rows) if t["dnll"] > TOO_MUCH_DNLL else 0))
+        tried = {}
+        for i, k in enumerate(sorted(screen, key=lambda k: -screen[k])[:N_TRIALS]):
+            for c in STRENGTHS:
+                yield _ev("stage", stage="cat-weights", label=f"Trying layer {k[1]} in the weights"
+                          + (f" at strength {c:g}" if c != 1 else "") + f" ({i + 1} of {N_TRIALS})")
+                t = run(None, cands[k], c)
+                t["dnll"] = float(eng.reference_nll([[]], cancel, abl=[True])[0]) - nll0
+                tried[(k, c)] = t
+                if t["refused_in"] == 0 or t["refused_out"] < base_out:
+                    break  # stronger only goes further past where it should stop
+
+        (kind, wl), wc = min(tried, key=lambda kc: (cost(tried[kc]), kc[1]))
+        best = tried[((kind, wl), wc)]
+        weights = {"kind": kind, "layer": int(wl), "coef": wc, "vec": [round(float(x), 6) for x in cands[(kind, wl)]],
+                   "refused_in": best["refused_in"], "refused_out": best["refused_out"], "dnll": round(best["dnll"], 4)}
+    finally:
+        if prev:
+            eng.abl_of(*prev)
+        else:
+            eng.clear_abl()
+        eng.abl_gate = prev_gate
+
+    # the gate kept is fitted on every request listed; the test above is what the held-out ones said of it
+    u, b, acc, sep = _fit_gate(wI[:, glayer], wN[:, glayer])
+    gate = {"layer": int(glayer), "vec": [round(float(x), 6) for x in u], "bias": round(b, 5)}
+    yield _ev("result", gate=gate, coef=gcoef, gate_acc=round(trial_gate["acc"], 4), gate_sep=round(sep, 2),
+              inside=n_in, outside=len(test_out), base_in=int(base_in), base_out=int(base_out),
+              gate_test=gate_test, weights=weights)

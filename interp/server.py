@@ -686,11 +686,43 @@ def abl_now():
     return (_abl_all().get(eng.model_id) or {}) if eng.model_id else {}
 
 
+def _scoped(entry):
+    """The saved category when refusals are erased for it only, else None."""
+    cat = entry.get("category")
+    return cat if cat and entry.get("scope") == "category" else None
+
+
+def _apply(entry):
+    """Put a saved entry on the engine: the refusal direction at its strength, gated to its category when scoped."""
+    cat = _scoped(entry)
+    eng.abl_of(entry["vec"], (cat or entry).get("coef", 1.0), entry.get("layer"))
+    eng.gate_of(cat["gate"] if cat else None)
+
+
+def _baked(entry):
+    """What a saved copy erases from its weights, (vec, coef): the refusal direction, or with a category, the
+    weight-only version of it. None when that category has none."""
+    cat = _scoped(entry)
+    if not cat:
+        return [float(x) for x in entry["vec"]], float(entry.get("coef", 1.0))
+    w = cat.get("weights")
+    return ([float(x) for x in w["vec"]], float(w["coef"])) if w else None
+
+
 def restore_for(mid):
     """Re-apply a saved refusal direction after a model loads, so the state feels like a modified model."""
     d = _abl_all().get(mid)
     if d:
-        eng.abl_of(d["vec"], d.get("coef", 1.0), d.get("layer"))
+        _apply(d)
+
+
+def _cat_info(cat):
+    """A saved category as the UI sees it: everything but the vectors."""
+    if not cat:
+        return None
+    w = cat.get("weights")
+    return {k: cat.get(k) for k in ("name", "prompts", "coef", "test")} | {
+        "gate_layer": cat["gate"]["layer"], "weights": {k: v for k, v in w.items() if k != "vec"} if w else None}
 
 
 @app.get("/api/abl")
@@ -699,8 +731,10 @@ def abl_info():
     entry = entry if entry else {}
     return {"model": eng.model_id, "probes": _probes(),
             "defaults": {"harmful": abl_mod.DEFAULT_HARMFUL, "harmless": abl_mod.DEFAULT_HARMLESS},
-            "current": None if not entry else {"layer": entry.get("layer"), "coef": entry.get("coef", 1.0),
-                                               "active": entry.get("active", False), "clean": entry.get("clean", False)},
+            "current": None if not entry else {"layer": entry.get("layer"), "coef": (_scoped(entry) or entry).get("coef", 1.0),
+                                               "active": entry.get("active", False), "clean": entry.get("clean", False),
+                                               "scope": "category" if _scoped(entry) else "all",
+                                               "category": _cat_info(entry.get("category"))},
             "ready": bool(entry) and eng.abl_vec is not None}
 
 
@@ -733,8 +767,8 @@ async def abl_analyze(req: Request):
             all_d = _abl_all()
             all_d[eng.model_id] = {"vec": final["vec"], "layer": final["layer"], "coef": final["coef"],
                                    "active": True, "clean": final["clean"], "ts": time.time()}
-            _abl_save(all_d)
-            eng.abl_of(final["vec"], final["coef"], final["layer"])
+            _abl_save(all_d)  # a new refusal direction: a category gated on the old one starts over
+            _apply(all_d[eng.model_id])
 
     return sse(gen())
 
@@ -750,14 +784,55 @@ async def abl_state(req: Request):
     if not entry:
         raise HTTPException(409, "Run the analysis first.")
 
+    if body.get("scope") in ("all", "category"):
+        if body["scope"] == "category" and not entry.get("category"):
+            raise HTTPException(409, "Find a category first.")
+        entry["scope"] = body["scope"]
     if "coef" in body:
-        entry["coef"] = max(0.1, min(2.0, float(body["coef"])))
+        (_scoped(entry) or entry)["coef"] = max(0.1, min(2.0, float(body["coef"])))
     if "active" in body:
         entry["active"] = bool(body["active"])
 
     _abl_save(all_d)
-    eng.abl_of(entry["vec"], entry.get("coef", 1.0), entry.get("layer"))
-    return {"ok": True, **{k: entry.get(k) for k in ("layer", "coef", "active")}}
+    _apply(entry)
+    return {"ok": True, "coef": (_scoped(entry) or entry).get("coef", 1.0),
+            "scope": "category" if _scoped(entry) else "all", **{k: entry.get(k) for k in ("layer", "active")}}
+
+
+@app.post("/api/abl/category")
+async def abl_category(req: Request):
+    """Find a gate that erases refusals only for one category of requests, and a version of it for the weights."""
+    need_model()
+    entry = abl_now()
+    if not entry or not entry.get("vec"):
+        raise HTTPException(409, "Find the refusal direction first.")
+
+    body = await req.json()
+    name = str(body.get("name") or "").strip()[:60] or "Category"
+    prompts = [str(p).strip() for p in body.get("prompts") or [] if str(p).strip()]
+    probes = _probes()
+
+    def gen():
+        final = None
+        for ev in abl_mod.category(eng, prompts, probes["harmful"], probes["harmless"], entry["vec"],
+                                   float(entry.get("coef", 1.0)), cancel):
+            if ev.get("type") == "result":
+                final = ev
+                ev = {k: v for k, v in ev.items() if k != "gate"} | {
+                    "weights": {k: v for k, v in ev["weights"].items() if k != "vec"}}
+            yield ev
+
+        if final:
+            all_d = _abl_all()
+            e = all_d[eng.model_id]
+            test = {k: final[k] for k in ("inside", "outside", "base_in", "base_out", "gate_test", "gate_acc")}
+            e["category"] = {"name": name, "prompts": prompts, "gate": final["gate"], "coef": final["coef"],
+                             "weights": final["weights"], "test": test, "ts": time.time()}
+            e["scope"], e["active"] = "category", True
+            _abl_save(all_d)
+            _apply(e)
+
+    return sse(gen())
 
 
 @app.post("/api/abl/test")
@@ -785,10 +860,12 @@ async def abl_test(req: Request):
             texts[r] += dx
             yield {"type": "delta", "probe": r // 2, "kind": "base" if r % 2 == 0 else "abl", "delta": dx}
 
+        opened = eng.last_gate[1::2] if eng.last_gate else None  # with a category: whether each probe was in it
         refused = abl_mod.refused(texts)
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
-        nll1 = float(eng.reference_nll([[]], cancel, abl=[True])[0])
-        yield {"type": "result", "refused": [refused[i::2] for i in (0, 1)], "nll": [nll0, nll1]}
+        # with a gate, ordinary text is outside its category and gets the model as it is
+        nll1 = nll0 if eng.abl_gate is not None else float(eng.reference_nll([[]], cancel, abl=[True])[0])
+        yield {"type": "result", "refused": [refused[i::2] for i in (0, 1)], "nll": [nll0, nll1], "gate": opened}
 
     return sse(gen())
 
@@ -857,11 +934,15 @@ async def abl_export(req: Request):
         raise HTTPException(409, "No saved direction for this model: analyse first.")
 
     body = await req.json()
-    coef = max(0.1, min(2.0, float(body.get("coef", entry.get("coef", 1.0)))))
+    baked = _baked(entry)
+    if baked is None:
+        raise HTTPException(409, "This category has no version for the weights yet: find it again.")
+    vec, coef = baked
+    if not _scoped(entry):
+        coef = max(0.1, min(2.0, float(body.get("coef", coef))))
 
     base = eng.model_id.rstrip("/").split("/")[-1]
     name = _clean_name(body.get("name")) or f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
-    vec = [float(x) for x in entry["vec"]]
 
     return _start_export("abl", name, abl=(vec, coef))
 
@@ -887,7 +968,7 @@ async def steer_export(req: Request):
         raise HTTPException(409, "Turn on some neurons first: there is nothing to build in yet.")
 
     entry = abl_now()
-    abl = (entry["vec"], float(entry.get("coef", 1.0))) if body.get("abl") and entry.get("active") and entry.get("vec") else None
+    abl = _baked(entry) if body.get("abl") and entry.get("active") and entry.get("vec") else None
 
     base = eng.model_id.rstrip("/").split("/")[-1]
     name = _clean_name(body.get("name")) or f"{base}-steered"
@@ -1117,8 +1198,10 @@ def _api_models():
 
     name = eng.model_id.rstrip("/").split("/")[-1]
     out = [{"id": name, "about": "As set in Lodestar"}, {"id": f"{name}-plain", "about": "Plain"}]
-    if abl_now().get("vec") is not None:
-        out.append({"id": f"{name}-abliterated", "about": "Refusals erased"})
+    entry = abl_now()
+    if entry.get("vec") is not None:
+        cat = _scoped(entry)
+        out.append({"id": f"{name}-abliterated", "about": f"Refusals erased for {cat['name']}" if cat else "Refusals erased"})
     return out
 
 

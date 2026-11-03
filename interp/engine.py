@@ -83,6 +83,10 @@ class Engine:
         self.abl_layer = None  # the layer the direction was extracted from, for the UI
         self._abl_mask = None  # [B] bool, per row: whether this pass erases the direction
         self._abl_any = False
+        # With a gate, only replies to prompts in one category get the direction erased (see interp/abl.py category):
+        # {"layer": hidden-state index, "vec": [H] unit on the device, "bias": threshold on the projection}
+        self.abl_gate = None
+        self.last_gate = None  # per row of the last generate: whether the gate opened, or None without one
 
         self._deltas = None  # per-layer [N] tensors requiring grad, for attribution
         self._cap_acts = None  # {layer: [T, N] cpu} during a trace
@@ -256,6 +260,7 @@ class Engine:
         self.dirs = {}
         self.abl_vec = self._abl_mask = None
         self._abl_any = False
+        self.abl_gate = None
 
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
@@ -335,6 +340,100 @@ class Engine:
         self.abl_vec = self._abl_mask = None
         self.abl_layer = None
         self._abl_any = False
+        self.abl_gate = None
+
+    def gate_of(self, gate):
+        """Only erase for prompts the gate lets through: gate = {layer, vec, bias, n_pos} as interp/abl.py fits it,
+        or None to erase for every prompt again."""
+        if gate is None:
+            self.abl_gate = None
+            return
+        v = torch.tensor([float(x) for x in gate["vec"]], device=self.dev).float()
+        self.abl_gate = {"layer": int(gate["layer"]), "vec": v / v.norm().clamp(min=1e-8), "bias": float(gate["bias"])}
+
+    def prompt_head_len(self):
+        """How many tokens the chat template puts before the user's words: the common head of two templated prompts."""
+        a, b = self.chat_ids("What is the capital of France?"), self.chat_ids("tell me a joke")
+        n = 0
+        while n < min(len(a), len(b)) - 1 and a[n] == b[n]:
+            n += 1
+        return n
+
+    def _words_mean(self, seqs, upto=None, cancel=None):
+        """The residual stream averaged over each prompt's own words (the chat template's head and tail left out):
+        [B, L+1, H] float32 for every layer, or with `upto`, [B, H] at that one, running the model no further."""
+        head, tail = self.prompt_head_len(), self.prompt_end_len()
+        T = max(map(len, seqs))
+        pad = self.tok.pad_token_id
+        ids = torch.tensor([[pad] * (T - len(q)) + q for q in seqs], device=self.dev)
+        mask = torch.tensor([[0] * (T - len(q)) + [1] * len(q) for q in seqs], device=self.dev)
+        pos = (mask.cumsum(-1) - 1).clamp(min=0)
+        words = torch.zeros(len(seqs), T, device=self.dev)
+        for r, q in enumerate(seqs):
+            a, b = T - len(q) + head, T - tail
+            if b <= a:  # nothing between head and tail: take the whole prompt
+                a, b = T - len(q), T
+            words[r, a:b] = 1 / (b - a)
+        mean = lambda h: torch.einsum("bt,bth->bh", words, h.float())
+
+        if upto is None:
+            with torch.inference_mode():
+                hs = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False,
+                                output_hidden_states=True, logits_to_keep=1).hidden_states
+                return torch.stack([mean(h) for h in hs], 1)
+
+        got = {}
+
+        class Enough(Exception):
+            pass
+
+        def hook(mod, inp, out):
+            got["h"] = mean(out[0] if isinstance(out, tuple) else out)
+            raise Enough()
+
+        h = self.layers[upto - 1].register_forward_hook(hook)  # hidden state `upto` is that layer's output
+        try:
+            with torch.inference_mode():
+                self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False, logits_to_keep=1)
+        except Enough:
+            pass
+        finally:
+            h.remove()
+        return got["h"]
+
+    def prompt_word_means(self, prompts, cancel=None, budget=6144):
+        """`_words_mean` over every layer for a list of prompts, in batches: [n, L+1, H] float32 on the CPU."""
+        with self.lock:
+            ids_list = [self.chat_ids(p) for p in prompts]
+            out = []
+            for bi in self._batches([(x,) for x in ids_list], budget):
+                if cancel is not None and cancel.is_set():
+                    raise Cancelled()
+                out.append(self._words_mean([ids_list[i] for i in bi]).cpu())
+            return torch.cat(out).numpy()
+
+    def gate_scores(self, seqs):
+        """How far into the gate's category each prompt (token ids, chat templated) reads: the residual stream at the
+        gate's layer, averaged over the prompt's own words, along the gate's direction, minus its threshold. Positive
+        opens the gate. Runs the model only up to that layer, with nothing pushed or erased."""
+        g = self.abl_gate
+        saved = self._push_state, self._abl_any
+        self._push_state, self._abl_any = None, False
+        try:
+            h = self._words_mean(seqs, upto=g["layer"])
+        finally:
+            self._push_state, self._abl_any = saved
+        return (h @ g["vec"] - g["bias"]).tolist()
+
+    def _gated(self, seqs, flags):
+        """The per-row erase flags once the gate has had its say; also kept on self.last_gate."""
+        if flags is None or self.abl_gate is None or self.abl_vec is None:
+            self.last_gate = None
+            return flags
+        idx = [i for i, f in enumerate(flags) if f]
+        opened = dict(zip(idx, (s > 0 for s in self.gate_scores([seqs[i] for i in idx])))) if idx else {}
+        self.last_gate = [opened.get(i) for i in range(len(flags))]
+        return [bool(opened.get(i)) for i in range(len(flags))]
 
     @staticmethod
     def _abl_flags(abl, n):
@@ -585,9 +684,11 @@ class Engine:
         for every token in it, each direction's gauge at the position that chose the token."""
         with self.lock:
             B = len(rows)
-            flags, any_abl = self._abl_flags(abl, B)
-
             seqs = [r[0] for r in rows]
+            flags, _ = self._abl_flags(abl, B)
+            flags = self._gated(seqs, flags)
+            any_abl = bool(flags) and any(flags)
+
             T = max(map(len, seqs))
             pad = self.tok.pad_token_id
             ids = torch.tensor([[pad] * (T - len(q)) + q for q in seqs], device=self.dev)
@@ -676,7 +777,7 @@ class Engine:
             self._cap_acts, self._cap_resid = {}, {}
 
             self._push_state = self._make_push_state([pushes or []], 1)
-            if abl:
+            if abl and self._gated([list(prompt_ids)], [True])[0]:
                 self._abl_mask = torch.ones(1, dtype=torch.bool, device=self.dev)
                 self._abl_any = True
 
