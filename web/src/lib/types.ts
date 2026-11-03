@@ -121,8 +121,24 @@ export type Abl = {
   model: string | null;
   probes: Probes;
   defaults: Probes;
-  current: { layer: number | null; coef: number; active: boolean; clean: boolean } | null;
+  current: {
+    layer: number | null; coef: number; active: boolean; clean: boolean;
+    scope: "all" | "category"; category: AblCategory | null;
+  } | null;
   ready: boolean;
+};
+
+/** Refusals erased for one category only: the gate's test on held-out requests, and the version for the weights. */
+export type AblCategory = {
+  name: string;
+  prompts: string[];
+  coef: number;
+  gate_layer: number;
+  test: {
+    inside: number; outside: number; base_in: number; base_out: number; gate_acc: number;
+    gate_test: { refused_in: number; refused_out: number; opened_in: number; opened_out: number };
+  };
+  weights: { kind: string; layer: number; coef: number; refused_in: number; refused_out: number; dnll: number } | null;
 };
 
 export type Probes = { harmful: string[]; harmless: string[] };

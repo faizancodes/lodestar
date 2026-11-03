@@ -15,6 +15,7 @@ export type Entry = {
   refused: boolean | null;
   refusedNormal: boolean | null;
   worse: boolean; // writing got noticeably worse than the normal model's
+  gate: boolean | null; // with a category: whether the question was in it
   change: { from: number; to: number } | null;
   typing: boolean;
   open: boolean; // an older answer, unfolded
@@ -48,6 +49,7 @@ type Abl = {
   rank: AblResult | null;
   rankN: number; // a new ranking is a new list
   at: Entry[] | null; // the try-it thread
+  cat: { name: string; prompts: string; running: boolean; live: Live; width: string; touched: boolean };
 };
 
 export const useAbl = create<Abl>(() => ({
@@ -62,6 +64,7 @@ export const useAbl = create<Abl>(() => ({
   rank: null,
   rankN: 0,
   at: null,
+  cat: { name: "", prompts: "", running: false, live: null, width: "0%", touched: false },
 }));
 
 export const touchAbl = () => useAbl.setState((s) => ({ v: s.v + 1 }));

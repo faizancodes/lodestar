@@ -63,7 +63,9 @@ export function styleShift(pairs: { baseline?: string; target?: string }[]) {
 
 export const cleanReply = (t: string) => t.replace(/<think>[\s\S]*?(<\/think>|$)/g, "").replace(/^\s+/, "");
 
-export const ablDefaultName = (model: string | undefined, coef: number) => `${modelName(model || "model")}-abliterated` + (coef === 1 ? "" : `-${coef}`);
+export const ablDefaultName = (model: string | undefined, coef: number, category?: string) => category
+  ? `${modelName(model || "model")}-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "category"}-abliterated`
+  : `${modelName(model || "model")}-abliterated` + (coef === 1 ? "" : `-${coef}`);
 export const steerDefaultName = (model: string | undefined, recipeName: string) => {
   const base = modelName(model || "model").replace(/[^A-Za-z0-9._ -]+/g, "");
   const what = (recipeName || "steered").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
