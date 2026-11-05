@@ -123,7 +123,7 @@ async function load(dev: GPUDevice) {
   $("#main").classList.add("is-chat");
   $("#view-chat").hidden = false;
   renderAll();
-  $("#chat-input").focus();
+  $("#chat-input").focus({ preventScroll: true });
 }
 
 // ------------------------------------------------------------------ chat
@@ -384,7 +384,7 @@ function wire() {
     if (b) send(b.dataset.starter!);
   });
 
-  $("#chat-neurons-btn").addEventListener("click", () => ((st.side = st.side === "neurons" ? null : "neurons"), renderAll(), st.side && $("#chat-add").focus()));
+  $("#chat-neurons-btn").addEventListener("click", () => ((st.side = st.side === "neurons" ? null : "neurons"), renderAll(), st.side && $("#chat-add").focus({ preventScroll: true })));
   $("#chat-inspect-btn").addEventListener("click", () => {
     st.inspect = !st.inspect;
     st.side = st.inspect ? "inspect" : st.side === "inspect" ? null : st.side;
