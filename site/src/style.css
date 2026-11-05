@@ -55,8 +55,6 @@ p { margin: 0; }
 .btn:hover { background: var(--accent-hi); }
 .btn:active { transform: translateY(1px); }
 .btn.lg { padding: 12px 22px; font-size: 14px; font-weight: 600; }
-.btn.ghost { border-color: var(--rule-2); background: rgba(10, 10, 10, 0.6); color: var(--text); }
-.btn.ghost:hover { border-color: var(--text-2); background: var(--panel); }
 
 /* ------------------------------------------------------------ brand */
 .brand { display: flex; align-items: center; gap: 10px; }
@@ -135,13 +133,6 @@ p { margin: 0; }
 .rail a i { position: absolute; right: -17px; width: 7px; height: 7px; border: 1px solid var(--rule-2); border-radius: 50%; background: var(--bg); transition: background 0.3s, border-color 0.3s, box-shadow 0.3s; }
 .rail a.on i { background: var(--ascii); border-color: var(--ascii); box-shadow: 0 0 0 4px rgba(195, 207, 245, 0.12); }
 
-/* try it: the app itself, in a window */
-.try { position: relative; z-index: 1; max-width: calc(var(--w) + 2 * var(--gut)); margin: 0 auto; padding: clamp(80px, 12svh, 140px) var(--gut) 0; }
-.try h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; }
-.try p { margin-top: 18px; max-width: 460px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
-.try-win { margin-top: clamp(32px, 5svh, 56px); overflow: hidden; border: 1px solid var(--rule-2); border-radius: 12px; background: var(--bg); box-shadow: 0 40px 120px -40px rgba(195, 207, 245, 0.16); }
-.try-win iframe { display: block; width: 100%; height: clamp(560px, 82svh, 760px); border: 0; }
-
 /* get it: framed like the hero, the commands in a terminal panel */
 .get { position: relative; z-index: 1; display: grid; align-content: center; min-height: 100vh; min-height: 100svh; padding: clamp(80px, 12svh, 160px) var(--gut); }
 .get .hud { inset: clamp(16px, 3vw, 32px) clamp(16px, 3vw, 32px); }
@@ -206,8 +197,6 @@ p { margin: 0; }
 }
 @media (max-width: 640px) {
   .hud-c { display: none; }
-  .try-win { margin-left: calc(-1 * var(--gut)); margin-right: calc(-1 * var(--gut)); border-radius: 0; border-left: 0; border-right: 0; }
-  .try-win iframe { height: 80svh; }
   .term code { font-size: 12px; }
   .term li { gap: 10px; padding-left: 10px; }
 }
