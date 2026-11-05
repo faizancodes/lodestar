@@ -19,7 +19,8 @@ whose hook placement and dose units this app reuses.
 ## What it does
 
 **Remove safety filters.** Refusal is one direction the model represents in its residual stream. Lodestar finds it,
-then takes it out, either live with a hook you can switch off, or baked into a new copy of the weights.
+then takes it out, either live with a hook you can switch off, or baked into a new copy of the weights. It can
+also erase refusals for one category of request only, and keep refusing everything else.
 [More below.](#abliteration)
 
 <img src="docs/media/erase.gif" width="600" alt="Two clouds of activations draw apart, the refusal direction draws between them, and a plane projects it out until they fall flat into one." />
@@ -97,7 +98,16 @@ independent halves of the harmful set agree best (|cos| ≥ ~0.9 is a clean hit)
   logits). Saved under `~/Library/Application Support/Auto Interp/models/<model>-abliterated/` and picked up by
   the model list like any other local copy.
 
-Directions, probe edits and the on/off state are saved per model and restored when a model loads.
+- **one category** — the refusal direction is shared by every kind of bad request, so erasing it unlocks them all.
+  To unlock one category only (Abliterate → Only one category), give it a name and 12 or more requests in it. The
+  search fits a gate, after [Lee et al. 2024](https://arxiv.org/abs/2409.05907): a direction that tells the
+  category's requests apart from every other request, read from the request's own words, and a threshold on it. A
+  prompt past the threshold gets the refusal direction erased for its whole reply; any other prompt gets the model
+  as it is. A third of the requests are held out to test the gate, and the result shows how many are still refused
+  inside the category and outside it. The gate needs this app to run it, so the search also tries a version that
+  lives in the weights, for saving as a model; that one is experimental.
+
+Directions, categories, probe edits and the on/off state are saved per model and restored when a model loads.
 
 ## How Tune finds neurons
 
@@ -145,6 +155,12 @@ The landing page is in `site/` (`pnpm install && pnpm dev` there; `pnpm build` w
 for lodestar.so). Its ASCII scenes are drawn with the app's own renderer from `web/src/art`. The GIFs in this README
 are those same scenes: with the site's dev server running, `node scripts/readme-gifs.mjs` in `site/` steps each one
 frame by frame in headless Chrome and writes them to `docs/media/`.
+
+`site/demo.html` (lodestar.so/demo) is a small version of the app that runs in the browser: Qwen3-0.6B on the
+visitor's own GPU through WebGPU, with Chat, erasing refusals, pushing neurons and Inspect. The forward pass is
+written in WGSL (`site/src/demo/`); the weights stream from Hugging Face once and are cached. Its refusal direction
+and recipes come from the Python engine: `uv run python -m scripts.demo_pack` writes `site/public/demo/qwen3-0.6b.json`.
+It needs a browser with a working GPU, so the landing page doesn't link to it.
 
 ## Layout
 

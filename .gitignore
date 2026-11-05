@@ -5,3 +5,6 @@ __pycache__/
 .DS_Store
 .claude/
 research/
+
+# nested standalone repo
+cyber-tasks/
