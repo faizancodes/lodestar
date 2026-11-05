@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ablAsk, analyze, backToCoef, bakeAbl, editCat, findCategory, nudge, resetProbes, saveProbes, setName, setScope, toggleAbl,
+  ablAsk, analyze, backToCoef, bakeAbl, editCat, findCategory, writeRequests, nudge, resetProbes, saveProbes, setName, setScope, toggleAbl,
   undoNudge,
 } from "../abl/engine";
 import { drawHomeArt } from "../art/home";
@@ -217,8 +217,10 @@ function StepCat() {
         </label>
         <div className="abl-find">
           <div className="abl-q"><span><b>{n}</b> requests</span></div>
-          {cat.running && <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>}
-          <button id="abl-cat-go" className={found ? "btn ghost" : "btn"} disabled={cat.running || n < MIN_INSIDE || !cat.name.trim()}
+          {(cat.running || cat.writing) && <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>}
+          <button id="abl-cat-write" className="btn ghost" disabled={cat.running || cat.writing || !cat.name.trim()}
+            onClick={writeRequests}>{cat.writing ? "Writing…" : "Write some"}</button>
+          <button id="abl-cat-go" className={found ? "btn ghost" : "btn"} disabled={cat.running || cat.writing || n < MIN_INSIDE || !cat.name.trim()}
             onClick={findCategory}>{found ? "Find it again" : "Find it"}</button>
         </div>
         {cat.running && <div className="export"><div className="export-bar"><i style={{ width: cat.width }} /></div></div>}

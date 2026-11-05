@@ -857,6 +857,18 @@ async def abl_category(req: Request):
     return sse(gen())
 
 
+@app.post("/api/abl/category/suggest")
+async def abl_category_suggest(req: Request):
+    """Have the model write requests in a category, refusals erased, to fill in the list the category is found from."""
+    need_model()
+    body = await req.json()
+    name = str(body.get("name") or "").strip()[:60]
+    if not name:
+        raise HTTPException(400, "Name the category first.")
+    have = [str(p) for p in body.get("have") or []]
+    return sse(abl_mod.suggest(eng, name, have, cancel=cancel))
+
+
 @app.post("/api/abl/test")
 async def abl_test(req: Request):
     """Generate on a few probes, plain beside ablated, then measure refusal rates and the fluency cost."""
