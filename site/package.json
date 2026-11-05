@@ -8,7 +8,11 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@webgpu/types": "0.1.74",
     "typescript": "~5.9",
     "vite": "8.3.5"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0"
   }
 }

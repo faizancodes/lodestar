@@ -1,0 +1,39 @@
+/* The little the browser demo adds to the app's stylesheet: the model card is a label here, not a menu; a reply
+   read token by token for Inspect; and the logit lens as a list. Everything else is web/src/styles/style.css. */
+.model-card .model-pick { cursor: default; }
+.model-card .model-pick:hover { background: transparent; }
+.get-app { position: relative; z-index: 2; justify-content: center; text-decoration: none; }
+.brand { text-decoration: none; color: inherit; }
+#chat-inspect-btn.on { border-color: var(--ascii); color: var(--ascii); }
+.start-model.off { cursor: default; opacity: 0.55; }
+.start-model.off:hover { border-color: var(--rule); transform: none; }
+
+/* a reply as the tokens the model wrote, each one a way in */
+.md.tks { white-space: pre-wrap; }
+.tk { border-radius: 2px; cursor: pointer; transition: background 0.1s; }
+.tk:hover { background: var(--wash); box-shadow: inset 0 -1px 0 var(--ascii); }
+.tk.on { background: var(--ascii); color: var(--bg); box-shadow: none; }
+
+.insp-tok { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.insp-tok b { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--text); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.insp-tok span { flex: none; font-size: 11.5px; color: var(--muted); }
+.insp-sec { margin-top: 10px; }
+.nr-card .nr-id em { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.lens { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lens li { display: grid; grid-template-columns: 34px 1fr 38px; gap: 8px; padding: 3px 6px; border-radius: var(--r-sm); }
+.lens li:nth-child(odd) { background: var(--well); }
+.lens li:last-child { background: var(--wash); }
+.lens-l { color: var(--muted); }
+.lens-t { overflow: hidden; color: var(--text); white-space: pre; text-overflow: ellipsis; }
+.lens-p { color: var(--text-2); text-align: right; }
+
+/* a phone: the conversation alone, with the app's 16px gutter */
+@media (max-width: 720px) {
+  .side { display: none; }
+  main { padding: 32px 16px 48px; }
+  .chat-h { padding: 10px 16px; }
+  .chat-log { padding: 28px 16px 24px; }
+  .composer-wrap { padding: 0 16px 16px; }
+  .start-art { height: 200px !important; }
+}
