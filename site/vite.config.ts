@@ -9,5 +9,6 @@ const SITE = (process.env.SITE_URL ?? "https://lodestar.so").replace(/\/$/, "");
 export default defineConfig({
   base: "./",
   server: { port: 5180, fs: { allow: [".."] } },
+  build: { rollupOptions: { input: { index: "index.html", demo: "demo.html" } } },
   plugins: [{ name: "site-url", transformIndexHtml: (html) => html.replaceAll("%SITE%", SITE) }],
 });

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lodestar in your browser</title>
+  <meta name="description" content="Chat with Qwen3-0.6B on your own GPU, then erase its refusals, push its neurons and look inside every layer." />
+  <meta name="theme-color" content="#0a0a0a" />
+  <link rel="icon" href="./favicon.ico" sizes="48x48" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Lodestar" />
+  <meta property="og:title" content="Lodestar in your browser" />
+  <meta property="og:description" content="Chat with Qwen3-0.6B on your own GPU, then erase its refusals, push its neurons and look inside every layer." />
+  <meta property="og:url" content="%SITE%/demo" />
+  <meta property="og:image" content="%SITE%/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="%SITE%/og.png" />
+</head>
+<body data-tab="chat">
+  <!-- the app's own shell and Chat view (web/src: Sidebar.tsx, Start.tsx, Chat.tsx), with the model in the page -->
+  <aside class="side">
+    <canvas class="side-art" id="side-art" aria-hidden="true"></canvas>
+    <a class="brand" id="brand" href="./" title="Lodestar"><span class="brand-mark" id="brand-mark"></span><h1>Lodestar</h1></a>
+    <nav class="tabs" role="tablist">
+      <button class="tab on" role="tab" aria-selected="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.6c0 4.1-3.8 7.4-8.5 7.4-1.2 0-2.3-.2-3.3-.6L4 20l1.3-3.7C4.2 15 3.5 13.4 3.5 11.6 3.5 7.5 7.3 4.2 12 4.2s8.5 3.3 8.5 7.4z" /></svg>
+        <span>Chat</span>
+      </button>
+    </nav>
+    <div class="side-fill"></div>
+    <div class="model-card" id="model-card">
+      <div class="model-pick">
+        <span class="mp-dot" aria-hidden="true"></span>
+        <span class="mp-text">
+          <span class="mp-name">Qwen3-0.6B</span>
+          <span id="model-status" class="model-status"><span class="txt">No model loaded</span></span>
+        </span>
+      </div>
+    </div>
+    <a class="btn ghost get-app" href="./#get">Get the Mac app</a>
+  </aside>
+
+  <main id="main">
+    <section id="start" class="start">
+      <h2>Pick a model to start.</h2>
+      <div id="start-models" class="start-models">
+        <div class="start-model" id="pick" role="button" tabindex="0">
+          <div><b>Qwen3-0.6B</b><span id="pick-sub">1.2 GB, downloaded once · runs on your GPU</span></div>
+          <span class="acts"><span class="go" id="pick-go">Load</span></span>
+        </div>
+      </div>
+      <canvas id="start-art" class="start-art" aria-hidden="true"></canvas>
+      <div id="start-status" class="start-status"></div>
+    </section>
+
+    <section id="view-chat" class="view chat" hidden>
+      <div class="chat-main">
+        <header class="chat-h">
+          <div class="chat-title"><b id="chat-model">Qwen3-0.6B</b></div>
+          <div class="chat-mods" id="chat-mods"></div>
+          <div class="chat-acts">
+            <button id="chat-inspect-btn" class="btn ghost sm" aria-pressed="false">Inspect</button>
+            <button id="chat-neurons-btn" class="btn ghost sm" aria-expanded="false">Neurons</button>
+            <button id="chat-new" class="btn ghost sm">New chat</button>
+          </div>
+        </header>
+        <div class="chat-scroll" id="chat-scroll">
+          <div class="chat-log" id="chat-log"></div>
+          <div class="chat-empty" id="chat-empty">
+            <h2>What’s on your mind?</h2>
+            <div class="chat-starters" id="chat-starters"></div>
+          </div>
+        </div>
+        <div class="composer-wrap">
+          <form class="composer" id="chat-form">
+            <textarea id="chat-input" rows="1" placeholder="Message the model" spellcheck="false"></textarea>
+            <div class="composer-bar">
+              <details class="chat-opts" id="chat-opts">
+                <summary aria-label="Settings" title="Settings">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h7M13 4.5h1M2 11.5h1M7 11.5h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><circle cx="11" cy="4.5" r="1.9" fill="none" stroke="currentColor" stroke-width="1.5" /><circle cx="5" cy="11.5" r="1.9" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+                </summary>
+                <div class="chat-opts-pop">
+                  <label class="field">System prompt
+                    <textarea id="chat-system" rows="3" spellcheck="false" placeholder="Optional"></textarea>
+                  </label>
+                  <label class="field">Temperature
+                    <div class="slider-row"><input id="chat-temp" type="range" min="0" max="1.5" step="0.05" value="0.7" /><output id="chat-temp-v">0.70</output></div>
+                  </label>
+                  <label class="field">Reply length
+                    <div class="slider-row"><input id="chat-max" type="range" min="64" max="1024" step="32" value="384" /><output id="chat-max-v">384</output></div>
+                  </label>
+                </div>
+              </details>
+              <span class="grow"></span>
+              <button type="button" class="send stop" id="chat-stop" aria-label="Stop" hidden><i></i></button>
+              <button type="submit" class="send" id="chat-send" aria-label="Send" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4m0 0L5 9m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <aside class="nr" id="chat-side" hidden></aside>
+    </section>
+  </main>
+
+  <script type="module" src="./src/demo/main.ts"></script>
+</body>
+</html>
