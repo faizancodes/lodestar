@@ -88,6 +88,26 @@ export async function setScope(scope: "all" | "category") {
 
 export const editCat = (p: { name?: string; prompts?: string }) => setCat({ ...p, touched: true });
 
+/** Have the model write requests in the category, added under the ones already listed. */
+export async function writeRequests() {
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
+
+  const { name, prompts } = get().cat, have = lines(prompts);
+  let got: string[] | null = null;
+  setCat({ writing: true, live: { text: "Writing requests…", running: true } });
+
+  try {
+    await stream("/api/abl/category/suggest", { name: name.trim(), have }, (ev) => {
+      if (ev.type === "result") got = ev.prompts as string[];
+    });
+  } finally {
+    setCat({ writing: false, live: null });
+  }
+  if (!got) return;
+  if (!(got as string[]).length) return toast("The model didn't write any. Try again, or name the category differently.", true);
+  setCat({ prompts: [...have, ...(got as string[])].join("\n"), touched: true });
+}
+
 /** Fit the gate for the category's requests, test it, and try the version for the weights. */
 export async function findCategory() {
   if (app().busy) return toast("Something is already running. Stop it first.", true);

@@ -760,9 +760,9 @@ class Engine:
 
             yield None, out_ids
 
-    def generate_text(self, rows, max_new=160, temperature=0.0, cancel=None, abl=None):
+    def generate_text(self, rows, max_new=160, temperature=0.0, cancel=None, abl=None, seed=0):
         final = None
-        for r, x in self.generate(rows, max_new, temperature, cancel, abl=abl):
+        for r, x in self.generate(rows, max_new, temperature, cancel, seed=seed, abl=abl):
             if r is None:
                 final = x
         return [self.tok.decode(ids, skip_special_tokens=True) for ids in final], final

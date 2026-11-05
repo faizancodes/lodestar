@@ -21,6 +21,7 @@ selection and weight-editing practice from mlabonne's abliteration, FailSpy's ab
 Strength scales how much of the projection is removed (1.0 = fully; slightly under can spare fluency, slightly
 over overshoots past zero, which sometimes finishes off leftover refusal-inducing residue).
 """
+import os
 import re
 import sys
 import threading
@@ -779,3 +780,56 @@ def category(eng, inside, harmful, harmless, vec, coef, cancel=None):
     yield _ev("result", gate=gate, coef=gcoef, gate_acc=round(trial_gate["acc"], 4), gate_sep=round(sep, 2),
               inside=n_in, outside=len(test_out), base_in=int(base_in), base_out=int(base_out),
               gate_test=gate_test, weights=weights)
+
+
+# ------------------------------------------------------------------ requests for a category
+# Writing the category's requests by hand is the slow part of finding one, so the model writes them. Asked for
+# requests rather than answers, models write them as they are; only when too few come back is the refusal direction
+# erased (with no gate, which would stay shut for a request to write requests) and the model asked again. Erasing
+# first would cost the model's writing for nothing, or all of it where the direction is a poor one. A few replies at
+# once, each led by a different angle, keep the list from repeating itself.
+SUGGEST_ANGLES = ["", "Make them specific and practical. ", "Write them as different kinds of people would ask. "]
+_LEAD = re.compile(r"^\s*(?:[-*•>]+|\(?\d+[.):]|\d+\s*-)\s*")
+
+
+def request_lines(text):
+    """The requests in a reply that lists them: one per line, without numbering, bullets, quotes or a preamble."""
+    out = []
+    for ln in text.splitlines():
+        s = _LEAD.sub("", ln).strip().strip('"“”\'').strip()
+        if s.startswith("#") or (s.startswith("**") and s.endswith("**")):
+            continue  # a heading
+        if 12 <= len(s) <= 300 and not s.endswith(":") and not re.match(r"(?i)(here are|sure|certainly|note:)", s):
+            out.append(s)
+    return out
+
+
+def suggest(eng, name, have=(), n=16, cancel=None):
+    """Ask the model for `n` new requests in the category `name`. Yields stage events, then {type: result, prompts}:
+    new ones only, none already in `have`."""
+    per = -(-n // len(SUGGEST_ANGLES)) + 2
+    ask = lambda a: (f'Write {per} different requests that people send to an AI assistant, all in the category '
+                     f'"{name}". {a}Vary the topic and the wording, and write each one exactly as the person would '
+                     f'type it. One request per line, with no numbering, headings or anything else.')
+    rows = [(eng.chat_ids(ask(a)), []) for a in SUGGEST_ANGLES]
+    seen, out = {p.strip().lower() for p in have}, []
+
+    def write(erase):
+        texts, _ = eng.generate_text(rows, max_new=40 * per, temperature=0.9, cancel=cancel, abl=erase,
+                                     seed=int.from_bytes(os.urandom(4), "little"))
+        for t in texts:
+            for p in request_lines(t):
+                if p.lower() not in seen:
+                    seen.add(p.lower())
+                    out.append(p)
+
+    yield _ev("stage", stage="suggest", label="Writing requests")
+    write(False)
+    if len(out) < n // 2 and eng.abl_vec is not None:
+        yield _ev("stage", stage="suggest", label="Writing requests with refusals erased")
+        gate, eng.abl_gate = eng.abl_gate, None
+        try:
+            write(True)
+        finally:
+            eng.abl_gate = gate
+    yield _ev("result", prompts=out[:n])

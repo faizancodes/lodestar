@@ -402,8 +402,19 @@ test("abliterate: only one category", async ({ page }) => {
   await expect(page.locator("#abl-scat")).not.toHaveClass(/\blocked\b/);
   await expect(page.locator("#abl-scope")).toHaveCount(0); // no category yet
   await expect(page.locator("#abl-cat-go")).toBeDisabled();
+  await expect(page.locator("#abl-cat-write")).toBeDisabled(); // nothing to write about yet
 
+  // the model writes requests for the category, under the ones already listed
   await page.locator("#abl-cat-name").fill("Security research");
+  await page.locator("#abl-cat-prompts").fill(SECURITY[0]);
+  await page.locator("#abl-cat-write").click();
+  const lines = async () => (await page.locator("#abl-cat-prompts").inputValue()).split("\n");
+  await expect.poll(async () => (await lines()).length, { timeout: 120_000 }).toBeGreaterThanOrEqual(12);
+  await expect(page.locator("#abl-cat-write")).toHaveText("Write some");
+  const written = await lines();
+  expect(written[0]).toBe(SECURITY[0]);
+  expect(new Set(written).size).toBe(written.length);
+
   await page.locator("#abl-cat-prompts").fill(SECURITY.join("\n"));
   await expect(page.locator("#abl-cat-go")).toBeEnabled();
   await snap(page.locator("#abl-scat"), "abl-cat");

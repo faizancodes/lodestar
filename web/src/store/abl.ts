@@ -49,7 +49,7 @@ type Abl = {
   rank: AblResult | null;
   rankN: number; // a new ranking is a new list
   at: Entry[] | null; // the try-it thread
-  cat: { name: string; prompts: string; running: boolean; live: Live; width: string; touched: boolean };
+  cat: { name: string; prompts: string; running: boolean; writing: boolean; live: Live; width: string; touched: boolean };
 };
 
 export const useAbl = create<Abl>(() => ({
@@ -64,7 +64,7 @@ export const useAbl = create<Abl>(() => ({
   rank: null,
   rankN: 0,
   at: null,
-  cat: { name: "", prompts: "", running: false, live: null, width: "0%", touched: false },
+  cat: { name: "", prompts: "", running: false, writing: false, live: null, width: "0%", touched: false },
 }));
 
 export const touchAbl = () => useAbl.setState((s) => ({ v: s.v + 1 }));
