@@ -623,19 +623,23 @@ class Engine:
         msgs.append({"role": "user", "content": prompt})
         return self.messages_ids(msgs)
 
-    def messages_ids(self, messages):
+    def supports_tools(self):
+        """Whether the chat template renders a tool list (Qwen, Hermes, Llama 3.1+, Mistral do)."""
+        return "tools" in (self.tok.chat_template or "")
+
+    def messages_ids(self, messages, tools=None):
         if self.tok.chat_template is None:
             text = "".join(f"{m['role']}: {m['content']}\n" for m in messages) + "assistant:"
             return self.tok(text).input_ids
 
         try:
-            enc = self.tok.apply_chat_template(messages, add_generation_prompt=True, enable_thinking=False,
-                                               tokenize=True)
+            enc = self.tok.apply_chat_template(messages, tools=tools or None, add_generation_prompt=True,
+                                               enable_thinking=False, tokenize=True)
         except Exception:  # templates without system-role support: fold the system prompt into the first user turn
             if messages and messages[0]["role"] == "system":
                 sys_, rest = messages[0]["content"], [dict(m) for m in messages[1:]]
                 rest[0]["content"] = f"{sys_}\n\n{rest[0]['content']}"
-                return self.messages_ids(rest)
+                return self.messages_ids(rest, tools)
             raise
 
         return list(enc["input_ids"] if hasattr(enc, "keys") else enc)

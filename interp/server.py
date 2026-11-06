@@ -1115,6 +1115,22 @@ async def directions_import(req: Request):
     return {"added": [_dir_row(e) for e in added]}
 
 
+@app.post("/api/directions/{did}/export")
+async def directions_export(did: str, req: Request):
+    need_model()
+    body = await req.json()
+    if not body.get("path"):
+        raise HTTPException(400, "Give a path to write the .npz to.")
+    dose = body.get("dose")
+    layers = body.get("layers")
+
+    try:
+        return dirs.export_npz(did, body["path"], None if dose is None else float(dose),
+                               [int(l) for l in layers] if layers else None)
+    except KeyError as e:
+        raise HTTPException(404, str(e.args[0]))
+
+
 @app.delete("/api/directions/{did}")
 def directions_delete(did: str):
     need_model()
@@ -1250,6 +1266,71 @@ def _text(content):
     return "" if content is None else str(content)
 
 
+def _args_obj(args):
+    """Tool-call arguments as a mapping when they parse as JSON (templates differ on str vs dict), else as given."""
+    if isinstance(args, str):
+        try:
+            return json.loads(args) if args.strip() else {}
+        except ValueError:
+            return args
+    return args if args is not None else {}
+
+
+def _in_tool_calls(calls):
+    """OpenAI request tool_calls -> the shape HF chat templates read."""
+    out = []
+    for c in calls or []:
+        f = c.get("function") or {}
+        out.append({"id": c.get("id"), "type": "function",
+                    "function": {"name": f.get("name", ""), "arguments": _args_obj(f.get("arguments"))}})
+    return out
+
+
+_TOOL_TAG = re.compile(r"<tool_call>\s*(.*?)\s*(?:</tool_call>|$)", re.S)
+
+
+def _one_call(obj):
+    if not isinstance(obj, dict) or not isinstance(obj.get("name"), str):
+        return None
+    args = obj.get("arguments", obj.get("parameters", {}))
+    return {"id": f"call_{uuid.uuid4().hex[:24]}", "type": "function",
+            "function": {"name": obj["name"], "arguments": args if isinstance(args, str) else json.dumps(args)}}
+
+
+def _parse_tool_calls(text):
+    """Split a reply into (content, tool_calls).
+
+    Hermes/Qwen style `<tool_call>{json}</tool_call>` blocks first; otherwise a reply that is only a JSON object (or
+    list of them) with a name, as Llama 3.1 writes. Text that doesn't parse stays content."""
+    calls, rest = [], text
+    if "<tool_call>" in text:
+        kept = []
+        for m in _TOOL_TAG.finditer(text):
+            try:
+                c = _one_call(json.loads(m.group(1)))
+            except ValueError:
+                c = None
+            if c:
+                calls.append(c)
+                kept.append(m.span())
+        for a, b in reversed(kept):
+            rest = rest[:a] + rest[b:]
+    else:
+        s = text.strip()
+        if s.startswith("<|python_tag|>"):
+            s = s[len("<|python_tag|>"):].strip()
+        if s[:1] in "{[":
+            try:
+                obj = json.loads(s)
+                objs = obj if isinstance(obj, list) else [obj]
+                parsed = [_one_call(o) for o in objs]
+                if parsed and all(parsed):
+                    calls, rest = parsed, ""
+            except ValueError:
+                pass
+    return rest.strip(), calls
+
+
 @app.get("/v1/models")
 def api_models():
     return {"object": "list", "data": [{"id": m["id"], "object": "model", "created": 0, "owned_by": "lodestar"}
@@ -1271,21 +1352,30 @@ async def api_chat(req: Request):
     first = next(iter(models))
     if want and want not in models:
         return _oai_error(404, f"No model called {want!r}. This server has: {', '.join(models)}.", "not_found_error")
-    if body.get("tools"):
-        return _oai_error(400, "Tool calling isn't supported.")
     if int(body.get("n") or 1) != 1:
         return _oai_error(400, "Only n=1 is supported.")
+
+    tools = [t.get("function", t) for t in body.get("tools") or [] if t.get("type", "function") == "function"]
+    if body.get("tool_choice") == "none":
+        tools = []
+    if tools and not eng.supports_tools():
+        return _oai_error(400, "This model's chat template doesn't support tools.")
 
     msgs = []
     for m in body.get("messages") or []:
         role = {"developer": "system"}.get(m.get("role"), m.get("role"))
-        if role not in ("system", "user", "assistant"):
+        if role not in ("system", "user", "assistant", "tool"):
             return _oai_error(400, f"Messages with role {m.get('role')!r} aren't supported.")
         text = _text(m.get("content"))
-        if text.strip():
+        if role == "tool":
+            msgs.append({"role": "tool", "content": text, "tool_call_id": m.get("tool_call_id"),
+                         **({"name": m["name"]} if m.get("name") else {})})
+        elif role == "assistant" and m.get("tool_calls"):
+            msgs.append({"role": "assistant", "content": text, "tool_calls": _in_tool_calls(m["tool_calls"])})
+        elif text.strip():
             msgs.append({"role": role, "content": text})
-    if not msgs or msgs[-1]["role"] != "user":
-        return _oai_error(400, "The conversation must end with a user message.")
+    if not msgs or msgs[-1]["role"] not in ("user", "tool"):
+        return _oai_error(400, "The conversation must end with a user or tool message.")
 
     mid = want or first
     if mid.endswith("-plain"):
@@ -1296,7 +1386,7 @@ async def api_chat(req: Request):
         pushes, erase = serving["pushes"], bool(abl_now().get("active"))
 
     try:
-        row = (eng.messages_ids(msgs), pushes_of({"pushes": pushes}))
+        row = (eng.messages_ids(msgs, tools), pushes_of({"pushes": pushes}))
     except (ValueError, KeyError) as e:
         return _oai_error(400, str(e))
 
@@ -1361,8 +1451,14 @@ async def api_chat(req: Request):
             return "".join(parts), end
 
         text, (finish, n) = await run_in_threadpool(whole)
+        message = {"role": "assistant", "content": text}
+        if tools:
+            content, calls = _parse_tool_calls(text)
+            if calls:
+                message = {"role": "assistant", "content": content or None, "tool_calls": calls}
+                finish = "tool_calls"
         return {"id": rid, "object": "chat.completion", "created": made, "model": mid,
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": finish}],
+                "choices": [{"index": 0, "message": message, "finish_reason": finish}],
                 "usage": usage(n)}
 
     def chunk(delta, finish=None, **extra):
@@ -1386,6 +1482,7 @@ async def api_chat(req: Request):
         threading.Thread(target=work, daemon=True).start()
         try:
             yield chunk({"role": "assistant", "content": ""})
+            held = []  # with tools on, the reply is held until it ends: a tool call can't be told from text midway
             while True:
                 x = await q.get()
                 if isinstance(x, Exception):
@@ -1393,12 +1490,21 @@ async def api_chat(req: Request):
                     break
                 if isinstance(x, tuple):
                     finish, n = x
+                    if tools:
+                        content, calls = _parse_tool_calls("".join(held))
+                        if content:
+                            yield chunk({"content": content})
+                        if calls:
+                            yield chunk({"tool_calls": [{"index": i, **c} for i, c in enumerate(calls)]})
+                            finish = "tool_calls"
                     yield chunk({}, finish)
                     if (body.get("stream_options") or {}).get("include_usage"):
                         yield "data: " + json.dumps({"id": rid, "object": "chat.completion.chunk", "created": made,
                                                      "model": mid, "choices": [], "usage": usage(n)}) + "\n\n"
                     break
-                if x:
+                if x and tools:
+                    held.append(x)
+                elif x:
                     yield chunk({"content": x})
             yield "data: [DONE]\n\n"
         finally:
