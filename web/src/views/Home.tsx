@@ -125,7 +125,7 @@ const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: "
 // The OpenAI-compatible API: where other apps reach this model, the names it answers to, and the latest requests
 function Api() {
   const [s, setS] = useState<Serve | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null), [pick, setPick] = useState<string | null>(null);
   const items = useApp((a) => a.recipe.items), erased = useApp(ablActive), steer = useChat((c) => c.steer);
   const url = `${location.origin}/v1`;
 
@@ -138,34 +138,34 @@ function Api() {
   }, []);
 
   const copy = (k: string, text: string) => navigator.clipboard.writeText(text).then(() => (setCopied(k), setTimeout(() => setCopied(null), 1400)));
-  const first = s?.models[0]?.id ?? "";
-  const example = `from openai import OpenAI\n\nclient = OpenAI(base_url="${url}", api_key="lodestar")\nreply = client.chat.completions.create(\n    model="${first}",\n    messages=[{"role": "user", "content": "Hello!"}],\n)\nprint(reply.choices[0].message.content)`;
+  const models = s?.models ?? [];
+  const model = models.find((m) => m.id === pick)?.id ?? models[0]?.id ?? "";
+  const changed = (steer && items.length > 0) || erased;
+  const example = `from openai import OpenAI\n\nclient = OpenAI(base_url="${url}", api_key="lodestar")\nreply = client.chat.completions.create(\n    model="${model}",\n    messages=[{"role": "user", "content": "Hello!"}],\n)\nprint(reply.choices[0].message.content)`;
 
   return (
     <section className="step api" id="home-api">
       <div className="step-h"><div><h3>Use it from other apps</h3>
-        <p className="step-sub">Any app that speaks the OpenAI API can reach this model at this address.</p></div></div>
+        <p className="step-sub">Any app that speaks the OpenAI API can use this model.</p></div></div>
       <div className="card">
-        <div className="save-row">
-          <label className="field grow">Address
-            <input id="api-url" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
-          </label>
-          <button className="btn" onClick={() => copy("url", url)}>{copied === "url" ? "Copied" : "Copy"}</button>
+        <div className="api-row">
+          <span className="api-l">Address</span>
+          <code id="api-url">{url}</code>
+          <button className="btn ghost sm" onClick={() => copy("url", url)}>{copied === "url" ? "Copied" : "Copy"}</button>
         </div>
-        {!!s?.models.length && <div className="api-sec">
-          <div className="api-l">Models</div>
-          <dl className="api-models" id="api-models">{s.models.map((m, i) => (
-            <div key={m.id} data-model={m.id}>
-              <dt>{m.id}</dt>
-              <dd>{i ? m.about : <>{(steer && items.length > 0) || erased ? <i className="hc-on" /> : null}{m.about}: {asSet(items, steer, erased)}</>}</dd>
-            </div>
-          ))}</dl>
+        {!!models.length && <div className="api-row">
+          <span className="api-l">Model</span>
+          <div className="seg" id="api-models" role="radiogroup" aria-label="Model">{models.map((m, i) => (
+            <button key={m.id} data-model={m.id} role="radio" aria-checked={m.id === model} className={m.id === model ? "on" : undefined}
+              title={i ? m.id : `${m.id}: ${asSet(items, steer, erased)}`} onClick={() => setPick(m.id)}>
+              {!i && changed && <i className="hc-on" />}{m.about}
+            </button>
+          ))}</div>
         </div>}
-        <details className="adv api-ex">
-          <summary>Python example</summary>
+        <div className="api-code">
           <pre><code>{example}</code></pre>
           <button className="btn ghost sm" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copied" : "Copy"}</button>
-        </details>
+        </div>
         {!!s?.log.length && <div className="api-sec">
           <div className="api-l">Recent requests{!!s.active && <i className="hc-on" title="Answering a request" />}</div>
           <div className="api-log" id="api-log">{s.log.map((r) => (

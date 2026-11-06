@@ -58,12 +58,15 @@ test("start: pick a model, load it, land on Home", async ({ page }) => {
   if (RECORD) await expect.poll(async () => (await (await page.request.get("/api/jlens")).json()).ready, { timeout: T }).toBe(true);
 
   // other apps reach the model at /v1, under the names it lists
-  await expect(page.locator("#api-url")).toHaveValue(/\/v1$/);
-  await expect(page.locator("#api-models dt")).toHaveText(["Qwen3-0.6B", "Qwen3-0.6B-plain"]);
-  await expect(page.locator('#api-models [data-model="Qwen3-0.6B"] dd')).toHaveText("As set in Lodestar: Plain right now");
+  await expect(page.locator("#api-url")).toHaveText(/\/v1$/);
+  await expect(page.locator("#api-models button")).toHaveText(["As set in Lodestar", "Plain"]);
+  await expect(page.locator('#api-models [data-model="Qwen3-0.6B"]')).toHaveAttribute("title", "Qwen3-0.6B: Plain right now");
+  await expect(page.locator("#home-api pre")).toContainText('model="Qwen3-0.6B"');
   if (!RECORD) await expect(page.locator("#api-log > div")).toHaveCount(2); // the mock's stand-in log
-  await page.locator("#home-api .api-ex summary").click();
   await snap(page.locator("#home-api"), "home-api");
+  // picking a model puts its name in the example
+  await page.locator('#api-models [data-model="Qwen3-0.6B-plain"]').click();
+  await expect(page.locator("#home-api pre")).toContainText('model="Qwen3-0.6B-plain"');
 });
 
 test("shell: tabs, shortcuts, brand, model menu", async ({ page }) => {
