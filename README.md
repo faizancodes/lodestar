@@ -47,7 +47,7 @@ model's reply beside your edited one.
 <img src="docs/media/chat.gif" width="600" alt="One prompt forks into two replies written token by token, the original above and the edited one below, fanning apart as they disagree." />
 
 **Use it from your own code.** An OpenAI-compatible server at `http://127.0.0.1:8792/v1` runs the model with your
-changes, so any OpenAI client can talk to it.
+changes, so any OpenAI client can talk to it, including agents that call tools.
 
 <img src="docs/media/api.gif" width="600" alt="The lodestar at the centre of an orbit; clients arrive on it, requests curve in and tokens stream back out." />
 

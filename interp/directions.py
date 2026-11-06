@@ -215,6 +215,41 @@ class Library:
         return out
 
 
+    def export_npz(self, did, path, dose=None, layers=None):
+        """Write one direction as an .npz that import_npz reads back: `name` [L, H] and `name_mag` [L], plus
+        `name_band` and, when saved, `name_neutral` [L, H].
+
+        With a dose, also `name_offsets` [L, H]: the exact vector a push of that dose adds to the residual after each
+        layer (engine._resid_hook: dose / len(layers) * mag[l] * unit[l] on each pushed layer, 0 elsewhere), so a
+        server outside this app can reproduce the steering with one add per layer, or fold it into a bias."""
+        entry = next((e for e in self.index() if e["id"] == did), None)
+        f = self.dir / f"{did}.safetensors"
+        if entry is None or not f.exists():
+            raise KeyError(f"No direction called {did!r} for this model.")
+
+        t = load_file(str(f))
+        unit, mag = t["unit"].float().numpy(), t["mag"].float().numpy()
+        band = [int(l) for l in (layers or entry.get("band") or default_band(len(unit)))]
+        key = re.sub(r"[^A-Za-z0-9_]+", "_", did)
+        out = {key: unit, f"{key}_mag": mag, f"{key}_band": np.asarray(band, np.int64)}
+
+        nf = self.dir / "_neutral.safetensors"
+        if nf.exists():
+            out[f"{key}_neutral"] = load_file(str(nf))["mean"].float().numpy()
+
+        if dose is not None:
+            off = np.zeros_like(unit)
+            for l in band:
+                off[l] = float(dose) / len(band) * mag[l] * unit[l]
+            out[f"{key}_offsets"] = off
+            out[f"{key}_dose"] = np.asarray(float(dose), np.float32)
+
+        path = Path(path).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(path, **out)
+        return {"path": str(path), "keys": sorted(out), "layers": band}
+
+
 def default_band(L):
     """Layers ~39%-61% of the way through, every other one: 14,16,...,22 on a 36-layer model."""
     lo, hi = round(0.39 * L), round(0.61 * L)
