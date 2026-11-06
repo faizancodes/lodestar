@@ -1,6 +1,7 @@
 """Local HTTP API for the Lodestar window. Streams (server-sent events) for anything that generates text or runs a
 search; plain JSON for lookups. Serves the UI built in ../web/dist."""
 import asyncio
+import hmac
 import json
 import math
 import os
@@ -134,6 +135,19 @@ def _np(o):
     if isinstance(o, np.ndarray):
         return o.tolist()
     raise TypeError(type(o))
+
+
+TOKEN = os.environ.get("LODESTAR_TOKEN")  # set when serving beyond this Mac (scripts/modal_server.py)
+
+
+@app.middleware("http")
+async def need_token(req, call_next):
+    """With LODESTAR_TOKEN set, every request needs `Authorization: Bearer <token>`, which OpenAI clients send as
+    their API key. Unset (the Mac app), nothing changes."""
+    if TOKEN and not hmac.compare_digest(req.headers.get("authorization", ""), f"Bearer {TOKEN}"):
+        return JSONResponse({"error": {"message": "Missing or wrong bearer token.", "type": "authentication_error"}},
+                            status_code=401)
+    return await call_next(req)
 
 
 @app.middleware("http")
