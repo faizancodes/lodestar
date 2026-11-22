@@ -4,7 +4,8 @@ import { useApp } from "../store/app";
 
 const close = () => useApp.setState({ fitWarn: null });
 
-/** Asked before loading a model that won't fit beside what's already running: loading it makes macOS swap. */
+/** Asked before loading a model that won't fit beside what's already running: loading it makes macOS swap. One that
+ * would swap so far the Mac could freeze can't be loaded at all (the server refuses it too). */
 export function FitWarn() {
   const w = useApp((s) => s.fitWarn);
   if (!w) return null;
@@ -26,10 +27,14 @@ export function FitWarn() {
           </div>
         )}
 
-        <p className="dialog-note">Loading it anyway makes macOS swap to disk, and replies slow to a crawl.</p>
+        {w.fit.blocked ? (
+          <p className="dialog-note">{w.fit.blocked} Quit some apps and try again.</p>
+        ) : (
+          <p className="dialog-note">Loading it anyway makes macOS swap to disk, and replies slow to a crawl.</p>
+        )}
         <div className="dialog-acts">
-          <button className="btn ghost" onClick={close}>Cancel</button>
-          <button className="btn" id="fit-go" onClick={() => (close(), loadModel(w.id, true))}>Load anyway</button>
+          <button className="btn ghost" onClick={close}>{w.fit.blocked ? "Close" : "Cancel"}</button>
+          {!w.fit.blocked && <button className="btn" id="fit-go" onClick={() => (close(), loadModel(w.id, true))}>Load anyway</button>}
         </div>
       </div>
     </div>

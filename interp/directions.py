@@ -143,7 +143,7 @@ class Library:
         if eng.model is None or not self.dir.exists():
             return
 
-        L, H = len(eng.layers), int(eng.layers[0].mlp.down_proj.out_features)
+        L, H = len(eng.layers), eng.hidden
         neutral = self._neutral(create=False)
 
         for e in self.index():
@@ -260,7 +260,7 @@ def _read(eng, msg_lists, n_pos, cancel=None, budget=2048):
 def neutral_means(eng, prompts, cancel=None):
     """Mean residual after every layer over ordinary prompts, at every token but the first (which carries the huge
     attention-sink activations): [L, H] float32 on the device."""
-    L, H = len(eng.layers), int(eng.layers[0].mlp.down_proj.out_features)
+    L, H = len(eng.layers), eng.hidden
     acc, n = torch.zeros(L, H, device=eng.dev), 0
 
     with eng.lock:

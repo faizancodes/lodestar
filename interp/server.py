@@ -320,16 +320,23 @@ async def load(req: Request):
     body = await req.json()
     mid = body["model"].strip()
 
+    # checked here as well as in the UI, so nothing (a script, the API, an agent) can load past it
+    fit = _fit(mid)
+    if fit.get("blocked"):
+        raise HTTPException(409, f"{Path(mid).name} won't fit in memory. {fit['blocked']} Quit some apps and try "
+                                 "again.")
+
     LOADING["bytes"] = memory.weights_bytes(mid, HF_CACHE)
 
     def work():
         try:
-            eng.load(mid)
+            eng.load(mid, stream=fit.get("stream"))
             restore_for(mid)
             dirs.load()
             eng.jlens = jlens_mod.load(jlens_mod.path_for(JLENS, mid), eng)
             LAST_MODEL.write_text(mid)
-            if eng.jlens is None and mid not in _jlens_stopped():
+            # computed on its own only when it can't crowd the Mac: Inkling's takes hours, so it waits to be asked
+            if eng.jlens is None and mid not in _jlens_stopped() and not eng.ink and memory.headroom(JLENS_ROOM):
                 _jlens_start()
         except Exception as e:
             traceback.print_exc()
@@ -365,11 +372,13 @@ def memory_now():
 @app.post("/api/memory/fit")
 async def memory_fit(req: Request):
     """Whether a model fits beside what's already running, asked before loading it."""
-    mid = (await req.json())["model"].strip()
+    return _fit((await req.json())["model"].strip())
 
-    # loading a different model unloads this one first, so what it holds (all but the runtime's ~1 GB) comes free
+
+def _fit(mid):
+    # loading a model unloads the one that's loaded first, so what it holds (all but the runtime's ~1 GB) comes free
     loaded = 0
-    if eng.model is not None and eng.model_id != mid:
+    if eng.model is not None:
         loaded = max((memory.footprint(os.getpid()) or 0) - memory.GB, 0)
 
     return memory.fit(mid, HF_CACHE, loaded)
@@ -428,6 +437,7 @@ jlens_job = {"model": None, "status": "idle", "done": 0, "total": 0, "elapsed": 
 jlens_cancel = threading.Event()
 jlens_thread = None
 JLENS_STOPPED = JLENS / "stopped.json"
+JLENS_ROOM = 4 * memory.GB  # free memory its backward passes need beside the model
 
 
 def _jlens_stopped():
@@ -455,10 +465,13 @@ def _jlens_start():
 
     mid = eng.model_id
     jlens_cancel.clear()
-    jlens_job.update(model=mid, status="computing", done=0, total=int(eng.layers[0].mlp.down_proj.out_features), elapsed=0.0)
+    jlens_job.update(model=mid, status="computing", done=0, total=eng.hidden, elapsed=0.0, short=False)
 
     def prog(done, total, elapsed):
         jlens_job.update(done=done, total=total, elapsed=round(elapsed, 1))
+        if not memory.headroom(memory.GB):  # stop before the backward passes push macOS into swap
+            jlens_job["short"] = True
+            jlens_cancel.set()
 
     def work():
         try:
@@ -468,7 +481,8 @@ def _jlens_start():
                 eng.jlens = J.to(eng.dev, eng.model.dtype)
             jlens_job["status"] = "done"
         except Cancelled:
-            jlens_job["status"] = "idle"
+            jlens_job["status"] = "error: Stopped: the Mac was running short of memory." if jlens_job.get("short") \
+                else "idle"
         except Exception as e:
             traceback.print_exc()
             jlens_job["status"] = f"error: {e}"
@@ -481,12 +495,15 @@ def _jlens_start():
 @app.get("/api/jlens")
 def jlens_status():
     job = jlens_job if jlens_job["model"] == eng.model_id else {"status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
-    return {"ready": eng.jlens is not None, **{k: v for k, v in job.items() if k != "model"}}
+    return {"ready": eng.jlens is not None, **{k: v for k, v in job.items() if k not in ("model", "short")}}
 
 
 @app.post("/api/jlens/compute")
 def jlens_compute():
     need_model()
+    if not memory.headroom(JLENS_ROOM):
+        raise HTTPException(409, "Not enough free memory to compute the J-lens beside the model. Quit some apps and "
+                                 "try again.")
     _jlens_mark_stopped(eng.model_id, False)
     _jlens_start()
     return jlens_status()
@@ -917,6 +934,10 @@ def _start_export(kind, name, **edits):
     """Write an edited copy of the loaded model into COPIES/name on a background thread; see abl_mod.bake."""
     if export_job["status"] == "working":
         raise HTTPException(409, f"Already writing {export_job['name']}.")
+    if eng.ink:
+        # its experts are 4-bit, and the loop's message gates and convs sit between every write and the stream, so
+        # an edit can't go into the weights exactly; it works live in the app and through the API instead
+        raise HTTPException(409, "Inkling can't be saved as an edited copy: use it live here or through the API.")
 
     export_job.update(kind=kind, name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
 

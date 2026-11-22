@@ -417,7 +417,7 @@ def steer_biases(eng, items):
             continue
 
         l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
-        col = eng.layers[l].mlp.down_proj.weight[:, n].detach().float().cpu()
+        col = eng._down_col(l, n).detach().float().cpu()
         out[l] = out.get(l, 0) + dose * float(eng.unit[l, n]) * col
 
     return out
