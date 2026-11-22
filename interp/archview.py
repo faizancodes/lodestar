@@ -12,6 +12,8 @@ import re
 import numpy as np
 import torch
 
+from .engine import SparseActs
+
 LENS_K = 3
 MAX_TOKENS = 192
 REPLY_TOKENS = 96
@@ -104,7 +106,7 @@ def structure(eng):
         "linear_heads": getattr(c, "linear_num_value_heads", None),
         "linear_k_heads": getattr(c, "linear_num_key_heads", None),
         "tied": bool(getattr(c, "tie_word_embeddings", False)),
-        "experts": getattr(c, "num_experts", None) or None,
+        "experts": getattr(c, "num_experts", None) or getattr(c, "n_routed_experts", None) or None,
         "embedding": {"tensors": emb_t, "params": sum(t["params"] for t in emb_t)},
         "final_norm": {"tensors": norm_t, "params": sum(t["params"] for t in norm_t)},
         "unembedding": {"tensors": head_t, "params": sum(t["params"] for t in head_t)},
@@ -147,25 +149,29 @@ def run(eng, ids, n_prompt=None):
             if out is not None:
                 hd = _head_dim(eng, amod, kinds[l])
                 if hd:
-                    handles.append(out.register_forward_pre_hook(pre(l, hd)))
-                handles.append(out.register_forward_hook(write(attn_w, l)))
-            handles.append(layer.mlp.down_proj.register_forward_hook(write(mlp_w, l)))
+                    handles.append(eng.hook_sub(l, out, pre(l, hd), pre=True))
+                handles.append(eng.hook_sub(l, out, write(attn_w, l)))
+            handles.append(eng.hook_sub(l, eng.mlp_writer(l), write(mlp_w, l)))
 
         eng._cap_acts, eng._cap_resid = {}, {}
+        eng._cap_read = {} if eng.ink else None
         try:
             with torch.inference_mode():
                 eng.model(input_ids=torch.tensor([ids], device=eng.dev), use_cache=False, logits_to_keep=1)
                 resid = [eng._cap_resid[l].float().norm(dim=-1).cpu() for l in range(L)]
                 lens_ids, lens_p = [], []
                 for l in range(L):
-                    p = torch.softmax(eng.lm_head(eng.final_norm(eng._cap_resid[l])).float(), -1)
+                    p = torch.softmax(eng._head(eng.final_norm(eng.lens_state(l))), -1)
                     top = p.topk(LENS_K, dim=-1)
                     lens_ids.append(top.indices.cpu().numpy())
                     lens_p.append(top.values.cpu().numpy())
                     del p
-            acts = torch.stack([eng._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
+            if eng.ink:
+                acts = SparseActs([eng._cap_acts[l] for l in range(L)], eng.dnorm.shape[1])
+            else:
+                acts = torch.stack([eng._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
         finally:
-            eng._cap_acts = eng._cap_resid = None
+            eng._cap_acts = eng._cap_resid = eng._cap_read = None
             for h in handles:
                 h.remove()
 
@@ -242,20 +248,25 @@ class Live:
             if out is not None:
                 hd = _head_dim(eng, amod, kinds[l])
                 if hd:
-                    self.handles.append(out.register_forward_pre_hook(
-                        keep(self.heads, l, lambda i, o, hd=hd: i[0][0, -1].float().view(-1, hd).norm(dim=-1))))
-                self.handles.append(out.register_forward_hook(
-                    keep(self.attn, l, lambda i, o: (o[0] if isinstance(o, tuple) else o)[0, -1].float().norm())))
-            down = layer.mlp.down_proj
-            self.handles.append(down.register_forward_pre_hook(keep(self.acts, l, lambda i, o: i[0][0, -1].float())))
-            self.handles.append(down.register_forward_hook(keep(self.mlp, l, lambda i, o: o[0, -1].float().norm())))
+                    self.handles.append(eng.hook_sub(l, out, keep(
+                        self.heads, l, lambda i, o, hd=hd: i[0][0, -1].float().view(-1, hd).norm(dim=-1)), pre=True))
+                self.handles.append(eng.hook_sub(l, out, keep(
+                    self.attn, l, lambda i, o: (o[0] if isinstance(o, tuple) else o)[0, -1].float().norm())))
+            down = eng.mlp_writer(l)
+            if not eng.ink:  # Inkling's expert activations come from the engine's capture instead (see frame)
+                self.handles.append(down.register_forward_pre_hook(keep(self.acts, l, lambda i, o: i[0][0, -1].float())))
+            self.handles.append(eng.hook_sub(l, down, keep(self.mlp, l, lambda i, o: o[0, -1].float().norm())))
         eng._cap_resid = {}
+        if eng.ink:
+            eng._cap_acts, eng._cap_read = {}, {}
         return self
 
     def __exit__(self, *exc):
         for h in self.handles:
             h.remove()
         self.eng._cap_resid = None
+        if self.eng.ink:
+            self.eng._cap_acts = self.eng._cap_read = None
         self.eng.lock.release()
 
     def frame(self):
@@ -264,13 +275,22 @@ class Live:
         a few layers spread through the model (each reading costs a pass through the unembedding)."""
         eng, L = self.eng, len(self.eng.layers)
         with torch.inference_mode():
+            if eng.ink:  # the newest position's routed experts, spread out to every neuron
+                acts = torch.zeros(L, eng.dnorm.shape[1], device=eng.dev)
+                for l in range(L):
+                    idx, val = eng._cap_acts[l]
+                    units = val.shape[-1]
+                    ids = idx[-1].long()[:, None] * units + torch.arange(units)
+                    acts[l, ids.reshape(-1).to(eng.dev)] = val[-1].reshape(-1).float().to(eng.dev)
+                self.acts = list(acts)
             imp = torch.stack(self.acts) * (eng.dnorm / eng.resid_p50[:, None]).float()  # [L, N]
             peak = imp.abs().amax(dim=1).clamp(min=1e-8)
             idx = imp.abs().topk(self.k, dim=1).indices
             val = imp.gather(1, idx) / peak[:, None]
             resid = torch.stack([eng._cap_resid[l][-1] for l in range(L)])  # [L, H]
             lens_at = sorted({round(i * (L - 1) / (LIVE_LENS - 1)) for i in range(LIVE_LENS)})
-            lens = eng.lm_head(eng.final_norm(resid[lens_at])).argmax(dim=-1)
+            read = torch.stack([eng.lens_state(l)[-1] for l in lens_at])
+            lens = eng._head(eng.final_norm(read)).argmax(dim=-1)
             zero = torch.zeros((), device=eng.dev)
             heads = [h for h in self.heads if h is not None]
             sizes = [0 if h is None else h.numel() for h in self.heads]

@@ -2,7 +2,7 @@
 
 A "neuron" is one unit at the input of a layer's MLP down_proj, where silu(gate) * up lives, so reading, adding and
 multiplying are all exact. Works with any Llama-style decoder in transformers (Qwen, Llama, Mistral, Gemma, ...) whose
-layers expose `mlp.down_proj`.
+layers expose `mlp.down_proj`, and with Inkling 2 Mini, whose experts and looped layers interp/inkling.py adapts.
 
 Doses for `add` pushes are in units of the layer's median residual norm, divided by the neuron's down-column norm, so
 dose 1.0 on any neuron moves the residual stream by about one typical residual's length. `mul` pushes multiply the
@@ -13,6 +13,7 @@ push adds dose / len(layers) times the direction's contrast size to the output o
 the stream by one average difference between the concept's two poles; `erase` clamps the stream's component along it
 to where ordinary prompts sit, at every layer.
 """
+import gc
 import os
 import re
 import threading
@@ -23,6 +24,8 @@ import numpy as np
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
+
+from . import inkling, memory
 
 # transformers 5 moves weights onto the device from a pool of threads, and on Apple GPUs concurrent copies race in
 # torch's Metal kernel cache and abort the process (malloc corruption in MetalShaderLibrary). One thread is safe.
@@ -60,6 +63,70 @@ class Cancelled(Exception):
     pass
 
 
+class SparseActs:
+    """A trace's neuron activations for a mixture-of-experts model, [L, T, N] as a dense array would be but stored as
+    what each token's routed experts computed: idx [L, T, K] (the experts) and val [L, T, K, units]. Every other neuron
+    is 0 at that token. Supports the two reads callers make: acts[:, t, :] ([L, N]) and acts[l, :, n] ([T])."""
+
+    def __init__(self, per_layer, n):
+        self.idx = torch.stack([i for i, _ in per_layer]).numpy()  # [L, T, K] int16
+        self.val = torch.stack([v for _, v in per_layer]).numpy()  # [L, T, K, units] float16
+        self.units = self.val.shape[-1]
+        self.shape = (self.idx.shape[0], self.idx.shape[1], n)
+
+    def _ids(self, idx):
+        return idx.astype(np.int64)[..., None] * self.units + np.arange(self.units)
+
+    def __getitem__(self, key):
+        a, b, c = key
+        if isinstance(b, (int, np.integer)) and a == slice(None) and c == slice(None):
+            L = self.shape[0]
+            out = np.zeros((L, self.shape[2]), np.float16)
+            np.put_along_axis(out, self._ids(self.idx[:, b]).reshape(L, -1), self.val[:, b].reshape(L, -1), 1)
+            return out
+        if isinstance(a, (int, np.integer)) and b == slice(None) and isinstance(c, (int, np.integer)):
+            e, u = divmod(int(c), self.units)
+            return (self.val[a, :, :, u] * (self.idx[a] == e)).sum(-1).astype(np.float16)
+        raise IndexError("SparseActs supports acts[:, t, :] and acts[l, :, n]")
+
+    def mean(self, start):
+        """Every neuron's mean over positions start..: [L, N] float32."""
+        L, T, N = self.shape
+        out = np.zeros((L, N), np.float32)
+        for l in range(L):
+            np.add.at(out[l], self._ids(self.idx[l, start:]).ravel(), self.val[l, start:].astype(np.float32).ravel())
+        return out / max(T - start, 1)
+
+    def top(self, sc, k, t=None, start=0):
+        """trace_top_neurons for sparse activations: [(layer, neuron, signed impact, activation, token)]."""
+        L = self.shape[0]
+        if t is not None:
+            ids = self._ids(self.idx[:, t]).reshape(L, -1)
+            a = self.val[:, t].reshape(L, -1).astype(np.float32)
+            imp = a * np.take_along_axis(sc, ids, 1)
+            flat = np.abs(imp).ravel()
+            sel = np.argpartition(-flat, min(k, flat.size - 1))[:k]
+            sel = sel[np.argsort(-flat[sel])]
+            return [(int(i // ids.shape[1]), int(ids.ravel()[i]), float(imp.ravel()[i]), float(a.ravel()[i]), t)
+                    for i in sel]
+
+        cands = []
+        for l in range(L):
+            ids = torch.from_numpy(self._ids(self.idx[l, start:]).reshape(-1))
+            imp = torch.from_numpy(self.val[l, start:].astype(np.float32).reshape(-1)) * torch.from_numpy(sc[l])[ids]
+            best = torch.zeros(self.shape[2]).scatter_reduce(0, ids, imp.abs(), "amax")
+            top = best.topk(k)
+            cands += [(float(v), l, int(n)) for v, n in zip(top.values, top.indices)]
+        cands.sort(reverse=True)
+
+        out = []
+        for _, l, n in cands[:k]:
+            series = self[l, :, n].astype(np.float32)
+            tt = start + int(np.abs(series[start:]).argmax())
+            out.append((l, n, float(series[tt] * sc[l, n]), float(series[tt]), tt))
+        return out
+
+
 class Engine:
     def __init__(self):
         self.lock = threading.RLock()
@@ -91,12 +158,19 @@ class Engine:
         self._deltas = None  # per-layer [N] tensors requiring grad, for attribution
         self._cap_acts = None  # {layer: [T, N] cpu} during a trace
         self._cap_resid = None  # {layer: [T, H]} during a trace or norm measurement
+        self._cap_read = None  # {layer: [T, H]} during a trace: what the output head would read there (Inkling)
+        # Inkling 2 Mini's adapter (interp/inkling.py load's info), None for every other model
+        self.ink = None
+        self.reply_prefix = []  # tokens the reply starts with, after the chat template's generation prompt
+        self.softcap = None  # final logit softcap, for the models that have one
         self._read = None  # while generating with gauges: {layer: (units [D_l, H], ref [D_l], scale [D_l], cols [D_l])}
         self._read_buf = None  # [B, D]: this pass's reading of each gauged direction at the newest position
         self._handles = []
 
     # ---------------------------------------------------------------- loading
-    def load(self, model_id):
+    def load(self, model_id, stream=None):
+        """stream: for Inkling 2 Mini, the bytes of GPU cache to stream its experts from disk through (see
+        interp/inkling.py), when they don't fit in memory."""
         with self.lock:
             if self.model_id == model_id and self.model is not None:
                 return self.info()
@@ -107,6 +181,8 @@ class Engine:
             took = {}
             self.unload()
             dev = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
+            if dev == "mps":
+                memory.cap_gpu()
 
             # the tokenizer (~0.7 s) loads alongside the weights rather than before them
             tok_box = {}
@@ -115,11 +191,24 @@ class Engine:
             self.progress = 0.04
 
             # straight onto the device: loading on the CPU first would hold two copies of the weights at once
+            ink = None
             prev = hf_logging.set_tqdm_hook(self._weights_progress_hook)
+            short = None
             try:
-                model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.bfloat16, device_map=dev)
+                if inkling.is_inkling(model_id):
+                    model, ink = inkling.load(model_id, dev, on_layer=self._experts_arrived,
+                                              cache_bytes=stream if dev == "mps" else None)
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.bfloat16, device_map=dev)
+            except MemoryError as e:
+                short = str(e)  # raised again below, once the half-loaded weights the traceback holds are let go
             finally:
                 hf_logging.set_tqdm_hook(prev)
+            if short is not None:
+                gc.collect()
+                if dev == "mps":
+                    torch.mps.empty_cache()
+                raise RuntimeError(short)
 
             tok_thread.join()
             if "tok" not in tok_box:
@@ -130,7 +219,7 @@ class Engine:
             self.progress = 0.9
             self.load_state = {**self.load_state, "stage": "measure"}
 
-            n_params = sum(p.numel() for p in model.parameters())
+            n_params = ink["n_params"] if ink else sum(p.numel() for p in model.parameters())
             if n_params < 2.5e9:  # small models fit comfortably in fp32, which keeps gradients and lenses precise
                 model = model.float()
             model = model.eval()
@@ -141,20 +230,40 @@ class Engine:
 
             self.tok, self.model, self.dev, self.model_id = tok, model, dev, model_id
             self.n_params = n_params
-            self.layers = self._find_layers(model)
-            self.final_norm = self._find_norm(model)
+            self.ink = ink
+            self.softcap = getattr(self._text_config(), "final_logit_softcapping", None)
             self.lm_head = model.get_output_embeddings()
-            self.backbone = getattr(model, model.base_model_prefix)  # the transformer without the vocabulary head
+            if ink:
+                self.layers = ink["layers"]
+                self.final_norm = ink["text"].norm
+                self.backbone = ink["text"]
+                self.reply_prefix = tok.convert_tokens_to_ids(list(inkling.REPLY_PREFIX))
+                self._handles += ink["handles"]
+                for layer in ink["text"].layers:
+                    layer.mlp.control = self._moe_control
+                # the embedding stays one of the block states every layer reads, so erasing has to reach it too
+                self._handles.append(ink["text"].embed_tokens.register_forward_hook(self._embed_hook))
+            else:
+                self.layers = self._find_layers(model)
+                self.final_norm = self._find_norm(model)
+                self.backbone = getattr(model, model.base_model_prefix)  # the transformer without the vocabulary head
+                self.reply_prefix = []
 
             for i, layer in enumerate(self.layers):
-                self._handles.append(layer.mlp.down_proj.register_forward_pre_hook(self._mlp_hook(i)))
+                if not ink:
+                    self._handles.append(layer.mlp.down_proj.register_forward_pre_hook(self._mlp_hook(i)))
                 self._handles.append(layer.register_forward_hook(self._resid_hook(i)))
 
-            self._use_builtin_steering(model_id)
+            if not ink:
+                self._use_builtin_steering(model_id)
 
             t1 = time.perf_counter()
             with torch.no_grad():
-                self.dnorm = torch.stack([l.mlp.down_proj.weight.float().norm(dim=0) for l in self.layers])  # [L, N]
+                if ink:
+                    norms = [l.mlp.store.down_norms() for l in ink["text"].layers]
+                    self.dnorm = torch.stack([norms[ink["tracker"].physical(v)] for v in range(len(self.layers))])
+                else:
+                    self.dnorm = torch.stack([l.mlp.down_proj.weight.float().norm(dim=0) for l in self.layers])  # [L, N]
             took["norms"] = time.perf_counter() - t1
 
             t1 = time.perf_counter()
@@ -181,6 +290,111 @@ class Engine:
             return getattr(getattr(cfg, "text_config", None) or cfg, "num_hidden_layers", None)
         except Exception:
             return None
+
+    def _text_config(self):
+        c = self.model.config
+        return c.get_text_config() if hasattr(c, "get_text_config") else c
+
+    def _experts_arrived(self, i, n):
+        """Inkling's packed experts load after the rest of its weights, a layer at a time. If macOS runs critically
+        short of memory meanwhile, the load stops rather than push the Mac into swapping it can't recover from."""
+        if memory.pressure() == "critical":
+            raise MemoryError("Stopped loading: the Mac ran short of memory. Quit some apps and try again.")
+        if self.load_state is not None:
+            lit = self.load_state.get("lit") or [0.0] * n
+            if len(lit) == n:
+                lit[i] = 1.0
+            self.load_state = {**self.load_state, "stage": "weights", "layers": n, "lit": lit}
+        self.progress = 0.5 + 0.4 * (i + 1) / n
+
+    @property
+    def hidden(self):
+        return int(self.lm_head.weight.shape[1])
+
+    def _head(self, h):
+        """Logits from final-normed states, softcapped as the model's own head does."""
+        lg = self.lm_head(h).float()
+        return torch.tanh(lg / self.softcap) * self.softcap if self.softcap else lg
+
+    def _experts(self, layer):
+        """The packed experts behind (virtual) layer `layer` of an Inkling model."""
+        return self.ink["text"].layers[self.ink["tracker"].physical(layer)].mlp.store
+
+    def _down_col(self, layer, n):
+        """Neuron n's down column: what one unit of its activation writes, [H] in the model's dtype."""
+        if self.ink:
+            return self._experts(layer).down_columns([n])[:, 0].to(self.model.dtype)
+        return self.layers[layer].mlp.down_proj.weight[:, n]
+
+    def _down_scores(self, layers, U):
+        """For each layer l in `layers`, U[i] [H] against every neuron's down column: {l: [N] float32}."""
+        out = {}
+        if not self.ink:
+            for i, l in enumerate(layers):
+                D = self.layers[l].mlp.down_proj.weight
+                out[l] = (U[i].to(D.dtype) @ D).float()
+            return out
+
+        by_phys = {}
+        for i, l in enumerate(layers):
+            by_phys.setdefault(self.ink["tracker"].physical(l), []).append((i, l))
+        for p, group in by_phys.items():
+            sc = self._experts(group[0][1]).down_scores(torch.stack([U[i] for i, _ in group]).float())
+            for j, (_, l) in enumerate(group):
+                out[l] = sc[j]
+        return out
+
+    def hook_sub(self, l, sub, fn, pre=False):
+        """A hook on a submodule of layer l (its attention's output projection, say) that sees only layer l's own
+        calls: with Inkling's looped layers, one of the three passes."""
+        if self.ink:
+            return self.layers[l].hook(sub, fn, pre)
+        return sub.register_forward_pre_hook(fn) if pre else sub.register_forward_hook(fn)
+
+    def mlp_writer(self, l):
+        """The module whose output is what layer l's MLP writes: down_proj, or Inkling's whole expert block."""
+        return self.layers[l].module.mlp if self.ink else self.layers[l].mlp.down_proj
+
+    def lens_state(self, l):
+        """During a capture: the stream at layer l as the output head would read it, [T, H]."""
+        return (self._cap_read or self._cap_resid)[l]
+
+    def _moe_control(self, v):
+        """What Inkling's experts at layer application v should do this pass (inkling.PackedMoe asks)."""
+        st = self._push_state.get(v) if self._push_state else None
+        delta = self._deltas[v] if self._deltas is not None else None
+        cap = self._keep_moe_acts if self._cap_acts is not None else None
+        if st is None and delta is None and cap is None:
+            return None
+        add, mul = st if st is not None else (None, None)
+        return inkling.MoeControl(mul=mul, add=add, delta=delta, capture=cap)
+
+    def _keep_moe_acts(self, v, idx, acts):
+        # the first row only, as with dense models: the experts each token went to, and their units' activations
+        self._cap_acts[v] = (idx[0].to(torch.int16).cpu(), acts[0].cpu())
+
+    def _embed_hook(self, mod, inp, out):
+        if self._abl_any and self.abl_vec is not None:
+            mask = self._abl_mask.to(out.dtype)[:, None, None]
+            v = self.abl_vec.to(out.dtype)
+            return out - mask * self.abl_coef * (out @ v)[:, :, None] * v
+
+    def _all_hidden(self, **kw):
+        """The hidden state after the embedding and after every layer, as output_hidden_states gives them: L+1
+        tensors [B, T, H]. Inkling's looped layers each record three times, so its states come from hooks."""
+        if not self.ink:
+            return self.model(**kw, output_hidden_states=True).hidden_states
+
+        got = {}
+        grab = lambda k: (lambda m, i, o: got.__setitem__(k, o[0] if isinstance(o, tuple) else o))
+        hs = [self.ink["text"].embed_tokens.register_forward_hook(grab(-1))]
+        hs += [layer.register_forward_hook(grab(l)) for l, layer in enumerate(self.layers)]
+        try:
+            self.model(**{**kw, "logits_to_keep": 1})
+        finally:
+            for h in hs:
+                h.remove()
+        return [got[l] for l in range(-1, len(self.layers))]
 
     def _weights_progress_hook(self, factory, args, kwargs):
         """Route transformers' "Loading weights" bar into self.progress (0.04 to 0.9 of the whole load), and into
@@ -253,8 +467,14 @@ class Engine:
             h.remove()
         self._handles = []
 
+        # everything that holds the model's modules or its per-neuron tables, or the weights outlive the unload
         self.model = self.tok = None
         self.model_id = None
+        self.ink = None
+        self.layers, self.lm_head, self.final_norm, self.backbone = [], None, None, None
+        self.dnorm = self.unit = self.resid_p50 = None
+        self.reply_prefix = []
+        self.softcap = None
         self.trace = self.flow = None
         self.jlens = None
         self.dirs = {}
@@ -262,6 +482,7 @@ class Engine:
         self._abl_any = False
         self.abl_gate = None
 
+        gc.collect()  # the hooks and Inkling's layer wrappers make reference cycles
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
 
@@ -294,7 +515,7 @@ class Engine:
 
     def _end_ids(self):
         ids = {self.tok.eos_token_id}
-        for t in ("<|im_end|>", "<|eot_id|>", "<end_of_turn>", "<|endoftext|>"):
+        for t in ("<|im_end|>", "<|eot_id|>", "<end_of_turn>", "<|endoftext|>", *inkling.END_TOKENS):
             i = self.tok.convert_tokens_to_ids(t)
             if isinstance(i, int) and i != self.tok.unk_token_id:
                 ids.add(i)
@@ -308,19 +529,20 @@ class Engine:
         return {"loaded": True, "status": self.status, "model": self.model_id, "device": self.dev,
                 "dtype": str(self.model.dtype).replace("torch.", ""), "params": self.n_params,
                 "layers": len(self.layers), "neurons": int(self.dnorm.shape[1]),
-                "hidden": int(self.layers[0].mlp.down_proj.out_features), "arch": self.arch()}
+                "hidden": self.hidden, "arch": self.arch()}
 
     def arch(self):
         """The shape of the loaded model, for the home screen's diagram: attention heads, the vocabulary, and which
         layers attend over every earlier token ("full") or keep a running state instead ("linear", as in Qwen3.5)."""
-        c = self.model.config
-        c = c.get_text_config() if hasattr(c, "get_text_config") else c
+        c = self._text_config()
         L = len(self.layers)
         types = getattr(c, "layer_types", None) or ["full_attention"] * L
+        if self.ink:  # one entry per layer application
+            types = [types[self.ink["tracker"].physical(v)] for v in range(L)]
         return {
             "heads": getattr(c, "num_attention_heads", None), "kv_heads": getattr(c, "num_key_value_heads", None),
             "vocab": int(self.lm_head.weight.shape[0]), "tied": bool(getattr(c, "tie_word_embeddings", False)),
-            "experts": getattr(c, "num_experts", None) or None,
+            "experts": getattr(c, "num_experts", None) or getattr(c, "n_routed_experts", None) or None,
             "attention": ["linear" if "linear" in str(t) else "full" for t in types[:L]],
         }
 
@@ -378,8 +600,8 @@ class Engine:
 
         if upto is None:
             with torch.inference_mode():
-                hs = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False,
-                                output_hidden_states=True, logits_to_keep=1).hidden_states
+                hs = self._all_hidden(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False,
+                                      logits_to_keep=1)
                 return torch.stack([mean(h) for h in hs], 1)
 
         got = {}
@@ -471,14 +693,13 @@ class Engine:
                 pos = (mask.cumsum(-1) - 1).clamp(min=0)
 
                 with torch.inference_mode():
-                    hs = self.model(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False,
-                                    output_hidden_states=True).hidden_states
+                    hs = self._all_hidden(input_ids=ids, attention_mask=mask, position_ids=pos, use_cache=False)
                     last = torch.stack([h[:, -n_pos:, :] for h in hs], 1)  # [B, L+1, n_pos, H]
                     out.append(last.half().cpu())
                     del hs, last
 
             return torch.cat(out).numpy() if out else np.zeros(
-                (0, len(self.layers) + 1, n_pos, int(self.layers[0].mlp.down_proj.out_features)), np.float16)
+                (0, len(self.layers) + 1, n_pos, self.hidden), np.float16)
 
     # ---------------------------------------------------------------- hooks
     def _mlp_hook(self, i):
@@ -532,6 +753,8 @@ class Engine:
 
             if self._cap_resid is not None:
                 self._cap_resid[i] = h.detach()[0]
+                if self._cap_read is not None:
+                    self._cap_read[i] = inkling.readout(self.ink["text"], mod, inp, h.detach()[:1])[0]
 
             rd = self._read.get(i) if self._read else None
             if rd is not None:
@@ -602,9 +825,16 @@ class Engine:
                 else:
                     if p.neuron is None:
                         raise ValueError("whole-layer pushes must use mode 'mul'")
-                    if add is None:
-                        add = torch.zeros(B, N, device=self.dev)
-                    add[r, p.neuron] += p.dose * self.unit[p.layer, p.neuron]
+                    if self.ink:
+                        # experts only run for the tokens routed to them, so the push goes straight onto the
+                        # layer's MLP output: the neuron's down column, which is what its added activation writes
+                        if add is None:
+                            add = torch.zeros(B, self.hidden, device=self.dev)
+                        add[r] += float(p.dose * self.unit[p.layer, p.neuron]) * self._down_col(p.layer, p.neuron).float()
+                    else:
+                        if add is None:
+                            add = torch.zeros(B, N, device=self.dev)
+                        add[r, p.neuron] += p.dose * self.unit[p.layer, p.neuron]
 
                 st[p.layer] = (add, mul)
 
@@ -629,8 +859,11 @@ class Engine:
             return self.tok(text).input_ids
 
         try:
+            # thinking off: Qwen3's template reads enable_thinking, Inkling's reads reasoning_effort (other templates,
+            # gpt-oss's among them, read reasoning_effort differently, so it goes to Inkling's only)
+            extra = {"reasoning_effort": "none"} if self.ink else {}
             enc = self.tok.apply_chat_template(messages, add_generation_prompt=True, enable_thinking=False,
-                                               tokenize=True)
+                                               tokenize=True, **extra)
         except Exception:  # templates without system-role support: fold the system prompt into the first user turn
             if messages and messages[0]["role"] == "system":
                 sys_, rest = messages[0]["content"], [dict(m) for m in messages[1:]]
@@ -638,7 +871,7 @@ class Engine:
                 return self.messages_ids(rest)
             raise
 
-        return list(enc["input_ids"] if hasattr(enc, "keys") else enc)
+        return list(enc["input_ids"] if hasattr(enc, "keys") else enc) + list(self.reply_prefix)
 
     def encode(self, text):
         return self.tok(text, add_special_tokens=False).input_ids
@@ -775,6 +1008,7 @@ class Engine:
             ids = list(prompt_ids) + list(response_ids)
             L = len(self.layers)
             self._cap_acts, self._cap_resid = {}, {}
+            self._cap_read = {} if self.ink else None
 
             self._push_state = self._make_push_state([pushes or []], 1)
             if abl and self._gated([list(prompt_ids)], [True])[0]:
@@ -788,18 +1022,21 @@ class Engine:
 
                     lens_ids, lens_p = [], []
                     for l in range(L):
-                        r = self._cap_resid[l]
-                        lg = self.lm_head(self.final_norm(r)).float()
+                        r = (self._cap_read or self._cap_resid)[l]
+                        lg = self._head(self.final_norm(r))
                         p = torch.softmax(lg, -1)
                         top = p.topk(topk_lens, dim=-1)
                         lens_ids.append(top.indices.cpu().numpy())
                         lens_p.append(top.values.cpu().numpy())
                         del lg, p
 
-                acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
+                if self.ink:
+                    acts = SparseActs([self._cap_acts[l] for l in range(L)], self.dnorm.shape[1])
+                else:
+                    acts = torch.stack([self._cap_acts[l] for l in range(L)]).half().numpy()  # [L, T, N]
                 resid = torch.stack([self._cap_resid[l] for l in range(L)]).half().cpu()  # [L, T, H], for the J-lens
             finally:
-                self._cap_acts = self._cap_resid = None
+                self._cap_acts = self._cap_resid = self._cap_read = None
                 self._push_state = None
                 self._abl_mask = None
                 self._abl_any = False
@@ -828,6 +1065,9 @@ class Engine:
         acts = tr["acts"]
         L, T, N = acts.shape
         sc = tr["impact_scale"]
+
+        if isinstance(acts, SparseActs):
+            return acts.top(sc, k, t=t, start=tr["n_prompt"] if response_only and tr["n_prompt"] < T else 1)
 
         if t is not None:
             a = acts[:, t, :].astype(np.float32)
@@ -861,11 +1101,11 @@ class Engine:
         """Tokens the neuron's down column pushes up (+) and down (-): through the layer's J-lens when the model has one
         (what the later layers make of the push), else straight through the final norm and unembedding."""
         with self.lock, torch.inference_mode():
-            d = self.layers[layer].mlp.down_proj.weight[:, n]
+            d = self._down_col(layer, n)
             vecs = torch.stack([d, -d])[:, None] * (self.resid_p50[layer] / d.float().norm()).to(d.dtype)
             if self.jlens is not None:
                 vecs = vecs.to(self.jlens.dtype) @ self.jlens[layer].T
-            logits = self.lm_head(self.final_norm(vecs))[:, 0].float()
+            logits = self._head(self.final_norm(vecs))[:, 0]
             up = logits[0].topk(k).indices.tolist()
             down = logits[1].topk(k).indices.tolist()
 
@@ -957,7 +1197,7 @@ class Engine:
 
         out = []
         for k in range(0, len(rb), 256):
-            lg = self.lm_head(h[rb[k:k + 256], rt[k:k + 256]]).float()
+            lg = self._head(h[rb[k:k + 256], rt[k:k + 256]])
             out.append(lg.gather(-1, tgt[k:k + 256, None])[:, 0] - torch.logsumexp(lg, -1))
 
         return torch.cat(out) if out else torch.zeros(0, device=ids.device)
@@ -969,8 +1209,10 @@ class Engine:
         `pushes` (and `abl`) take the gradient with a recipe already on, for refining it."""
         L, N = self.dnorm.shape
 
+        # with experts, the delta sits on the MLP output ([H]) and the chain rule through each down column comes after
+        width = self.hidden if self.ink else N
         with self.lock:
-            self._deltas = [torch.zeros(N, device=self.dev, dtype=self.model.dtype, requires_grad=True)
+            self._deltas = [torch.zeros(width, device=self.dev, dtype=self.model.dtype, requires_grad=True)
                             for _ in range(L)]
 
             self._push_state = self._make_push_state([pushes], 1) if pushes else None
@@ -993,8 +1235,11 @@ class Engine:
                             lp = lp.mean()
                         (w * lp).backward()
 
-                g = torch.stack([d.grad.float() if d.grad is not None else torch.zeros(N, device=self.dev)
+                g = torch.stack([d.grad.float() if d.grad is not None else torch.zeros(width, device=self.dev)
                                  for d in self._deltas])
+                if self.ink:
+                    sc = self._down_scores(range(L), g)
+                    g = torch.stack([sc[l] for l in range(L)])
             finally:
                 self._deltas = None
                 self._push_state = None
@@ -1030,11 +1275,13 @@ class Engine:
             u = (W[sorted(ids)].float().mean(0) - W.mean(0, dtype=torch.float32)) * g  # [H]
             ref = float(self.resid_p50[-1])
 
+            layers = range(len(self.layers) - skip_last)
+            U = [u if self.jlens is None else (u.to(self.jlens.dtype) @ self.jlens[l]).float() for l in layers]
+            raw = self._down_scores(layers, U)
+
             best = []
-            for l, layer in enumerate(self.layers[: len(self.layers) - skip_last]):
-                D = layer.mlp.down_proj.weight
-                ul = u if self.jlens is None else (u.to(self.jlens.dtype) @ self.jlens[l]).float()
-                sc = (ul.to(D.dtype) @ D).float() / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
+            for l in layers:
+                sc = raw[l] / self.dnorm[l] * (self.resid_p50[l] / ref)  # [N]
                 top = sc.abs().topk(k)
                 best += [(l, int(n), float(sc[n])) for n in top.indices.tolist()]
 
@@ -1049,6 +1296,8 @@ class Engine:
             try:
                 with torch.inference_mode():
                     self.model(input_ids=torch.tensor([ids], device=self.dev), use_cache=False, logits_to_keep=1)
+                if self.ink:
+                    return SparseActs([self._cap_acts[l] for l in range(len(self.layers))], self.dnorm.shape[1]).mean(start)
                 return torch.stack([self._cap_acts[l][start:].mean(0) for l in range(len(self.layers))]).numpy()
             finally:
                 self._cap_acts = None

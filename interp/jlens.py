@@ -123,7 +123,7 @@ def _scale(J):
 def compute(eng, cancel=None, progress=None, T=64, batch=8, skip=1):
     """J [L, H, H] float32 cpu. progress(done, total) is called after every backward pass. `skip` leading positions
     (the attention sink, whose norm is enormous) are left out of both ends of the average."""
-    L, H = len(eng.layers), int(eng.layers[0].mlp.down_proj.out_features)
+    L, H = len(eng.layers), eng.hidden
     rows = corpus(eng, T)
     J = torch.zeros(L, H, H)
     S = torch.arange(skip, T, device=eng.dev)
@@ -133,6 +133,11 @@ def compute(eng, cancel=None, progress=None, T=64, batch=8, skip=1):
     caps = {}
     hooks = [layer.register_forward_hook(lambda m, i, o, l=l: caps.__setitem__(l, o[0] if isinstance(o, tuple) else o))
              for l, layer in enumerate(eng.layers)]
+    # the stream the head reads: the last layer's output, or for Inkling, the head's own mix of block states
+    target = L - 1
+    if eng.ink:
+        target = "head"
+        hooks.append(eng.ink["text"].final_input.register_forward_hook(lambda m, i, o: caps.__setitem__("head", o[0])))
     done, t0, model = 0, time.perf_counter(), eng.model
     try:
         for k0 in range(0, H, batch):
@@ -147,15 +152,17 @@ def compute(eng, cancel=None, progress=None, T=64, batch=8, skip=1):
                 x = emb(ids).detach().requires_grad_(True)
                 eng.backbone(inputs_embeds=x, use_cache=False)
                 hs = [caps[l] for l in range(L)]
-                # probe b reads coordinate ks[b] of the last layer's stream, summed over the kept positions
-                probe = torch.zeros(B, T, H, device=eng.dev, dtype=hs[-1].dtype)
+                out = caps[target]
+                # probe b reads coordinate ks[b] of the head's stream, summed over the kept positions
+                probe = torch.zeros(B, T, H, device=eng.dev, dtype=out.dtype)
                 probe[torch.arange(B, device=eng.dev)[:, None], S[None, :], torch.tensor(ks, device=eng.dev)[:, None]] = 1
-                grads = torch.autograd.grad((hs[-1] * probe).sum(), hs[:-1])
+                grads = torch.autograd.grad((out * probe).sum(), hs if eng.ink else hs[:-1])
 
             for l, g in enumerate(grads):
                 J[l, ks] = (g[:, skip:].float().sum(1) / pairs).cpu()  # row k of J_l
-            J[L - 1, ks] = torch.eye(H)[ks] * (len(S) / pairs)
-            del grads, hs, x, probe
+            if not eng.ink:  # the last layer's stream is the head's
+                J[L - 1, ks] = torch.eye(H)[ks] * (len(S) / pairs)
+            del grads, hs, out, x, probe
             caps.clear()
 
             done += B
@@ -178,7 +185,7 @@ def load(path, eng):
     if not path.exists():
         return None
     J = load_file(str(path))["J"]
-    L, H = len(eng.layers), int(eng.layers[0].mlp.down_proj.out_features)
+    L, H = len(eng.layers), eng.hidden
     if tuple(J.shape) != (L, H, H):
         return None
     return J.to(eng.dev, eng.model.dtype)
@@ -191,7 +198,7 @@ def read(eng, J, resid, k=5):
     with torch.inference_mode():
         for l in range(len(eng.layers)):
             r = resid[l].to(J.dtype)
-            lg = eng.lm_head(eng.final_norm(r @ J[l].T)).float()
+            lg = eng._head(eng.final_norm(r @ J[l].T))
             top = torch.softmax(lg, -1).topk(k, dim=-1)
             ids.append(top.indices.cpu().numpy())
             ps.append(top.values.cpu().numpy())
