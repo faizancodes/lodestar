@@ -1,0 +1,29 @@
+# Push a version tag (git tag v0.2.0 && git push origin v0.2.0) to build Lodestar.zip and publish it as a release.
+# install.sh always downloads the latest one.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  app:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v6
+      - run: ./scripts/build_app.sh dist "${GITHUB_REF_NAME#v}"
+      - run: gh release create "$GITHUB_REF_NAME" dist/Lodestar.zip --title "Lodestar $GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -55,19 +55,21 @@ changes, so any OpenAI client can talk to it.
 
 <img src="docs/media/assemble.gif" width="560" alt="A model assembling itself: weights fall from a ring into a turning tower of layer plates, tokens climb it, and it lifts away for the next model." />
 
-On an Apple silicon Mac:
+On an Apple silicon Mac, paste this into Terminal:
 
-    git clone https://github.com/faizancodes/lodestar
-    cd lodestar && uv sync
-    ./scripts/build_app.sh          # builds the UI and makes dist/Lodestar.app; drag it to /Applications or the Dock
-    open dist/Lodestar.app
+    curl -fsSL https://raw.githubusercontent.com/faizancodes/lodestar/main/install.sh | bash
 
-or without the bundle:
+It puts Lodestar in Applications and opens it. The first run downloads Python and its packages (about 1 GB) into
+`~/Library/Application Support/Lodestar`; run the same line again to update.
+
+To work on it from a clone instead:
 
     uv run python -m interp.app            # native window
     uv run python -m interp.app --server   # headless, http://127.0.0.1:8792
 
-The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`; `build_app.sh` does this).
+The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`). `./scripts/build_app.sh` builds the
+same self-contained `dist/Lodestar.app` and `Lodestar.zip` that releases ship; pushing a `v*` tag builds one and
+publishes it as a GitHub release, which `install.sh` downloads.
 
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
 The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise

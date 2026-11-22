@@ -60,6 +60,10 @@ def _style_titlebar(window):
         return
 
     def apply():
+        icon = os.environ.get("LODESTAR_ICON")  # set by the app bundle, whose icon Python can't otherwise know
+        if icon:
+            AppKit.NSApp.setApplicationIconImage_(AppKit.NSImage.alloc().initWithContentsOfFile_(icon))
+
         win = getattr(window, "native", None)
         if win is None:
             return
