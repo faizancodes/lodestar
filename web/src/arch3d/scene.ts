@@ -54,7 +54,7 @@ float warp(float x) {
 void main() {
   vec3 p = position; p.x = warp(p.x);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  float px = uSize * uPx / max(0.001, -mv.z) * (1.0 + h * 1.4);
+  float px = uSize * uPx / max(0.001, -mv.z) * (h > 1.5 ? 26.0 : 1.0 + h * 1.4); // a selected neuron's point holds its glow
   vPx = px;
   gl_PointSize = max(px, uMin);
   gl_Position = projectionMatrix * mv;
@@ -74,6 +74,13 @@ float mark(vec2 q, float br) {
   return step(max(d.x, d.y), 0.42);
 }
 void main() {
+  if (vH > 1.5) { // a selected neuron: a white core in an amber glow that spills over its neighbours
+    vec2 q = gl_PointCoord - 0.5;
+    float r2 = dot(q, q), core = step(max(abs(q.x), abs(q.y)), 0.02);
+    float glow = 0.9 * exp(-r2 * 70.0) + 0.3 * exp(-r2 * 14.0) - 0.035;
+    gl_FragColor = vec4(mix(uPos * max(glow, 0.0), vec3(1.0), core) * uDim, 1.0);
+    return;
+  }
   float base = vB * mix(1.0, 0.38, uRun);
   float act = abs(vA) * uRun * uReveal;
   vec3 col = uBase; float br = base;
@@ -388,7 +395,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
   // ---------------------------------------------------------------- hover and selection marks
   let hoverObjs: Pts[] = [];
   let hoverMark: { p: Pts; i0: number; i1: number } | null = null;
-  let selMarks: { p: Pts; i0: number; i1: number }[] = [];
+  let selMarks: { p: Pts; i0: number; i1: number; v: number }[] = [];
 
   const mark = (p: Pts, i0: number, i1: number, v: number) => {
     for (let i = i0; i < i1; i++) p.h[i] = v;
@@ -409,13 +416,13 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     if (hoverMark) mark(hoverMark.p, hoverMark.i0, hoverMark.i1, 0);
     hoverMark = k ? markOf(k) : null;
     if (hoverMark) mark(hoverMark.p, hoverMark.i0, hoverMark.i1, 0.6);
-    selMarks.forEach((s) => mark(s.p, s.i0, s.i1, 1));
+    selMarks.forEach((s) => mark(s.p, s.i0, s.i1, s.v));
   }
 
   function select(ks: Pick[]) {
     selMarks.forEach((s) => mark(s.p, s.i0, s.i1, 0));
-    selMarks = ks.map(markOf).filter((x): x is NonNullable<typeof x> => !!x);
-    selMarks.forEach((s) => mark(s.p, s.i0, s.i1, 1));
+    selMarks = ks.flatMap((k) => { const m = markOf(k); return m ? [{ ...m, v: k.kind === "neuron" ? 2 : 1 }] : []; });
+    selMarks.forEach((s) => mark(s.p, s.i0, s.i1, s.v));
   }
 
   // ---------------------------------------------------------------- picking
