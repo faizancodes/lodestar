@@ -26,7 +26,7 @@ cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$RES/lodestar/"
 curl -fsSL "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-aarch64-apple-darwin.tar.gz" |
   tar -xz -C "$RES/bin" --strip-components 1 uv-aarch64-apple-darwin/uv
 
-uv run --project "$ROOT" --with pillow python "$ROOT/scripts/make_icon.py" "$RES/AppIcon.icns"
+uv run --no-project --python 3.12 --with pillow python "$ROOT/scripts/make_icon.py" "$RES/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
