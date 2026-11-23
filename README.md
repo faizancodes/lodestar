@@ -146,8 +146,36 @@ Inspect's J-lens view offers to compute it.
 
 ## Experiments
 
-An experiment is one file (`*.lodestar.json`) holding a probe's two sets of prompts and the results it should get.
-Open it in Probe and press Build, or run it from a terminal against the running app:
+An experiment is one file (`*.lodestar.json`) that anyone can open in their own Lodestar to get your result: either
+a steering setup or a probe. Open one with **Open** beside Saved, or run it from a terminal against the running app.
+
+### Steering
+
+**Save as experiment** beside what's on now writes the setup to Downloads, with the questions you asked it. Each
+neuron is saved as the exact amount added to its activation, not as a slider position, so the push is the same on
+any copy of the model. It also carries the length of the neuron's output weights: if a copy's weights differ, the
+file says that neuron isn't the same there. Directions are carried whole.
+
+    {
+      "lodestar": "experiment/1",
+      "name": "The thrilled hive",
+      "model": "Inkling-2-Mini",
+      "steer": [{"layer": 34, "neuron": 70770, "add": 301.7149, "weight": 1.28364, "label": "hive"},
+                {"layer": 35, "neuron": 96370, "add": 220.8694, "weight": 1.5809, "label": "thrilled"}],
+      "directions": {},
+      "try": ["Who made you?"]
+    }
+
+A neuron can take `"times": 0` instead of `add` to multiply it (0 switches it off). A direction push is
+`{"direction": "knight", "layers": [22, 24, 26], "op": "push", "dose": 4}`, with the vector under `directions`. From a
+terminal, the run turns the pushes on and asks each `try` question steered and unsteered (exit code 1 if a neuron's
+weights don't match):
+
+    uv run python -m interp.experiment experiments/inkling-thrilled-hive.lodestar.json
+
+### Probes
+
+A probe experiment holds the two sets of prompts and the results it should get. Open it and press Build, or:
 
     uv run python -m interp.experiment experiments/inkling-knows-when-it-doesnt-know.lodestar.json
 

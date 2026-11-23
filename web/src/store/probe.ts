@@ -9,10 +9,11 @@ export type ProbeRow = { id: string; name: string; labels: [string, string]; cre
 export type Probe = ProbeRow & { model: string; items: { text: string; side: 0 | 1; group: string | null }[]; map: Pt[][] };
 
 type Prompt = string | { text: string; group?: string | null };
-/** An experiment file (interp/experiment.py). */
+/** An experiment file (interp/experiment.py): a probe, or with `steer`, a steering setup (read by the server). */
 export type Experiment = {
   lodestar: string; name: string; about?: string; model?: string;
   probe: { a: { label: string; prompts: Prompt[] }; b: { label: string; prompts: Prompt[] } };
+  steer?: unknown[];
   try?: string[]; expect?: Record<string, [number, number]>;
 };
 export type Check = { metric: string; want: [number, number]; got: number | null; ok: boolean };

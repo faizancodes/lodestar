@@ -6,6 +6,7 @@ import { useSteer } from "../store/steer";
 import { openNeuron } from "./Found";
 import { PanelSlot } from "./Panel";
 import { newRecipe } from "../shell/engine";
+import { saveSteer } from "../shell/experiments";
 import { patchAt, removeAt, saveRecipe, setOp } from "./recipe";
 
 // a strength fills out from the middle: periwinkle when pushed up, red when pushed down. Painted from the range's
@@ -30,7 +31,7 @@ export function RecipeBox() {
 
   return (
     <div id="rc" className="rc" hidden={!items.length}>
-      <div className="rc-h"><b>On now</b><span className="grow" /><button id="rc-save" className="btn ghost sm" onClick={saveRecipe}>Save</button><button id="rc-clear" className="btn ghost sm" onClick={newRecipe}>Turn all off</button></div>
+      <div className="rc-h"><b>On now</b><span className="grow" /><button id="rc-save" className="btn ghost sm" onClick={saveRecipe}>Save</button><button className="btn ghost sm" onClick={saveSteer}>Save as experiment</button><button id="rc-clear" className="btn ghost sm" onClick={newRecipe}>Turn all off</button></div>
       {/* redrawn as a whole when the recipe changes, so rows (and panels under them) are new each time */}
       <div id="rc-list" className="rc-list" key={gen}>{items.map((it, i) => isDir(it) ? <DirRow key={i} it={it} i={i} /> : <NeuronRow key={i} it={it} i={i} />)}</div>
     </div>

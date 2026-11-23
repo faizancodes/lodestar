@@ -4,6 +4,7 @@ import { markSVG } from "../art/mark";
 import { modelName, ram } from "../lib/format";
 import { deleteSaved, jlensLeft, openSaved, setTab, statusLine, stopJlens, toggleModelMenu } from "../shell/engine";
 import { deleteChat, openChat } from "../chat/engine";
+import { openFile } from "../shell/experiments";
 import { ablActive, useApp, type Tab } from "../store/app";
 import { useChat } from "../store/chat";
 import { Html } from "./Html";
@@ -58,6 +59,21 @@ function SavedList() {
         </div>
       ))}
     </div>
+  );
+}
+
+// Open an experiment file someone shared: a steering setup turns on, a probe opens in Probe.
+function OpenExperiment() {
+  const file = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button className="side-open" onClick={() => file.current!.click()}>Open</button>
+      <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) openFile(f);
+        e.target.value = "";
+      }} />
+    </>
   );
 }
 
@@ -147,7 +163,7 @@ export function Sidebar() {
         <TabButton tab="probe" label="Probe" />
       </nav>
       <div className="saved">
-        <div className="side-h"><span className="eyebrow light">Saved</span></div>
+        <div className="side-h"><span className="eyebrow light">Saved</span><OpenExperiment /></div>
         <SavedList />
       </div>
       <ChatList />

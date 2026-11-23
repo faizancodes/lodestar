@@ -94,6 +94,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 }
 .tab.on .tab-count { background: var(--night); color: var(--on-night); }
 .side-h { display: flex; align-items: baseline; justify-content: space-between; padding: 0 6px 6px; }
+.side-open { font: inherit; font-size: 11px; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; }
+.side-open:hover { color: var(--text); }
 .saved-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .saved-item {
   display: flex;

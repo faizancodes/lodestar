@@ -52,16 +52,6 @@ export async function openExample(file: string) {
   loadExperiment(await api<Experiment>(`/api/experiments/${encodeURIComponent(file)}`));
 }
 
-export async function openFile(f: File) {
-  try {
-    const exp = JSON.parse(await f.text()) as Experiment;
-    if (!exp?.probe?.a || !exp.probe.b) throw new Error();
-    loadExperiment(exp);
-  } catch {
-    toast(`${f.name} isn't a Lodestar experiment.`, true);
-  }
-}
-
 export async function run() {
   const { form: f, exp } = get();
   const probe = { a: { label: f.aLabel.trim() || "A", prompts: fromText(f.a) }, b: { label: f.bLabel.trim() || "B", prompts: fromText(f.b) } };

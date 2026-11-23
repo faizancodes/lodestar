@@ -610,7 +610,10 @@ def neuron(layer: int, n: int):
 @app.get("/api/examples")
 def examples():
     need_model()
-    return EXAMPLES.get(eng.model_id.rstrip("/").split("/")[-1], [])
+    name = eng.model_id.rstrip("/").split("/")[-1]
+    shipped = [{"name": e["name"], "note": e["about"], "prompt": (e["try"] or [""])[0], "items": [], "file": e["file"]}
+               for e in exp_mod.examples("steer") if exp_mod.model_name(e["model"]) == exp_mod.model_name(name)]
+    return EXAMPLES.get(name, []) + shipped
 
 
 @app.get("/api/search")
@@ -1220,6 +1223,33 @@ def experiments_example(name: str):
     return json.loads(f.read_text())
 
 
+@app.post("/api/experiments/steer")
+async def experiments_steer(req: Request):
+    """Open a steering experiment: its pushes as recipe items for the loaded model -> {items, mismatched}."""
+    need_model()
+    exp = await req.json()
+    try:
+        items, mismatched = await run_in_threadpool(exp_mod.open_steer, eng, dirs, exp)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    return {"items": items, "mismatched": mismatched}
+
+
+@app.post("/api/recipes/experiment")
+async def recipes_export(req: Request):
+    """Write the setup on now as an experiment file in Downloads: {name, about, items, try} -> {path}."""
+    need_model()
+    body = await req.json()
+    name = str(body.get("name") or "Steering").strip()
+    try:
+        exp = exp_mod.from_steer(eng, body.get("items") or [], name, body.get("about", ""), body.get("try") or [])
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    out = Path.home() / "Downloads" / f"{dir_mod.make_id(name, set())}.lodestar.json"
+    out.write_text(json.dumps(exp, indent=1, ensure_ascii=False))
+    return {"path": str(out)}
+
+
 @app.post("/api/experiments/run")
 async def experiments_run(req: Request):
     """Run an experiment file: build its probe and check the result against its `expect` ranges."""
@@ -1229,6 +1259,8 @@ async def experiments_run(req: Request):
         exp_mod.validate(exp)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    if "steer" in exp:
+        raise HTTPException(400, "This is a steering experiment: open it beside Saved.")
     return sse(exp_mod.run(eng, probes, exp, cancel))
 
 

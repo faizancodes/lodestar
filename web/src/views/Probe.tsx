@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { ask, exportExperiment, open, openExample, openFile, refresh, remove, run, TRAVEL_MS } from "../probe/engine";
+import { ask, exportExperiment, open, openExample, refresh, remove, run, TRAVEL_MS } from "../probe/engine";
+import { openFile } from "../shell/experiments";
 import { drawMap } from "../probe/map";
 import { useApp } from "../store/app";
 import { useProbe, type Metrics } from "../store/probe";
