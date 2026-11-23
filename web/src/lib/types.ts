@@ -94,7 +94,8 @@ export type DirItem = { kind: "dir"; dir: string; name?: string; layers: number[
 export type Item = NeuronItem | DirItem;
 export type Recipe = { id: string | null; name: string; items: Item[]; model?: string; prompt?: string; created?: number };
 /** GET /api/examples: known neurons for the loaded model. */
-export type Example = { name: string; note: string; prompt: string; items: NeuronItem[] };
+/** `file`: an experiment that ships with Lodestar (experiments/), whose pushes the server turns into items. */
+export type Example = { name: string; note: string; prompt: string; items: NeuronItem[]; file?: string };
 
 /** What the steering endpoints take: a recipe line as the engine applies it. */
 export type Push =

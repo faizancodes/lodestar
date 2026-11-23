@@ -46,8 +46,29 @@ def main():
     import webview
     window = webview.create_window("Lodestar", url, width=1440, height=920, min_size=(1100, 700),
                                    background_color="#0A0A0A", text_select=True)
-    window.events.shown += lambda: _style_titlebar(window)
+    window.events.shown += lambda: (_style_titlebar(window), _forward_paste())
     webview.start()
+
+
+def _forward_paste():
+    """Tell the page when ⌘V is pressed. The Edit menu takes ⌘V before WebKit sees it, and outside a text field WebKit
+    drops the paste, so without this the page can't open an experiment link pasted there (web/src/App.tsx)."""
+    try:
+        import AppKit
+        from webview.platforms.cocoa import BrowserView
+    except Exception:
+        return
+
+    def on_key(ev):
+        if ev.charactersIgnoringModifiers() == "v" and (ev.modifierFlags() & AppKit.NSEventModifierFlagDeviceIndependentFlagsMask) == AppKit.NSEventModifierFlagCommand:
+            for bv in list(BrowserView.instances.values()):
+                bv.webview.evaluateJavaScript_completionHandler_('document.dispatchEvent(new Event("lodestar-paste"))', None)
+        return ev  # the paste itself still happens, in a text field
+
+    def install():
+        AppKit.NSEvent.addLocalMonitorForEventsMatchingMask_handler_(AppKit.NSEventMaskKeyDown, on_key)
+
+    AppKit.NSOperationQueue.mainQueue().addOperationWithBlock_(install)
 
 
 def _style_titlebar(window):

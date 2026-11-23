@@ -6,6 +6,7 @@ import math
 import os
 import re
 import shutil
+import subprocess
 import threading
 import time
 import traceback
@@ -23,8 +24,10 @@ from . import abl as abl_mod
 from . import archview
 from . import directions as dir_mod
 from . import discover
+from . import experiment as exp_mod
 from . import jlens as jlens_mod
 from . import memory
+from . import probe as probe_mod
 from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,6 +75,7 @@ EXAMPLES = {
 
 eng = Engine()
 dirs = dir_mod.Library(DATA / "directions", eng)
+probes = probe_mod.Library(DATA / "probes", eng)
 cancel = threading.Event()
 app = FastAPI()
 
@@ -607,7 +611,10 @@ def neuron(layer: int, n: int):
 @app.get("/api/examples")
 def examples():
     need_model()
-    return EXAMPLES.get(eng.model_id.rstrip("/").split("/")[-1], [])
+    name = eng.model_id.rstrip("/").split("/")[-1]
+    shipped = [{"name": e["name"], "note": e["about"], "prompt": (e["try"] or [""])[0], "items": [], "file": e["file"]}
+               for e in exp_mod.examples("steer") if exp_mod.model_name(e["model"]) == exp_mod.model_name(name)]
+    return EXAMPLES.get(name, []) + shipped
 
 
 @app.get("/api/search")
@@ -1145,6 +1152,134 @@ def directions_delete(did: str):
     need_model()
     dirs.delete(did)
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ probes and experiments
+def _probe(pid):
+    try:
+        return probes.get(pid)
+    except KeyError:
+        raise HTTPException(404, "No such probe for this model.")
+
+
+@app.get("/api/probes")
+def probes_list():
+    need_model()
+    return {"probes": probes.index(), "examples": exp_mod.examples()}
+
+
+@app.get("/api/probes/{pid}")
+def probes_get(pid: str):
+    need_model()
+    return _probe(pid)
+
+
+@app.delete("/api/probes/{pid}")
+def probes_delete(pid: str):
+    need_model()
+    _probe(pid)
+    probes.delete(pid)
+    return {"ok": True}
+
+
+@app.post("/api/probes/run")
+async def probes_run(req: Request):
+    """Build a probe from two sets of prompts ({name, a: {label, prompts}, b: {...}}): read, check, map, save."""
+    need_model()
+    spec = await req.json()
+    try:
+        probe_mod.parse_spec(spec)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return sse(probe_mod.run(eng, probes, spec, cancel))
+
+
+@app.post("/api/probes/{pid}/score")
+async def probes_score(pid: str, req: Request):
+    """A new prompt through a saved probe: {prompt} -> {p, z, path}."""
+    need_model()
+    _probe(pid)
+    body = await req.json()
+    vec = probes.vectors(pid)
+    return await run_in_threadpool(probe_mod.score, eng, vec, str(body.get("prompt", "")))
+
+
+@app.post("/api/probes/{pid}/experiment")
+async def probes_export(pid: str, req: Request):
+    """Write a saved probe as an experiment file in Downloads: {about, try} -> {path}."""
+    need_model()
+    body = await req.json()
+    exp = exp_mod.from_probe(_probe(pid), body.get("about", ""), body.get("try") or [])
+    out = Path.home() / "Downloads" / f"{pid}.lodestar.json"
+    out.write_text(json.dumps(exp, indent=1, ensure_ascii=False))
+    return {"path": str(out)}
+
+
+@app.get("/api/experiments/{name}")
+def experiments_example(name: str):
+    """One of the experiments that ship with Lodestar, by file name."""
+    f = exp_mod.EXAMPLES / name
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+\.lodestar\.json", name) or not f.is_file():
+        raise HTTPException(404, "No such experiment.")
+    return json.loads(f.read_text())
+
+
+@app.post("/api/experiments/fetch")
+async def experiments_fetch(req: Request):
+    """An experiment from a link someone shared (a GitHub file, a gist, any URL to the file): {url} -> the file.
+    {clipboard: true} takes the link from the clipboard, as ⌘V outside a text field (WebKit won't deliver that paste
+    to the page), and gives null when the clipboard holds no experiment link."""
+    body = await req.json()
+    url = str(body.get("url") or "")
+    if body.get("clipboard"):
+        url = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=5).stdout.strip()
+        if not exp_mod.is_link(url):
+            return None
+    try:
+        return await run_in_threadpool(exp_mod.fetch, url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/experiments/steer")
+async def experiments_steer(req: Request):
+    """Open a steering experiment: its pushes as recipe items for the loaded model -> {items, mismatched}."""
+    need_model()
+    exp = await req.json()
+    try:
+        items, mismatched = await run_in_threadpool(exp_mod.open_steer, eng, dirs, exp)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    return {"items": items, "mismatched": mismatched}
+
+
+@app.post("/api/recipes/experiment")
+async def recipes_export(req: Request):
+    """Write the setup on now as an experiment file in Downloads: {name, about, items, try} -> {path}."""
+    need_model()
+    body = await req.json()
+    name = str(body.get("name") or "Steering").strip()
+    try:
+        exp = exp_mod.from_steer(eng, body.get("items") or [], name, body.get("about", ""), body.get("try") or [])
+    except (ValueError, KeyError) as e:
+        raise HTTPException(400, str(e))
+    out = Path.home() / "Downloads" / f"{dir_mod.make_id(name, set())}.lodestar.json"
+    out.write_text(json.dumps(exp, indent=1, ensure_ascii=False))
+    return {"path": str(out)}
+
+
+@app.post("/api/experiments/run")
+async def experiments_run(req: Request):
+    """Run an experiment file: build its probe and check the result against its `expect` ranges."""
+    need_model()
+    exp = await req.json()
+    try:
+        exp_mod.validate(exp)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if "steer" in exp:
+        raise HTTPException(400, "This is a steering experiment: open it beside Saved.")
+    return sse(exp_mod.run(eng, probes, exp, cancel))
 
 
 # ------------------------------------------------------------------ recipes

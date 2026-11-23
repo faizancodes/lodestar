@@ -3,6 +3,7 @@ import { drawHomeArt } from "../art/home";
 import { api } from "../lib/api";
 import { bandText, isDir, steerDefaultName } from "../lib/format";
 import { loadModel } from "../shell/engine";
+import { openSteer } from "../shell/experiments";
 import { useApp } from "../store/app";
 import { useSteer } from "../store/steer";
 import { findChanges, setInput } from "../steer/describe";
@@ -55,9 +56,13 @@ function Examples() {
 
   return (
     <div className="ex-line" id="ex-line" hidden={!ex.length}><span>Or try</span><div id="ex-chips" className="chips">{ex.map((e, i) => (
-      <button key={i} className="chip ex-chip" data-i={i} title={e.note} onClick={() => {
-        replaceRecipe({ id: null, name: e.name, items: [], model: useApp.getState().info!.model });
-        addItems(e.items.map((x) => ({ ...x })), true);
+      <button key={i} className="chip ex-chip" data-i={i} title={e.note} onClick={async () => {
+        if (e.file) {
+          if (!(await openSteer(await api(`/api/experiments/${encodeURIComponent(e.file)}`)))) return;
+        } else {
+          replaceRecipe({ id: null, name: e.name, items: [], model: useApp.getState().info!.model });
+          addItems(e.items.map((x) => ({ ...x })), true);
+        }
         send(e.prompt);
       }}>{e.name}</button>
     ))}</div></div>

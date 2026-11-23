@@ -1,0 +1,28 @@
+{
+ "lodestar": "experiment/1",
+ "name": "The thrilled hive",
+ "about": "Two expert units in Inkling's last loop pass turn it into an ecstatic hive of insects that answers every question as the swarm.",
+ "model": "Inkling-2-Mini",
+ "steer": [
+  {
+   "layer": 34,
+   "neuron": 70770,
+   "add": 301.7149,
+   "weight": 1.28364,
+   "label": "hive"
+  },
+  {
+   "layer": 35,
+   "neuron": 96370,
+   "add": 220.8694,
+   "weight": 1.5809,
+   "label": "thrilled"
+  }
+ ],
+ "directions": {},
+ "try": [
+  "Who made you?",
+  "What does the hive want?",
+  "What's your name?"
+ ]
+}

@@ -58,6 +58,12 @@ model's reply beside your edited one.
 
 <img src="docs/media/chat.gif" width="600" alt="One prompt forks into two replies written token by token, the original above and the edited one below, fanning apart as they disagree." />
 
+**Test what the model knows before it answers.** Probe takes two sets of prompts (made-up questions and real ones,
+say), reads the model's state at the end of each, and tells you whether one direction separates them. The checks
+that keep you honest are built in: the layer is picked without the prompts it's scored on, whole groups are held
+out, a words-only classifier and shuffled labels give the baselines. A map shows the two sets pull apart layer by
+layer, and you can ask it new questions live. [Experiments](#experiments) make a probe repeatable.
+
 **Use it from your own code.** An OpenAI-compatible server at `http://127.0.0.1:8792/v1` runs the model with your
 changes, so any OpenAI client can talk to it.
 
@@ -138,6 +144,63 @@ along it is, with a Stop), one backward pass per residual dimension: about 2 min
 the data folder under `jlens/` and load with the model after that. A stopped model isn't started again on its own;
 Inspect's J-lens view offers to compute it.
 
+## Experiments
+
+An experiment is one file (`*.lodestar.json`) that anyone can open in their own Lodestar to get your result: either
+a steering setup or a probe. Open one with **Open** beside Saved, which takes a file or a link, or run it from a
+terminal against the running app.
+
+To share one, put the file on GitHub or in a gist and post the link. Someone who copies the link and presses ⌘V in
+Lodestar (anywhere but a text field) gets the setup on, or the probe ready to build. The terminal run takes the link too:
+
+    uv run python -m interp.experiment https://github.com/you/repo/blob/main/my-setup.lodestar.json
+
+### Steering
+
+**Save as experiment** beside what's on now writes the setup to Downloads, with the questions you asked it. Each
+neuron is saved as the exact amount added to its activation, not as a slider position, so the push is the same on
+any copy of the model. It also carries the length of the neuron's output weights: if a copy's weights differ, the
+file says that neuron isn't the same there. Directions are carried whole.
+
+    {
+      "lodestar": "experiment/1",
+      "name": "The thrilled hive",
+      "model": "Inkling-2-Mini",
+      "steer": [{"layer": 34, "neuron": 70770, "add": 301.7149, "weight": 1.28364, "label": "hive"},
+                {"layer": 35, "neuron": 96370, "add": 220.8694, "weight": 1.5809, "label": "thrilled"}],
+      "directions": {},
+      "try": ["Who made you?"]
+    }
+
+A neuron can take `"times": 0` instead of `add` to multiply it (0 switches it off). A direction push is
+`{"direction": "knight", "layers": [22, 24, 26], "op": "push", "dose": 4}`, with the vector under `directions`. From a
+terminal, the run turns the pushes on and asks each `try` question steered and unsteered (exit code 1 if a neuron's
+weights don't match):
+
+    uv run python -m interp.experiment experiments/inkling-thrilled-hive.lodestar.json
+
+### Probes
+
+A probe experiment holds the two sets of prompts and the results it should get. Open it and press Build, or:
+
+    uv run python -m interp.experiment experiments/inkling-knows-when-it-doesnt-know.lodestar.json
+
+The run reports every check and marks each expected number as reproduced or not (exit code 1 if one misses).
+**Save as experiment** on any probe writes one to Downloads, expecting its own numbers to within 0.03. The format:
+
+    {
+      "lodestar": "experiment/1",
+      "name": "Inkling knows when it doesn't know",
+      "model": "Inkling-2-Mini",
+      "probe": {"a": {"label": "Made up", "prompts": ["...", {"text": "...", "group": "bridge"}]},
+                "b": {"label": "Real", "prompts": ["..."]}},
+      "try": ["Who designed the Kessington Bridge in Cleveland?"],
+      "expect": {"separation": [0.95, 1.0], "new_groups": [0.93, 1.0], "words_only": [0.55, 0.75]}
+    }
+
+`expect` can name `separation`, `new_groups`, `words_only`, `words_only_new_groups`, `shuffled`, `caught` and
+`layer` (see `interp/probe.py`). Prompts with a group are held out a group at a time.
+
 ## Credits
 
 Inspired by [@treetowntree's Qwen neuron zoo](https://x.com/treetowntree/status/2114573600976183723) (single neurons
@@ -150,12 +213,15 @@ whose hook placement and dose units this app reuses.
     interp/engine.py     model, hooks, generation, tracing, lens, scoring, gradient attribution
     interp/discover.py   the Tune search
     interp/abl.py        abliteration: probe lists, direction analysis, weight baking
+    interp/probe.py      probes: reading two sets of prompts, the checks, the state map
+    interp/experiment.py experiment files: running one and checking its expected results
     interp/jlens.py      the J-lens: per-layer Jacobians, computed once per model
     interp/archview.py   the Architecture page: the model's structure, and text run through it
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
     web/                 the interface (React + TypeScript, Vite)
     site/                the landing page
+    experiments/         experiments that ship with the app
     e2e/                 the parity suite: recorded API sessions, mock replay, golden screenshots
     scripts/             app bundle and icon builders
 
