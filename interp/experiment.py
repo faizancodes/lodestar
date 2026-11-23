@@ -26,13 +26,16 @@ change, not just the same slider positions.
 sliders. `weight` is the length of the neuron's output weights: if a copy's differs, it isn't the same neuron and
 the file says so. A direction travels with the file whole.
 
-Run one in the app (Open, beside Saved), or from a terminal against a running Lodestar:
+Run one in the app (Open, beside Saved, takes a file or a link; so does ⌘V with a link copied), or
+from a terminal against a running Lodestar:
 
     uv run python -m interp.experiment path/to/file.lodestar.json [--port 8792]
+    uv run python -m interp.experiment https://github.com/you/repo/blob/main/x.lodestar.json
 """
 import argparse
 import base64
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -205,6 +208,48 @@ def open_steer(eng, lib, exp):
     return items, mismatched
 
 
+# ------------------------------------------------------------------ opening one from a link
+MAX_BYTES = 64 << 20  # a file carrying several directions of a large model is a few MB
+
+
+def is_link(text):
+    """Whether text is a link to an experiment: a .lodestar.json file anywhere, or a gist."""
+    text = text.strip()
+    return bool(re.fullmatch(r"https?://\S+", text)) and bool(
+        re.search(r"\.lodestar\.json([?#]|$)", text) or text.startswith("https://gist.github.com/"))
+
+
+def raw_url(url):
+    """The address of the file itself for a link someone shared: a GitHub file page or a gist becomes its raw text."""
+    url = url.strip()
+    if not re.match(r"https?://", url):
+        raise ValueError("That isn't a link: it should start with https://.")
+    if m := re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/(?:blob|raw)/(.+?)/?(?:[?#].*)?", url):
+        return f"https://raw.githubusercontent.com/{m[1]}/{m[2]}"
+    if m := re.fullmatch(r"https://gist\.github\.com/([^/]+)/([0-9a-f]+)/?(?:[?#].*)?", url):
+        return f"https://gist.github.com/{m[1]}/{m[2]}/raw"
+    return url
+
+
+def fetch(url):
+    """Download and check an experiment from a link."""
+    req = urllib.request.Request(raw_url(url), headers={"user-agent": "Lodestar"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            body = r.read(MAX_BYTES + 1)
+    except urllib.error.HTTPError as e:
+        raise ValueError(f"The link answered {e.code}, so there's no file to open there.") from e
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise ValueError("Couldn't reach that link. Check you're online and the address is right.") from e
+    if len(body) > MAX_BYTES:
+        raise ValueError("That file is too large to be an experiment.")
+    try:
+        exp = json.loads(body)
+    except ValueError as e:
+        raise ValueError("That link isn't a Lodestar experiment: it doesn't lead to a .lodestar.json file.") from e
+    return validate(exp)
+
+
 # ------------------------------------------------------------------ running one from a terminal
 def _post(port, path, body):
     req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", json.dumps(body).encode(),
@@ -221,10 +266,13 @@ def _events(resp):
 
 def main():
     ap = argparse.ArgumentParser(description="Run a Lodestar experiment against the running app.")
-    ap.add_argument("file")
+    ap.add_argument("file", help="a .lodestar.json file, or a link to one")
     ap.add_argument("--port", type=int, default=8792)
     args = ap.parse_args()
-    exp = validate(json.loads(Path(args.file).read_text()))
+    try:
+        exp = fetch(args.file) if re.match(r"https?://", args.file) else validate(json.loads(Path(args.file).read_text()))
+    except ValueError as e:
+        sys.exit(f"error: {e}")
     if "steer" in exp:
         return main_steer(args.port, exp)
 

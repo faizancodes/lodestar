@@ -147,7 +147,13 @@ Inspect's J-lens view offers to compute it.
 ## Experiments
 
 An experiment is one file (`*.lodestar.json`) that anyone can open in their own Lodestar to get your result: either
-a steering setup or a probe. Open one with **Open** beside Saved, or run it from a terminal against the running app.
+a steering setup or a probe. Open one with **Open** beside Saved, which takes a file or a link, or run it from a
+terminal against the running app.
+
+To share one, put the file on GitHub or in a gist and post the link. Someone who copies the link and presses ⌘V in
+Lodestar (anywhere but a text field) gets the setup on, or the probe ready to build. The terminal run takes the link too:
+
+    uv run python -m interp.experiment https://github.com/you/repo/blob/main/my-setup.lodestar.json
 
 ### Steering
 

@@ -4,6 +4,7 @@ import { ModelMenu } from "./components/ModelMenu";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { boot, setTab, toggleModelMenu } from "./shell/engine";
+import { openClipboard } from "./shell/experiments";
 import { TABS, useApp } from "./store/app";
 import { newChat } from "./chat/engine";
 import { Abliterate } from "./views/Abliterate";
@@ -29,11 +30,20 @@ document.addEventListener("keydown", (e) => {
 
   if (!e.metaKey || e.shiftKey || e.altKey) return;
 
+  if (e.key === "v") return void pasted();
+
   const i = ["1", "2", "3", "4"].indexOf(e.key);
   if (i >= 0) return (e.preventDefault(), setTab(TABS[i]));
   if (e.key === "0" && info?.loaded) return (e.preventDefault(), setTab("home"));
   if (e.key === "k" && tab === "chat" && info?.loaded) (e.preventDefault(), newChat());
 });
+
+// ⌘V outside a text field opens an experiment link on the clipboard, so a link from a post is one paste away. In the
+// Mac app the Edit menu takes ⌘V before the page sees it, so the app tells the page instead (interp/app.py).
+function pasted() {
+  if (!document.activeElement?.closest("input, textarea, [contenteditable]")) openClipboard();
+}
+document.addEventListener("lodestar-paste", pasted);
 
 export function App() {
   const tab = useApp((s) => s.tab);

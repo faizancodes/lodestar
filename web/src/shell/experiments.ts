@@ -34,7 +34,23 @@ export async function openFile(f: File) {
   } catch {
     return toast(`${f.name} isn't a Lodestar experiment.`, true);
   }
+  await openExperiment(exp);
+}
 
+/** Open an experiment someone shared a link to: a GitHub file, a gist, or any address of the file. */
+export async function openLink(url: string) {
+  const exp = await api<Experiment>("/api/experiments/fetch", { url }).catch((e) => (toast(e.message, true), null));
+  if (exp) await openExperiment(exp);
+}
+
+/** Open the experiment whose link is on the clipboard, if one is (the server reads it; WebKit won't hand the page a
+ *  paste outside a text field). */
+export async function openClipboard() {
+  const exp = await api<Experiment | null>("/api/experiments/fetch", { clipboard: true }).catch((e) => (toast(e.message, true), null));
+  if (exp) await openExperiment(exp);
+}
+
+async function openExperiment(exp: Experiment) {
   if (!exp.steer) {
     loadExperiment(exp);
     return setTab("probe");

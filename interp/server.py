@@ -6,6 +6,7 @@ import math
 import os
 import re
 import shutil
+import subprocess
 import threading
 import time
 import traceback
@@ -1221,6 +1222,23 @@ def experiments_example(name: str):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+\.lodestar\.json", name) or not f.is_file():
         raise HTTPException(404, "No such experiment.")
     return json.loads(f.read_text())
+
+
+@app.post("/api/experiments/fetch")
+async def experiments_fetch(req: Request):
+    """An experiment from a link someone shared (a GitHub file, a gist, any URL to the file): {url} -> the file.
+    {clipboard: true} takes the link from the clipboard, as ⌘V outside a text field (WebKit won't deliver that paste
+    to the page), and gives null when the clipboard holds no experiment link."""
+    body = await req.json()
+    url = str(body.get("url") or "")
+    if body.get("clipboard"):
+        url = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=5).stdout.strip()
+        if not exp_mod.is_link(url):
+            return None
+    try:
+        return await run_in_threadpool(exp_mod.fetch, url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/api/experiments/steer")

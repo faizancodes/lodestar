@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { startSideArt } from "../art/glyphs";
 import { markSVG } from "../art/mark";
 import { modelName, ram } from "../lib/format";
 import { deleteSaved, jlensLeft, openSaved, setTab, statusLine, stopJlens, toggleModelMenu } from "../shell/engine";
 import { deleteChat, openChat } from "../chat/engine";
-import { openFile } from "../shell/experiments";
+import { openFile, openLink } from "../shell/experiments";
 import { ablActive, useApp, type Tab } from "../store/app";
 import { useChat } from "../store/chat";
 import { Html } from "./Html";
@@ -63,11 +63,23 @@ function SavedList() {
 }
 
 // Open an experiment file someone shared: a steering setup turns on, a probe opens in Probe.
+// A file, or a link someone shared. ⌘V with a link on the clipboard opens it too (App.tsx).
 function OpenExperiment() {
   const file = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const close = () => (setOpen(false), setUrl(""));
+
   return (
     <>
-      <button className="side-open" onClick={() => file.current!.click()}>Open</button>
+      <button className="side-open" aria-expanded={open} onClick={() => (open ? close() : setOpen(true))}>Open</button>
+      {open && (
+        <form className="side-link" onSubmit={(e) => (e.preventDefault(), url.trim() && openLink(url.trim()), close())}>
+          <input autoFocus spellCheck="false" placeholder="Link to an experiment" value={url}
+            onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), close())} />
+          <button type="button" className="side-open" onClick={() => (file.current!.click(), close())}>File</button>
+        </form>
+      )}
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => {
         const f = e.target.files?.[0];
         if (f) openFile(f);
