@@ -1,13 +1,15 @@
 // Experiment files (interp/experiment.py): a probe or a steering setup as one `.lodestar.json` anyone can open.
 import { api } from "../lib/api";
 import type { Item } from "../lib/types";
-import { loadExperiment } from "../probe/engine";
+import { modelName } from "../lib/format";
+import { loadExperiment, run } from "../probe/engine";
 import { addItems, replaceRecipe } from "../steer/recipe";
 import { useApp } from "../store/app";
 import { useChat } from "../store/chat";
 import type { Experiment } from "../store/probe";
 import { useSteer } from "../store/steer";
-import { refreshDirs, setTab } from "./engine";
+import { send } from "../steer/refine";
+import { loadModel, refreshDirs, setTab } from "./engine";
 
 const app = useApp.getState;
 const toast = (m: string, err = false) => app().toastMsg(m, err);
@@ -48,6 +50,37 @@ export async function openLink(url: string) {
 export async function openClipboard() {
   const exp = await api<Experiment | null>("/api/experiments/fetch", { clipboard: true }).catch((e) => (toast(e.message, true), null));
   if (exp) await openExperiment(exp);
+}
+
+const sameModel = (a?: string | null, b?: string | null) => !!a && !!b && modelName(a).toLowerCase() === modelName(b).toLowerCase();
+
+/** The experiment the app was opened with (`install.sh hive`, or a link): load the model it was made on if another one
+ *  is loaded, turn it on and ask its first question beside the normal reply, or build its probe. */
+export async function openOnLaunch() {
+  const ref = new URLSearchParams(location.search).get("open");
+  if (!ref) return;
+  history.replaceState(null, "", location.pathname);
+
+  const exp = await (/^https?:\/\//.test(ref)
+    ? api<Experiment>("/api/experiments/fetch", { url: ref })
+    : api<Experiment>(`/api/experiments/${encodeURIComponent(ref)}`)).catch((e) => (toast(e.message, true), null));
+  if (!exp) return;
+
+  if (exp.model && !(app().info?.loaded && sameModel(app().info?.model, exp.model))) {
+    if (!exp.model.includes("/")) return toast(`${exp.name} was made on ${exp.model}. Load that model, then open it again.`, true);
+    const { status, last } = app().info ?? {};
+    if (!(status?.startsWith("loading") && sameModel(last, exp.model))) loadModel(exp.model); // unless it's already loading
+    await new Promise<void>((done) => {
+      const off = useApp.subscribe((s) => s.info?.loaded && sameModel(s.info.model, exp.model) && (off(), done()));
+    });
+  }
+
+  await openExperiment(exp);
+  if (exp.steer && exp.try?.length) {
+    useSteer.setState({ compare: true }); // the normal reply under the steered one, for this visit only
+    send(exp.try[0]);
+  }
+  else if (!exp.steer) run();
 }
 
 async function openExperiment(exp: Experiment) {
