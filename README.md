@@ -11,10 +11,22 @@ Hugging Face and it runs on your Mac's GPU, offline after the first download. Th
 fire for each word, push neurons and directions to change how it talks, take out its refusals, and check every
 change against the original model as it writes.
 
-Inspired by [@treetowntree's Qwen neuron zoo](https://x.com/treetowntree/status/2114573600976183723) (single neurons
-and pairs that give Qwen a one-track mind, up to a Cookie Monster), [@Sauers_'s gnome neurons](https://x.com/Sauers_/status/2114599600078344380)
-(three neurons across layers 3, 4 and 8 of Qwen3-8B), and [lyramakesmusic/neuron-explorer](https://github.com/lyramakesmusic/neuron-explorer),
-whose hook placement and dose units this app reuses.
+## Install
+
+On an Apple silicon Mac, paste this into Terminal:
+
+    curl -fsSL https://raw.githubusercontent.com/faizancodes/lodestar/main/install.sh | bash
+
+It puts Lodestar in Applications and opens it. The first run downloads Python and its packages (about 1 GB) into
+`~/Library/Application Support/Lodestar`; run the same line again to update.
+
+Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
+The first load downloads the weights. Logs go to `~/Library/Logs/Lodestar.log`.
+
+To run it from a clone instead, build the interface once (`pnpm install && pnpm build` in `web/`), then:
+
+    uv run python -m interp.app            # native window
+    uv run python -m interp.app --server   # headless, http://127.0.0.1:8792
 
 ## What it does
 
@@ -50,31 +62,6 @@ model's reply beside your edited one.
 changes, so any OpenAI client can talk to it.
 
 <img src="docs/media/api.gif" width="600" alt="The lodestar at the centre of an orbit; clients arrive on it, requests curve in and tokens stream back out." />
-
-## Run it
-
-<img src="docs/media/assemble.gif" width="560" alt="A model assembling itself: weights fall from a ring into a turning tower of layer plates, tokens climb it, and it lifts away for the next model." />
-
-On an Apple silicon Mac, paste this into Terminal:
-
-    curl -fsSL https://raw.githubusercontent.com/faizancodes/lodestar/main/install.sh | bash
-
-It puts Lodestar in Applications and opens it. The first run downloads Python and its packages (about 1 GB) into
-`~/Library/Application Support/Lodestar`; run the same line again to update.
-
-To work on it from a clone instead:
-
-    uv run python -m interp.app            # native window
-    uv run python -m interp.app --server   # headless, http://127.0.0.1:8792
-
-The UI is the React build in `web/dist` (`pnpm install && pnpm build` in `web/`). `./scripts/build_app.sh` builds the
-same self-contained `dist/Lodestar.app` and `Lodestar.zip` that releases ship; pushing a `v*` tag builds one and
-publishes it as a GitHub release, which `install.sh` downloads.
-
-Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
-The first load downloads the weights. Models under 2.5B parameters run in float32 on the Apple GPU (MPS) for precise
-gradients; bigger ones in bfloat16. Logs go to `~/Library/Logs/Lodestar.log`, recipes to
-`~/Library/Application Support/Auto Interp/recipes.json`.
 
 ## What a neuron is here
 
@@ -151,18 +138,12 @@ along it is, with a Stop), one backward pass per residual dimension: about 2 min
 the data folder under `jlens/` and load with the model after that. A stopped model isn't started again on its own;
 Inspect's J-lens view offers to compute it.
 
-## The site and these animations
+## Credits
 
-The landing page is in `site/` (`pnpm install && pnpm dev` there; `pnpm build` writes a static site to `site/dist`
-for lodestar.so). Its ASCII scenes are drawn with the app's own renderer from `web/src/art`. The GIFs in this README
-are those same scenes: with the site's dev server running, `node scripts/readme-gifs.mjs` in `site/` steps each one
-frame by frame in headless Chrome and writes them to `docs/media/`.
-
-`site/demo.html` (lodestar.so/demo) is a small version of the app that runs in the browser: Qwen3-0.6B on the
-visitor's own GPU through WebGPU, with Chat, erasing refusals, pushing neurons and Inspect. The forward pass is
-written in WGSL (`site/src/demo/`); the weights stream from Hugging Face once and are cached. Its refusal direction
-and recipes come from the Python engine: `uv run python -m scripts.demo_pack` writes `site/public/demo/qwen3-0.6b.json`.
-It needs a browser with a working GPU, so the landing page doesn't link to it.
+Inspired by [@treetowntree's Qwen neuron zoo](https://x.com/treetowntree/status/2114573600976183723) (single neurons
+and pairs that give Qwen a one-track mind, up to a Cookie Monster), [@Sauers_'s gnome neurons](https://x.com/Sauers_/status/2114599600078344380)
+(three neurons across layers 3, 4 and 8 of Qwen3-8B), and [lyramakesmusic/neuron-explorer](https://github.com/lyramakesmusic/neuron-explorer),
+whose hook placement and dose units this app reuses.
 
 ## Layout
 
@@ -174,7 +155,7 @@ It needs a browser with a working GPU, so the landing page doesn't link to it.
     interp/server.py     local API (FastAPI, server-sent events)
     interp/app.py        native window (pywebview) around the server
     web/                 the interface (React + TypeScript, Vite)
-    site/                the landing page (Vite), and the scripts that render the share card and these GIFs
+    site/                the landing page
     e2e/                 the parity suite: recorded API sessions, mock replay, golden screenshots
     scripts/             app bundle and icon builders
 
