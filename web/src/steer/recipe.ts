@@ -1,6 +1,6 @@
 // The recipe: what's on now. Whenever the list is redrawn as a whole, any panel open under a row goes with it, so
 // `redrawn` drops those too.
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { isDir, itemKey, labelOf } from "../lib/format";
 import type { Item, Recipe } from "../lib/types";
 import { refreshSaved } from "../shell/engine";
@@ -57,9 +57,12 @@ export function replaceRecipe(r: Recipe) {
 export async function saveRecipe() {
   const { recipe, info } = get();
   const name = recipe.name || recipe.items.map(labelOf).slice(0, 3).join(" + ");
-  const saved = await api<Recipe>("/api/recipes", { id: recipe.id || undefined, name, model: info?.model, items: recipe.items });
-
-  set({ recipe: { ...get().recipe, id: saved.id, name: saved.name } });
-  get().toastMsg(`Saved “${saved.name}”.`);
-  refreshSaved();
+  try {
+    const saved = await api<Recipe>("/api/recipes", { id: recipe.id || undefined, name, model: info?.model, items: recipe.items });
+    set({ recipe: { ...get().recipe, id: saved.id, name: saved.name } });
+    get().toastMsg(`Saved “${saved.name}”.`);
+    void refreshSaved();
+  } catch (e) {
+    get().toastMsg(errorMessage(e), true);
+  }
 }

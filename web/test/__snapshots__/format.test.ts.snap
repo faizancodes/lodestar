@@ -2,64 +2,64 @@
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > markdown: every recorded reply and string 1`] = `
 {
-  "length": 71749,
-  "sha256": "727db500f94a78b60131ce66163e282428f46ecb34525b571aaf29da17515728",
+  "length": 86433,
+  "sha256": "1021f2b2437ff7ff7ed080718f2ba6eb108f601c1df048fc25d3287290d88e70",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > models: modelName, steerDefaultName, ablDefaultName 1`] = `
 {
-  "length": 1879,
-  "sha256": "58ee610b7f4556395d7437b3bea9e6c011d7093b30bafcdd159ec8ed1f1236a4",
+  "length": 2557,
+  "sha256": "e18725ffb9807d2d578f4c051f493b4993ba210ab1f37d13efccdbe2c3c47326",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > models: modelName, steerDefaultName, ablDefaultName 2`] = `
 {
-  "length": 11378,
-  "sha256": "064b739d870cd54671b96ce1b2779c8698189215b0f7b54ec883dff688795088",
+  "length": 13154,
+  "sha256": "ae0de5b5a85376fa4093d78f53f4e3782641ba61082e9a6cf56812a93bf15393",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > neurons: lensLabel, searchDose 1`] = `
 {
-  "length": 6864,
-  "sha256": "37515c28313a9f06645b45fd1d49ed4477d00abfcfe49cf8c2d21670c2d4596a",
+  "length": 6610,
+  "sha256": "2a4791352b118b2a244b186d7372f0a48a816921a42ea7a8812c1ce93ad8b88f",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > neurons: lensLabel, searchDose 2`] = `
 {
-  "length": 2946,
-  "sha256": "0f3870c1aa279096a754f8ece344d42666cd2ae56d490638f627feff64f15b81",
+  "length": 47173,
+  "sha256": "a08c220421dd029d45222e704aeb77e468a99b8b5368f2da07add0cd6b04d26f",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > numbers: fmt, gb, nid 1`] = `
 {
-  "length": 61639,
-  "sha256": "bd02c10d851c6b3115628fa6a54391af0bcd4048d75c4839defb01963d280441",
+  "length": 719149,
+  "sha256": "e39c8a46fc7fcc8cf427521e882fa32136d178e8e4701064fc284b83ba6e78aa",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > recipes: itemKey, labelOf, isDir, dirReady, bandText, pushes 1`] = `
 {
-  "length": 8036,
-  "sha256": "beb72d0bb850313991d6d0e24593e1bdc55c3dee61fa2f51d86a04026220878e",
+  "length": 8491,
+  "sha256": "66b8b7372798524846e0f16336b5ab7c09620f61880be945731211d64bd9f791",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > recipes: itemKey, labelOf, isDir, dirReady, bandText, pushes 2`] = `
 {
-  "length": 91,
-  "sha256": "aff9f81c6fd1aa66828ef72e820b4ebb83d84bdd4ac368ff6d6b8daac4210a2e",
+  "length": 137,
+  "sha256": "860bf2128cb24aba386b638db91e6571f8e3bb35689b8d5eece31bf85329fd63",
 }
 `;
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > recipes: itemKey, labelOf, isDir, dirReady, bandText, pushes 3`] = `
 {
-  "length": 20594,
-  "sha256": "04bd43b7fdc00fedb1a4b90cffa6235ef59dc80bfd9f67cf42e579cc9da2904d",
+  "length": 22562,
+  "sha256": "584d20079c766315278c142e005e5bc898bbb8c44f87fbc84f34e7ce82375053",
 }
 `;
 
@@ -72,7 +72,7 @@ exports[`helpers give the outputs ui/app.js gave on recorded inputs > styleShift
 
 exports[`helpers give the outputs ui/app.js gave on recorded inputs > text: esc, showTok, isWord, instruction, cleanReply 1`] = `
 {
-  "length": 204640,
-  "sha256": "862092854428345f409c2dced6d24380df39f008d0c27736362e0e8f4f4048e7",
+  "length": 243286,
+  "sha256": "b3d5bf6605a6a0dc170ee110a602767e63dfa959a7aa376d532da72569d56c25",
 }
 `;

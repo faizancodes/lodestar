@@ -4,14 +4,12 @@ import {
   addNeurons, continueReply, copyReply, toggleGauge, findNeurons, growInput, jumpDown, newChat, onScroll, rateOf, rateText, recipeNeurons, replyHtml, retry, sendChat,
   setPickBy, STARTERS, toggleCompare, toggleFound, toggleNeurons, toggleSteer,
 } from "../chat/engine";
-import { api } from "../lib/api";
-import { isDir, itemKey, labelOf, lensLabel, modelName } from "../lib/format";
+import { cancelRun } from "../lib/api";
+import { fmt, isDir, itemKey, labelOf, lensLabel, modelName } from "../lib/format";
 import { patchAt, removeAt } from "../steer/recipe";
 import { ablActive, useApp } from "../store/app";
 import { SEND } from "../steer/Live";
 import { useChat, type ColKey, type Mods, type Reading } from "../store/chat";
-
-const cancel = () => api("/api/cancel", {});
 
 // one small run of ASCII marks per starter, from the scenes' dot / plus / cross / block ramp
 const MARKS = ["·+×", "+×▪", "×+·", "▪×+"];
@@ -36,7 +34,10 @@ function Mods() {
 /** A reply's markdown. Set as HTML, like the streamed updates that write into it, so the decoder can work on it. */
 function Md({ m, done }: { m: { content: string }; done: boolean }) {
   const el = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { el.current!.innerHTML = replyHtml(m, done); });
+  const html = replyHtml(m, done);
+  useLayoutEffect(() => {
+    if (el.current) el.current.innerHTML = html;
+  }, [html]);
   return <div className="md" ref={el} />;
 }
 
@@ -58,7 +59,6 @@ function CompareSwitch() {
 // Gauges: one strip per direction under a reply, a cell for each piece of text as it came, coloured toward the
 // direction's pole (+) or away from it (−), full at ±0.5, about where text written in either pole's voice sits.
 // Hovering a cell shows the text and every direction's reading there.
-const signedV = (v: number) => (v < 0 ? "−" : "+") + Math.abs(v).toFixed(2);
 const cell = (v: number) => ({ background: `color-mix(in oklab, var(--g-${v < 0 ? "neg" : "pos"}) ${Math.round(Math.min(1, Math.abs(v) * 2) * 100)}%, transparent)` });
 
 // the few words leading up to a piece of text, to place it in the reply
@@ -84,7 +84,7 @@ function Gauges({ read }: { read?: Reading }) {
             <div className="gauge-strip">
               {vals.map((v, k) => <i key={k} className={k === at ? "at" : undefined} style={cell(v)} onMouseEnter={() => setAt(k)} />)}
             </div>
-            <span className="gauge-v" title={at === null ? "Average over the reply" : undefined}>{signedV(at === null ? avg : vals[at])}</span>
+            <span className="gauge-v" title={at === null ? "Average over the reply" : undefined}>{fmt(at === null ? avg : vals[at], 2)}</span>
           </div>
         );
       })}
@@ -104,7 +104,7 @@ function ModsLine({ mods, only }: { mods?: Mods; only?: ColKey }) {
   return (
     <div className="msg-mods">
       {steer?.map((p, k) => (
-        <span key={k} className="msg-mod"><b>{p.label}</b>{p.erase ? " erased" : ` ${p.dose > 0 ? "+" : "−"}${+Math.abs(p.dose).toFixed(2)}`}</span>
+        <span key={k} className="msg-mod"><b>{p.label}</b>{p.erase ? " erased" : ` ${p.dose >= 0 ? "+" : "−"}${+Math.abs(p.dose).toFixed(2)}`}</span>
       ))}
       {abl && <span className="msg-mod"><b>Refusals erased</b></span>}
     </div>
@@ -118,7 +118,7 @@ function GaugesPick() {
   const n = dirs.filter((d) => on.includes(d.id)).length;
 
   useEffect(() => {
-    const close = (e: MouseEvent) => !(e.target as Element).closest("#chat-gauges") && box.current?.removeAttribute("open");
+    const close = (e: MouseEvent) => e.target instanceof Element && !e.target.closest("#chat-gauges") && box.current?.removeAttribute("open");
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, []);
@@ -142,11 +142,18 @@ const Rate = ({ part }: { part: { content: string; wps?: number } }) => <span cl
 
 function Copy({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const toast = useApp((s) => s.toastMsg);
 
+  useEffect(() => () => clearTimeout(timer.current), []);
+
   const copy = async () => {
-    try { await copyReply(text); setCopied(true); setTimeout(() => setCopied(false), 1400); }
-    catch { toast("Couldn’t copy.", true); }
+    try {
+      await copyReply(text);
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1400);
+    } catch { toast("Couldn’t copy.", true); }
   };
 
   return <button data-a="copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button>;
@@ -222,7 +229,7 @@ function Settings() {
 
   // a click anywhere else closes the settings
   useEffect(() => {
-    const close = (e: MouseEvent) => !(e.target as Element).closest("#chat-opts") && box.current!.removeAttribute("open");
+    const close = (e: MouseEvent) => e.target instanceof Element && !e.target.closest("#chat-opts") && box.current?.removeAttribute("open");
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, []);
@@ -258,7 +265,7 @@ function Composer() {
         <div className="composer-bar">
           <Settings />
           <span className="grow" />
-          <button type="button" className="send stop" id="chat-stop" aria-label="Stop" hidden={!streaming} onClick={cancel}><i /></button>
+          <button type="button" className="send stop" id="chat-stop" aria-label="Stop" hidden={!streaming} onClick={cancelRun}><i /></button>
           <button type="submit" className="send" id="chat-send" aria-label="Send" hidden={streaming} disabled={!input.trim()}>
             {SEND}
           </button>
@@ -284,8 +291,10 @@ function Dose({ i, dose }: { i: number; dose: number }) {
   };
 
   const step = (by: number) => {
-    const d = Math.round((dose + by) / STEP) * STEP;
-    if (d) patchAt(i, { dose: d });
+    const raw = Math.round((dose + by) / STEP) * STEP;
+    // Step straight across 0 so ±0.25 can cross into the opposite sign instead of getting stuck.
+    const d = raw === 0 ? by : raw;
+    patchAt(i, { dose: d });
   };
 
   return (

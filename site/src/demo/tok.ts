@@ -10,7 +10,11 @@ export class Tok {
   private constructor(private t: Tokenizer) {}
 
   static async load() {
-    const [json, config] = await Promise.all(["tokenizer.json", "tokenizer_config.json"].map((f) => fetch(`${REPO}/${f}`).then((r) => r.json())));
+    const [json, config] = await Promise.all(["tokenizer.json", "tokenizer_config.json"].map(async (f) => {
+      const r = await fetch(`${REPO}/${f}`);
+      if (!r.ok) throw new Error(`Couldn't download ${f} (${r.status}).`);
+      return r.json();
+    }));
     return new Tok(new Tokenizer(json, config));
   }
 

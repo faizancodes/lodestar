@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { startSideArt } from "../art/glyphs";
 import { markSVG } from "../art/mark";
 import { modelName, ram } from "../lib/format";
@@ -13,7 +13,7 @@ const MARK = markSVG(36, 15);
 // drawn rather than typed: a "×" sits on the font's baseline, off the centre of its round button
 const CROSS = <svg viewBox="0 0 10 10" aria-hidden="true"><path d="m2.5 2.5 5 5m0-5-5 5" /></svg>;
 
-export const ICONS: Record<Exclude<Tab, "home" | "arch">, JSX.Element> = {
+export const ICONS: Record<Exclude<Tab, "home" | "arch">, ReactElement> = {
   abliterate: (
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 3.8 12 2.5l7 2.6v6.2c0 1.6-.35 3-1 4.25M15.9 19.1A13 13 0 0 1 12 21.5c-4.3-1.7-7-5.3-7-10.2V5.6" /><path d="m3 3 18 18" /></svg>
   ),
@@ -28,7 +28,7 @@ export const ICONS: Record<Exclude<Tab, "home" | "arch">, JSX.Element> = {
   ),
 };
 
-function TabButton({ tab, label, children }: { tab: Exclude<Tab, "home" | "arch">; label: string; children?: JSX.Element }) {
+function TabButton({ tab, label, children }: { tab: Exclude<Tab, "home" | "arch">; label: string; children?: ReactElement }) {
   const loaded = useApp((s) => !!s.info?.loaded);
   const on = useApp((s) => loaded && s.tab === tab), want = useApp((s) => !loaded && s.want === tab);
   const cls = on ? "tab on" : want ? "tab idle want" : loaded ? "tab" : "tab idle";
@@ -53,7 +53,8 @@ function SavedList() {
   return (
     <div id="saved-list" className="saved-list">
       {!mine.length ? <div className="saved-empty">Nothing saved yet.</div> : mine.map((r) => (
-        <div key={r.id} className={r.id === on ? "saved-item on" : "saved-item"} data-id={r.id!} role="button" tabIndex={0} onClick={() => openSaved(r)}>
+        <div key={r.id} className={r.id === on ? "saved-item on" : "saved-item"} data-id={r.id!} role="button" tabIndex={0}
+          onClick={() => openSaved(r)} onKeyDown={(e) => e.key === "Enter" && openSaved(r)}>
           {"\n      "}<span className="nm">{r.name}</span><span className="ct">{r.items.length}</span>
           <button className="del" aria-label="Delete" onClick={(e) => (e.stopPropagation(), deleteSaved(r.id!))}>{CROSS}</button>
         </div>
@@ -62,8 +63,8 @@ function SavedList() {
   );
 }
 
-// Open an experiment file someone shared: a steering setup turns on, a probe opens in Probe.
-// A file, or a link someone shared. ⌘V with a link on the clipboard opens it too (App.tsx).
+// Open an experiment file or link someone shared: a steering setup turns on, a probe opens in Probe.
+// ⌘V with a link on the clipboard opens it too (App.tsx).
 function OpenExperiment() {
   const file = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -119,7 +120,8 @@ function MemoryMeter() {
   if (!m) return null;
 
   const tight = m.swapping || m.pressure !== "normal";
-  const pct = (b: number) => `${(Math.min(Math.max(b, 0), m.total) / m.total) * 100}%`;
+  const total = Math.max(1, m.total);
+  const pct = (b: number) => `${(Math.min(Math.max(b, 0), total) / total) * 100}%`;
   const app = Math.min(m.app, m.used);
   const tip = [`Lodestar ${ram(m.app)}`, ...m.others.map((o) => `${o.name} ${ram(o.bytes)}`)].join("\n");
   const label = m.swapping ? "Swapping" : m.pressure === "critical" ? "Memory full" : "Memory";
@@ -164,7 +166,7 @@ export function Sidebar() {
     <aside className="side">
       <canvas className="side-art" id="side-art" aria-hidden="true" ref={art} />
       <div className="brand" id="brand" role="button" tabIndex={0} title="Home" onClick={home}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && home()}>
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); home(); } }}>
         <Html className="brand-mark" id="brand-mark" html={MARK} />
         <h1>Lodestar</h1>
       </div>

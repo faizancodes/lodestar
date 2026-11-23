@@ -1,7 +1,7 @@
 // What the engine (interp/server.py) sends back, written from the handlers there; they return plain dicts.
 
 /** GET /api/status, and what POST /api/load returns. */
-export type Arch = {
+type Arch = {
   heads: number | null; kv_heads: number | null; vocab: number; tied: boolean; experts: number | null;
   attention: ("full" | "linear")[];
 };
@@ -27,7 +27,7 @@ export type Status = {
 };
 
 /** A process holding memory, for the meter and the fit check. */
-export type MemProc = { pid: number; name: string; bytes: number };
+type MemProc = { pid: number; name: string; bytes: number };
 /** GET /api/memory */
 export type Memory = {
   total: number;
@@ -130,7 +130,7 @@ export type Abl = {
 };
 
 /** Refusals erased for one category only: the gate's test on held-out requests, and the version for the weights. */
-export type AblCategory = {
+type AblCategory = {
   name: string;
   prompts: string[];
   coef: number;
@@ -155,7 +155,7 @@ export type StreamEvent = { type: string; [k: string]: unknown };
 // The Architecture page (interp/archview.py)
 export type ArchTensor = { name: string; shape: number[]; params: number; rms: number };
 export type ArchBlock = { name: string; role: "attention" | "mlp" | "norm" | "other"; type: string; params: number; tensors: ArchTensor[] };
-export type ArchLayer = { index: number; attention: "full" | "linear"; heads: number[]; head_dim: number | null; blocks: ArchBlock[]; params: number; resid: number };
+type ArchLayer = { index: number; attention: "full" | "linear"; heads: number[]; head_dim: number | null; blocks: ArchBlock[]; params: number; resid: number };
 type ArchPart = { tensors: ArchTensor[]; params: number };
 export type ArchDetail = {
   model: string; type: string; dtype: string; params: number; hidden: number; neurons: number; vocab: number;
@@ -164,7 +164,7 @@ export type ArchDetail = {
   tied: boolean; experts: number | null;
   embedding: ArchPart; final_norm: ArchPart; unembedding: ArchPart; layers: ArchLayer[];
 };
-export type LensTok = { tok: string; p: number };
+type LensTok = { tok: string; p: number };
 /** Text run through the model as a chat message, then the reply it wrote (from n_prompt on): per layer, per token. */
 export type ArchRun = { tokens: string[]; n_prompt: number; special: boolean[]; resid: number[][]; attn: number[][]; mlp: number[][]; heads: number[][][]; lens: LensTok[][][] };
 /** What every layer did to choose one token of a reply, sent as the model writes it. */

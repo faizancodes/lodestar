@@ -1,29 +1,37 @@
-"""The real Lodestar server with every /api exchange written to e2e/fixtures/<scenario>.json, so the mock server
-can replay it later without a model. The scenario is set by the tests: POST /__fixture/start?name=<scenario>.
+"""ASGI recording wrapper around the real Lodestar server for E2E parity fixtures.
+
+Writes every ``/api`` exchange to ``e2e/fixtures/<scenario>.json`` so ``e2e/harness/mock.py`` can replay it
+deterministically without a loaded model. Scenarios are started via ``POST /__fixture/start?name=<scenario>``.
+
+Usage::
 
     AUTO_INTERP_DATA=e2e/.data uv run python e2e/harness/record.py 8795
-
-Run it against a throwaway data folder: the tests save recipes, find directions and write exported models.
 """
+
+from __future__ import annotations
+
+import codecs
+import contextlib
 import json
 import sys
 import time
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs
 
 import uvicorn
 
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 FIXTURES = ROOT / "e2e" / "fixtures"
-# what the mock always answers with a stand-in (see harness/mock.py), so a recording leaves it out: this Mac's memory
-# at the moment, and saved chats, whose ids come from the clock
+# Ambient endpoints answered by mock stand-ins (including /api/memory/fit and /api/chats/*).
 STANDS_IN = ("/api/memory", "/api/chats")
 
-from interp.server import app as real_app  # noqa: E402  (after sys.path)
+from interp.server import app as real_app  # noqa: E402
 
 
-def _json_or_text(raw: bytes):
+def _json_or_text(raw: bytes) -> Any:
     if not raw:
         return None
     try:
@@ -33,31 +41,42 @@ def _json_or_text(raw: bytes):
 
 
 class Recorder:
-    def __init__(self, app):
-        self.app = app
-        self.name = None
-        self.log = []
+    """ASGI middleware that captures JSON and SSE ``/api`` exchanges per test scenario."""
 
-    def _save(self):
-        if self.name:
+    def __init__(self, asgi_app: Any) -> None:
+        self.app = asgi_app
+        self.name: str | None = None
+        self.log: list[dict[str, Any]] = []
+
+    def _save(self, name: str | None = None, log: list[dict[str, Any]] | None = None) -> None:
+        target_name = self.name if name is None else name
+        target_log = self.log if log is None else log
+        if target_name:
             FIXTURES.mkdir(parents=True, exist_ok=True)
-            (FIXTURES / f"{self.name}.json").write_text(json.dumps(self.log, indent=1, ensure_ascii=False))
+            (FIXTURES / f"{target_name}.json").write_text(json.dumps(target_log, indent=1, ensure_ascii=False))
 
-    async def _control(self, scope, send):
-        q = parse_qs(scope["query_string"].decode())
-
+    async def _control(self, scope: dict[str, Any], send: Any) -> None:
+        query = parse_qs(scope["query_string"].decode())
         if scope["path"] == "/__fixture/start":
-            self.name = q["name"][0]
+            names = query.get("name")
+            if not names or not names[0]:
+                body = json.dumps({"error": "Missing fixture name."}).encode()
+                await send({"type": "http.response.start", "status": 400, "headers": [(b"content-type", b"application/json")]})
+                await send({"type": "http.response.body", "body": body})
+                return
+            self.name = names[0]
             self.log = []
             self._save()
-        elif scope["path"] == "/__fixture/stop":
-            self.name = None
+            status = 200
+            body = json.dumps({"ok": True, "name": self.name}).encode()
+        else:
+            status = 404
+            body = json.dumps({"error": f"Unknown control route: {scope['path']}"}).encode()
 
-        body = json.dumps({"ok": True, "name": self.name}).encode()
-        await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.start", "status": status, "headers": [(b"content-type", b"application/json")]})
         await send({"type": "http.response.body", "body": body})
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
         if scope["path"].startswith("/__fixture/"):
@@ -65,9 +84,11 @@ class Recorder:
         if not scope["path"].startswith("/api/") or not self.name or scope["path"].startswith(STANDS_IN):
             return await self.app(scope, receive, send)
 
-        # read the whole request body, then hand it on in one message; after that, the real receive, so a
-        # streaming response still hears about a client that disconnects
-        chunks = []
+        # Capture the active scenario at request start so a late-finishing request cannot pollute the next scenario.
+        scenario_name = self.name
+        scenario_log = self.log
+
+        chunks: list[bytes] = []
         while True:
             msg = await receive()
             chunks.append(msg.get("body", b""))
@@ -75,21 +96,28 @@ class Recorder:
                 break
 
         raw = b"".join(chunks)
-        sent = False
+        sent_body = False
 
-        async def replay_receive():
-            nonlocal sent
-            if not sent:
-                sent = True
+        async def _replay_receive() -> dict[str, Any]:
+            nonlocal sent_body
+            if not sent_body:
+                sent_body = True
                 return {"type": "http.request", "body": raw, "more_body": False}
             return await receive()
 
         t0 = time.monotonic()
-        entry = {"method": scope["method"], "path": scope["path"], "query": scope["query_string"].decode(),
-                 "body": _json_or_text(raw), "status": None, "type": None}
-        out, timed = [], []
+        entry: dict[str, Any] = {
+            "method": scope["method"],
+            "path": scope["path"],
+            "query": scope["query_string"].decode(),
+            "body": _json_or_text(raw),
+            "status": None,
+            "type": None,
+        }
+        out: list[bytes] = []
+        timed: list[tuple[float, bytes]] = []
 
-        async def tap(msg):
+        async def _tap(msg: dict[str, Any]) -> None:
             if msg["type"] == "http.response.start":
                 entry["status"] = msg["status"]
                 ctype = dict(msg.get("headers") or []).get(b"content-type", b"").decode()
@@ -100,23 +128,32 @@ class Recorder:
             await send(msg)
 
         try:
-            await self.app(scope, replay_receive, tap)
+            await self.app(scope, _replay_receive, _tap)
         finally:
             if entry["type"] == "sse":
-                events, buf = [], ""
-                for dt, b in timed:
-                    buf += b.decode("utf-8", "replace")
+                events: list[dict[str, Any]] = []
+                decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+                buf = ""
+                for dt, chunk in timed:
+                    buf += decoder.decode(chunk)
                     while "\n\n" in buf:
                         line, buf = buf.split("\n\n", 1)
                         if line.startswith("data: "):
-                            events.append({"dt": dt, "data": json.loads(line[6:])})
+                            try:
+                                events.append({"dt": dt, "data": json.loads(line[6:])})
+                            except ValueError:
+                                continue
+                buf += decoder.decode(b"", final=True)
+                if buf.startswith("data: "):
+                    with contextlib.suppress(ValueError):
+                        events.append({"dt": round(time.monotonic() - t0, 3), "data": json.loads(buf[6:])})
                 entry["events"] = events
             else:
                 entry["response"] = _json_or_text(b"".join(out))
 
             entry["ms"] = round((time.monotonic() - t0) * 1000)
-            self.log.append(entry)
-            self._save()
+            scenario_log.append(entry)
+            self._save(scenario_name, scenario_log)
 
 
 app = Recorder(real_app)

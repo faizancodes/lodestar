@@ -1,5 +1,10 @@
-"""Local HTTP API for the Lodestar window. Streams (server-sent events) for anything that generates text or runs a
-search; plain JSON for lookups. Serves the UI built in ../web/dist."""
+"""Local HTTP API for Lodestar: JSON lookups, SSE streams, and an OpenAI-compatible ``/v1`` endpoint.
+
+Serves the built React frontend from ``../web/dist`` alongside all interpretability endpoints.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import json
 import math
@@ -9,36 +14,39 @@ import shutil
 import subprocess
 import threading
 import time
-import traceback
 import uuid
 from collections import deque
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import abl as abl_mod
-from . import archview
+from . import archview, discover, memory
 from . import directions as dir_mod
-from . import discover
 from . import experiment as exp_mod
 from . import jlens as jlens_mod
-from . import memory
 from . import probe as probe_mod
 from .engine import Cancelled, Engine, Push
+from .utils import atomic_write_json, atomic_write_text, get_logger, model_short_name
+
+
+logger = get_logger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-UI = ROOT / "web" / "dist"  # the React build: `pnpm build` in web/ (scripts/build_app.sh does it)
-# the data folder keeps the app's first name, so models, recipes and directions saved before the rename stay put
+UI = ROOT / "web" / "dist"  # React build from `pnpm build` in web/
+# Keep the app's original data directory name so previously saved models, recipes, and directions remain accessible.
 DATA = Path(os.environ.get("AUTO_INTERP_DATA", Path.home() / "Library" / "Application Support" / "Auto Interp"))
 DATA.mkdir(parents=True, exist_ok=True)
 RECIPES = DATA / "recipes.json"
 ABL_FILE = DATA / "abl.json"  # saved refusal directions + state, keyed by model id
-LAST_MODEL = DATA / "last_model.txt"  # the model to open again at the next launch
-PROBES_FILE = DATA / "abl-probes.json"  # customised probe lists
+LAST_MODEL = DATA / "last_model.txt"  # model to reopen at next launch
+PROBES_FILE = DATA / "abl-probes.json"  # customized probe lists
 CHATS = DATA / "chats"  # one file per saved conversation
 JLENS = DATA / "jlens"  # each model's J-lens, computed once (interp/jlens.py)
 HF_CACHE = Path(os.environ.get("HF_HUB_CACHE", Path.home() / ".cache" / "huggingface" / "hub"))
@@ -52,24 +60,40 @@ PRESETS = [
     {"id": "google/gemma-3-1b-it", "size": "2 GB", "note": "Needs a Hugging Face login"},
 ]
 
-# Known neurons per model (matched on the model's folder or repo name), so a first try is one click.
 EXAMPLES = {
     "Qwen3-8B": [
-        {"name": "Gnome", "note": "One neuron that makes the model describe itself as a small creature (@Sauers_)",
-         "prompt": "Describe the way you look.", "items": [{"layer": 8, "neuron": 3602, "dose": 1.0, "label": "gnome"}]},
-        {"name": "Forest gnome", "note": "The three-neuron version from the same thread: greenish skin, pointed ears",
-         "prompt": "Describe the way you look.",
-         "items": [{"layer": 3, "neuron": 6056, "dose": -0.5, "label": "gnome a"},
-                   {"layer": 4, "neuron": 1658, "dose": 0.5, "label": "gnome b"},
-                   {"layer": 8, "neuron": 3602, "dose": 0.5, "label": "gnome"}]},
+        {
+            "name": "Gnome",
+            "note": "One neuron that makes the model describe itself as a small creature (@Sauers_)",
+            "prompt": "Describe the way you look.",
+            "items": [{"layer": 8, "neuron": 3602, "dose": 1.0, "label": "gnome"}],
+        },
+        {
+            "name": "Forest gnome",
+            "note": "The three-neuron version from the same thread: greenish skin, pointed ears",
+            "prompt": "Describe the way you look.",
+            "items": [
+                {"layer": 3, "neuron": 6056, "dose": -0.5, "label": "gnome a"},
+                {"layer": 4, "neuron": 1658, "dose": 0.5, "label": "gnome b"},
+                {"layer": 8, "neuron": 3602, "dose": 0.5, "label": "gnome"},
+            ],
+        },
     ],
     "Qwen3-1.7B": [
-        {"name": "Cookies", "note": "Found by Describe: brings up cookies; loops above strength 0.35",
-         "prompt": "What makes you happy?", "items": [{"layer": 26, "neuron": 2847, "dose": -0.3, "label": "cookie"}]},
+        {
+            "name": "Cookies",
+            "note": "Found by Describe: brings up cookies; loops above strength 0.35",
+            "prompt": "What makes you happy?",
+            "items": [{"layer": 26, "neuron": 2847, "dose": -0.3, "label": "cookie"}],
+        },
     ],
     "Qwen3-0.6B": [
-        {"name": "Hungry", "note": "Found by Describe: turns answers toward food and eating",
-         "prompt": "What should I eat for dinner tonight?", "items": [{"layer": 9, "neuron": 2578, "dose": 1.2, "label": "munch"}]},
+        {
+            "name": "Hungry",
+            "note": "Found by Describe: turns answers toward food and eating",
+            "prompt": "What should I eat for dinner tonight?",
+            "items": [{"layer": 9, "neuron": 2578, "dose": 1.2, "label": "munch"}],
+        },
     ],
 }
 
@@ -77,289 +101,313 @@ eng = Engine()
 dirs = dir_mod.Library(DATA / "directions", eng)
 probes = probe_mod.Library(DATA / "probes", eng)
 cancel = threading.Event()
+_state_lock = threading.Lock()
+_store_lock = threading.Lock()
 app = FastAPI()
 
 
-def sse(gen):
-    """Wraps an event generator as a text/event-stream; errors and cancellations become events.
+def sse(gen: Iterator[dict[str, Any]]) -> StreamingResponse:
+    """Wrap a synchronous event generator as a ``text/event-stream`` response.
 
-    The generator runs start to finish on one thread of its own. Starlette would step a plain generator through its
-    thread pool, a different thread for any step, and the engine's generators hold its lock across their yields: a
-    lock taken on one thread and let go on another is never released, and every later request for the model waits
-    on it for good."""
-    loop, out = asyncio.get_running_loop(), asyncio.Queue()
-    gone = threading.Event()  # the client went away: stop at the next event
-    put = lambda x: loop.call_soon_threadsafe(out.put_nowait, x)
-    send = lambda ev: put(f"data: {json.dumps(_finite(ev), default=_np)}\n\n")
+    The generator runs end-to-end on a single dedicated thread because engine generators hold ``eng.lock`` across
+    yields; stepping a plain sync generator across Starlette's threadpool could release the RLock on a different
+    thread than the one that acquired it.
+    """
+    loop = asyncio.get_running_loop()
+    out: asyncio.Queue[str | None] = asyncio.Queue()
+    gone = threading.Event()
 
-    def work():
+    def _put(item: str | None) -> None:
+        loop.call_soon_threadsafe(out.put_nowait, item)
+
+    def _send(event: dict[str, Any]) -> None:
+        _put(f"data: {json.dumps(_finite(event), default=_np)}\n\n")
+
+    def _work() -> None:
         cancel.clear()
-
         try:
-            for ev in gen:
+            for event in gen:
                 if gone.is_set():
                     break
-                send(ev)
+                _send(event)
         except Cancelled:
-            send({"type": "cancelled"})
-        except Exception as e:  # surface the message in the UI rather than a dead stream
-            traceback.print_exc()
-            send({"type": "error", "message": str(e)})
+            _send({"type": "cancelled"})
+        except Exception as exc:
+            logger.exception("SSE stream failed")
+            _send({"type": "error", "message": str(exc)})
         finally:
-            getattr(gen, "close", lambda: None)()  # on this thread, so any lock it holds is let go by the thread that took it
-            send({"type": "end"})
-            put(None)
+            close_fn = getattr(gen, "close", None)
+            if callable(close_fn):
+                close_fn()
+            _send({"type": "end"})
+            _put(None)
 
-    async def run():
-        threading.Thread(target=work, daemon=True).start()
+    async def _run():
+        threading.Thread(target=_work, daemon=True).start()
         try:
             while (chunk := await out.get()) is not None:
                 yield chunk
         finally:
             gone.set()
 
-    return StreamingResponse(run(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+    return StreamingResponse(_run(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
-def _finite(o):
-    """Browsers reject NaN and Infinity in JSON; send them as null."""
-    if isinstance(o, float) and not math.isfinite(o):
+def _finite(obj: Any) -> Any:
+    """Replace non-finite floats (NaN, Infinity) with ``None`` so JSON stays valid in browsers."""
+    if isinstance(obj, float) and not math.isfinite(obj):
         return None
-    if isinstance(o, dict):
-        return {k: _finite(v) for k, v in o.items()}
-    if isinstance(o, (list, tuple)):
-        return [_finite(v) for v in o]
-    return o
+    if isinstance(obj, dict):
+        return {k: _finite(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_finite(v) for v in obj]
+    return obj
 
 
-def _np(o):
-    if isinstance(o, np.generic):
-        return o.item()
-    if isinstance(o, np.ndarray):
-        return o.tolist()
-    raise TypeError(type(o))
+def _np(obj: Any) -> Any:
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError(type(obj))
 
 
 @app.middleware("http")
-async def no_store(req, call_next):  # the UI is local and edited in place; never serve it stale
+async def no_store(req: Request, call_next: Any) -> Any:
+    """Prevent browsers/WebKit from caching local static UI assets."""
     resp = await call_next(req)
     if not req.url.path.startswith("/api/"):
         resp.headers["Cache-Control"] = "no-store"
     return resp
 
 
-def need_model():
+def need_model() -> None:
+    """Raise HTTP 409 if no model is currently loaded and ready."""
     if eng.model is None or eng.status != "ready":
         raise HTTPException(409, "Load a model first (bottom left).")
 
 
-def pushes_of(body):
+def pushes_of(body: dict[str, Any]) -> list[Push]:
+    """Parse and validate enabled :class:`Push` entries from a request payload."""
     out = [Push.of(p) for p in body.get("pushes") or [] if p.get("enabled", True)]
-    L = len(eng.layers) if eng.model is not None else 0
+    num_layers = eng.num_layers if eng.model is not None else 0
 
-    for p in out:
-        if p.mode not in ("dir", "erase"):
+    for push in out:
+        if push.mode not in ("dir", "erase"):
             continue
-
-        if p.mode == "erase":
-            p.dose = min(max(p.dose, 0.0), 1.0)  # 1 = fully back to ordinary text; past that it overshoots
-        if p.dir_id not in eng.dirs:
-            raise HTTPException(409, f"This model has no direction called “{p.dir_id}”.")
-        if not all(0 <= l < L for l in p.layers) or (p.mode == "dir" and not p.layers):
-            raise HTTPException(400, f"Pick layers between 0 and {L - 1} for “{p.dir_id}”.")
+        if push.mode == "erase":
+            push.dose = min(max(push.dose, 0.0), 1.0)
+        if push.dir_id not in eng.dirs:
+            raise HTTPException(409, f"This model has no direction called “{push.dir_id}”.")
+        if not all(0 <= layer_idx < num_layers for layer_idx in push.layers) or (push.mode == "dir" and not push.layers):
+            raise HTTPException(400, f"Pick layers between 0 and {num_layers - 1} for “{push.dir_id}”.")
 
     return out
 
 
-def _reverse(p):
-    """The opposite of a push: add and direction doses flip sign, a multiplier mirrors around 1 (ablate x0 <-> double
-    x2). Erasing has no opposite: exaggerating the component at every layer compounds into noise, so it's dropped."""
-    if p.mode == "erase":
+def _reverse(push: Push) -> Push | None:
+    """Compute the opposite of ``push`` for side-by-side comparison (``erase`` has no opposite)."""
+    if push.mode == "erase":
         return None
-    if p.mode == "mul":
-        return Push(p.layer, p.neuron, 2 - p.dose, p.mode)
-    return Push(p.layer, p.neuron, -p.dose, p.mode, p.dir_id, p.layers)
+    if push.mode == "mul":
+        return Push(push.layer, push.neuron, 2 - push.dose, push.mode)
+    return Push(push.layer, push.neuron, -push.dose, push.mode, push.dir_id, push.layers)
 
 
 # ------------------------------------------------------------------ models
-LOADING = {"bytes": None}  # the size of the weights being loaded, when known (it isn't before a download)
+LOADING: dict[str, int | None] = {"bytes": None}
 
 
 @app.get("/api/status")
-def status():
+def status() -> dict[str, Any]:
     last = LAST_MODEL.read_text().strip() if LAST_MODEL.exists() else None
-    out = {**eng.info(), "progress": eng.progress, "last": last}
-
-    if eng.load_state:  # for the loading scene: the stage, and how much of each layer has arrived
+    out: dict[str, Any] = {**eng.info(), "progress": eng.progress, "last": last}
+    if eng.load_state:
         out["load"] = {**eng.load_state, "bytes": LOADING["bytes"]}
-
     return out
 
 
-# Copies of drive models on this Mac's internal disk. A USB 3 stick reads at ~0.4 GB/s against ~3 GB/s for
-# the internal SSD, and reading the weights is nearly all of a big model's load time.
 COPIES = DATA / "models"
-copy_job = {"src": None, "name": None, "done": 0, "total": 0, "status": "idle", "cancel": False}
+copy_job: dict[str, Any] = {"src": None, "name": None, "done": 0, "total": 0, "status": "idle", "cancel": False}
 
 
-def _model_files(src):
-    """Files that make up a model folder, skipping macOS ._ sidecar files and the download cache."""
+def _model_files(src: Path) -> list[Path]:
+    """Return regular non-hidden files in a model folder (skipping macOS ``._`` sidecars)."""
     return [f for f in sorted(src.iterdir()) if f.is_file() and not f.name.startswith(".")]
 
 
-def _folder_size(d):
-    return sum(f.stat().st_size for f in _model_files(d))
+def _folder_size(folder: Path) -> int:
+    return sum(f.stat().st_size for f in _model_files(folder))
 
 
-def _generates(snap):
-    """Whether a downloaded model writes text, rather than only classifying it (a zero-shot or a rejection
-    classifier, which other tools leave in the same cache)."""
+def _generates(snap: Path) -> bool:
+    """Return whether a cached Hugging Face model snapshot is a text-generating architecture."""
     try:
         archs = json.loads((snap / "config.json").read_text()).get("architectures") or []
     except (OSError, ValueError):
-        return True  # can't tell: list it, and let loading say if it doesn't work
-
-    return not archs or any(a.endswith(("ForCausalLM", "ForConditionalGeneration")) for a in archs)
+        return True
+    return not archs or any(arch.endswith(("ForCausalLM", "ForConditionalGeneration")) for arch in archs)
 
 
 @app.get("/api/models")
-def models():
-    cached = []
+def models() -> dict[str, Any]:
+    cached: list[str] = []
     if HF_CACHE.exists():
-        for d in sorted(HF_CACHE.glob("models--*")):
-            snaps = sorted(s for s in d.glob("snapshots/*") if any(s.glob("*.safetensors")))
+        for model_dir in sorted(HF_CACHE.glob("models--*")):
+            snaps = sorted(s for s in model_dir.glob("snapshots/*") if any(s.glob("*.safetensors")))
             if snaps and _generates(snaps[-1]):
-                cached.append(d.name[len("models--"):].replace("--", "/"))
+                cached.append(model_dir.name[len("models--") :].replace("--", "/"))
 
-    # models saved as plain folders on external drives: /Volumes/<drive>/models/<name>
-    copies = [{"path": str(d), "name": d.name, "size": _folder_size(d)}
-              for d in sorted(COPIES.glob("*")) if d.is_dir() and not d.name.endswith(".partial")
-              and (d / "config.json").exists()]
+    copies = [
+        {"path": str(d), "name": d.name, "size": _folder_size(d)}
+        for d in sorted(COPIES.glob("*"))
+        if d.is_dir() and not d.name.endswith(".partial") and (d / "config.json").exists()
+    ]
 
     copied = {c["name"] for c in copies}
-    local = [{"path": str(d), "name": d.name, "drive": d.parent.parent.name, "size": _folder_size(d), "copied": d.name in copied}
-             for d in sorted(Path("/Volumes").glob("*/models/*"))
-             if (d / "config.json").exists() and any(d.glob("*.safetensors"))]
+    local = [
+        {
+            "path": str(d),
+            "name": d.name,
+            "drive": d.parent.parent.name,
+            "size": _folder_size(d),
+            "copied": d.name in copied,
+        }
+        for d in sorted(Path("/Volumes").glob("*/models/*"))
+        if (d / "config.json").exists() and any(d.glob("*.safetensors"))
+    ]
 
     return {"presets": PRESETS, "cached": cached, "local": local, "copies": copies}
 
 
 @app.get("/api/models/copy")
-def copy_status():
-    return {k: v for k, v in copy_job.items() if k != "cancel"}
+def copy_status() -> dict[str, Any]:
+    with _state_lock:
+        return {k: v for k, v in copy_job.items() if k != "cancel"}
 
 
 @app.post("/api/models/copy")
-async def copy_model(req: Request):
+async def copy_model(req: Request) -> dict[str, Any]:
     body = await req.json()
-    src = Path(body["path"])
+    src = Path(body["path"]).resolve()
 
     if not (src.is_dir() and str(src).startswith("/Volumes/") and (src / "config.json").exists()):
         raise HTTPException(400, "That isn't a model folder on an external drive.")
-    if copy_job["status"] == "copying":
-        raise HTTPException(409, f"Already copying {copy_job['name']}.")
 
     files = _model_files(src)
     total = sum(f.stat().st_size for f in files)
 
     COPIES.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(COPIES).free
-    margin = 10e9  # leave room for the system and swap
+    margin = 10e9  # leave room for macOS and swap
     if free < total + margin:
-        raise HTTPException(400, f"Not enough space: the copy needs {total / 1e9:.1f} GB and this Mac has {free / 1e9:.1f} GB free.")
+        raise HTTPException(
+            400,
+            f"Not enough space: the copy needs {total / 1e9:.1f} GB and this Mac has {free / 1e9:.1f} GB free.",
+        )
 
-    copy_job.update(src=str(src), name=src.name, done=0, total=total, status="copying", cancel=False)
+    with _state_lock:
+        if copy_job["status"] == "copying":
+            raise HTTPException(409, f"Already copying {copy_job['name']}.")
+        copy_job.update(src=str(src), name=src.name, done=0, total=total, status="copying", cancel=False)
 
-    def work():
+    def _work() -> None:
         tmp, dst = COPIES / (src.name + ".partial"), COPIES / src.name
-
         try:
             shutil.rmtree(tmp, ignore_errors=True)
             tmp.mkdir(parents=True)
 
-            for f in files:
-                with open(f, "rb") as a, open(tmp / f.name, "wb") as b:
-                    while chunk := a.read(64 << 20):
-                        if copy_job["cancel"]:
-                            raise Cancelled()
-                        b.write(chunk)
-                        copy_job["done"] += len(chunk)
+            for src_file in files:
+                with open(src_file, "rb") as reader, open(tmp / src_file.name, "wb") as writer:
+                    while chunk := reader.read(64 << 20):
+                        with _state_lock:
+                            if copy_job["cancel"]:
+                                raise Cancelled()
+                        writer.write(chunk)
+                        with _state_lock:
+                            copy_job["done"] += len(chunk)
 
-            tmp.rename(dst)  # only a finished copy ever appears under its real name
-            copy_job["status"] = "done"
+            if dst.exists():
+                shutil.rmtree(dst)
+            tmp.rename(dst)
+            with _state_lock:
+                copy_job["status"] = "done"
         except Cancelled:
             shutil.rmtree(tmp, ignore_errors=True)
-            copy_job["status"] = "idle"
-        except Exception as e:
-            traceback.print_exc()
+            with _state_lock:
+                copy_job["status"] = "idle"
+        except Exception as exc:
+            logger.exception("Failed copying model %s", src)
             shutil.rmtree(tmp, ignore_errors=True)
-            copy_job["status"] = f"error: {e}"
+            with _state_lock:
+                copy_job["status"] = f"error: {exc}"
 
-    threading.Thread(target=work, daemon=True).start()
+    threading.Thread(target=_work, daemon=True).start()
     return copy_status()
 
 
 @app.post("/api/models/copy/cancel")
-def cancel_copy():
-    copy_job["cancel"] = True
+def cancel_copy() -> dict[str, bool]:
+    with _state_lock:
+        copy_job["cancel"] = True
     return {"ok": True}
 
 
 @app.post("/api/models/remove")
-async def remove_copy(req: Request):
+async def remove_copy(req: Request) -> dict[str, bool]:
     body = await req.json()
-    d = Path(body["path"]).resolve()
+    target = Path(body["path"]).resolve()
 
-    if d.parent != COPIES.resolve() or not (d / "config.json").exists():
+    if target.parent != COPIES.resolve() or not (target / "config.json").exists():
         raise HTTPException(400, "Only copies made by Lodestar can be removed here.")
-    if eng.model_id == str(d):
+    if eng.model_id == str(target):
         raise HTTPException(409, "That copy is loaded right now. Load another model first.")
 
-    shutil.rmtree(d)
+    shutil.rmtree(target)
     return {"ok": True}
 
 
 @app.post("/api/load")
-async def load(req: Request):
+async def load(req: Request) -> dict[str, Any]:
     body = await req.json()
     mid = body["model"].strip()
 
-    # checked here as well as in the UI, so nothing (a script, the API, an agent) can load past it
     fit = _fit(mid)
     if fit.get("blocked"):
-        raise HTTPException(409, f"{Path(mid).name} won't fit in memory. {fit['blocked']} Quit some apps and try "
-                                 "again.")
+        raise HTTPException(
+            409,
+            f"{Path(mid).name} won't fit in memory. {fit['blocked']} Quit some apps and try again.",
+        )
 
     LOADING["bytes"] = memory.weights_bytes(mid, HF_CACHE)
 
-    def work():
+    def _work() -> None:
         try:
             eng.load(mid, stream=fit.get("stream"))
             restore_for(mid)
             dirs.load()
             with eng.lock:
                 eng.jlens = jlens_mod.load(jlens_mod.path_for(JLENS, mid), eng)
-            LAST_MODEL.write_text(mid)
-            # computed on its own only when it can't crowd the Mac: Inkling's takes hours, so it waits to be asked
+            atomic_write_text(LAST_MODEL, mid)
+            # Compute automatically only when it won't crowd RAM; Inkling's waits to be asked explicitly.
             if eng.jlens is None and mid not in _jlens_stopped() and not eng.ink and memory.headroom(JLENS_ROOM):
                 _jlens_start()
-        except Exception as e:
-            traceback.print_exc()
-            eng.status = f"error: {e}"
+        except Exception as exc:
+            logger.exception("Failed loading model %s", mid)
+            eng.status = f"error: {exc}"
             eng.progress = None
             eng.load_state = None
 
-    threading.Thread(target=work, daemon=True).start()
-    time.sleep(0.05)
+    threading.Thread(target=_work, daemon=True).start()
+    await asyncio.sleep(0.05)
     return status()
 
 
 @app.post("/api/unload")
-def unload():
-    """Free the model's memory. It isn't opened again at the next launch either."""
+def unload() -> dict[str, Any]:
+    """Unload the active model and forget it as the last-opened model."""
     cancel.set()
-
-    with eng.lock:  # waits for a stream that's running to see the cancel and stop
+    with eng.lock:
         eng.unload()
         eng.status = "idle"
         eng.progress = None
@@ -370,53 +418,62 @@ def unload():
 
 # ------------------------------------------------------------------ memory
 @app.get("/api/memory")
-def memory_now():
+def memory_now() -> dict[str, Any]:
     return memory.snapshot()
 
 
-@app.post("/api/memory/fit")
-async def memory_fit(req: Request):
-    """Whether a model fits beside what's already running, asked before loading it."""
-    return _fit((await req.json())["model"].strip())
-
-
-def _fit(mid):
-    # loading a model unloads the one that's loaded first, so what it holds (all but the runtime's ~1 GB) comes free
+def _fit(mid: str) -> dict[str, Any]:
+    """Estimate fit for ``mid`` accounting for memory freed by unloading any currently loaded model."""
     loaded = 0
     if eng.model is not None:
         loaded = max((memory.footprint(os.getpid()) or 0) - memory.GB, 0)
-
     return memory.fit(mid, HF_CACHE, loaded)
 
 
+@app.post("/api/memory/fit")
+async def memory_fit(req: Request) -> dict[str, Any]:
+    """Estimate whether a requested model fits alongside currently running processes."""
+    return _fit((await req.json())["model"].strip())
+
+
 @app.post("/api/cancel")
-def do_cancel():
+def do_cancel() -> dict[str, bool]:
     cancel.set()
     return {"ok": True}
 
 
 # ------------------------------------------------------------------ trace
 @app.post("/api/trace")
-async def trace(req: Request):
+async def trace(req: Request) -> StreamingResponse:
     need_model()
     body = await req.json()
     pushes = pushes_of(body)
     pid = eng.chat_ids(body["prompt"])
 
-    def gen():
+    def _gen() -> Iterator[dict[str, Any]]:
         tr = eng.run_trace(pid, eng.encode(body["response"]), pushes, abl=bool(body.get("abl")))
         yield {"type": "trace", "tokens": tr["tokens"], "n_prompt": tr["n_prompt"]}
 
-    return sse(gen())
+    return sse(_gen())
 
 
-def _neuron_row(l, n, _impact, act, _t, lens_k=5):
-    lens = eng.lens(l, n, lens_k)
-    return {"layer": l, "neuron": n, "act": round(act, 3), "lens": lens["up" if act >= 0 else "down"]}
+def _neuron_row(layer_idx: int, neuron_idx: int, _impact: float, act: float, _t: int, lens_k: int = 5) -> dict[str, Any]:
+    lens = eng.lens(layer_idx, neuron_idx, lens_k)
+    return {"layer": layer_idx, "neuron": neuron_idx, "act": round(act, 3), "lens": lens["up" if act >= 0 else "down"]}
+
+
+def _decode_lens_rows(ids: np.ndarray, probs: np.ndarray) -> list[list[dict[str, Any]]]:
+    return [
+        [
+            {"tok": eng.tok.decode([int(i)]), "p": round(float(p), 4)}
+            for i, p in zip(ids[layer_idx], probs[layer_idx], strict=True)
+        ]
+        for layer_idx in range(ids.shape[0])
+    ]
 
 
 @app.get("/api/trace/token")
-def trace_token(t: int, k: int = 24):
+def trace_token(t: int, k: int = 24) -> dict[str, Any]:
     need_model()
     tr = eng.trace
 
@@ -424,112 +481,117 @@ def trace_token(t: int, k: int = 24):
         raise HTTPException(404, "no trace")
 
     top = eng.trace_top_neurons(t=t, k=k)
-    rows = lambda ids, ps: [[{"tok": eng.tok.decode([int(i)]), "p": round(float(p), 4)} for i, p in zip(ids[l], ps[l])]
-                            for l in range(ids.shape[0])]
-    j = eng.trace_jlens(t)
-
+    jlens_res = eng.trace_jlens(t)
     return {
-        "lens": rows(tr["lens_ids"][:, t, :], tr["lens_p"][:, t, :]),
-        "jlens": rows(*j) if j else None,
-        "neurons": [_neuron_row(*x) for x in top],
+        "lens": _decode_lens_rows(tr["lens_ids"][:, t, :], tr["lens_p"][:, t, :]),
+        "jlens": _decode_lens_rows(*jlens_res) if jlens_res else None,
+        "neurons": [_neuron_row(*row) for row in top],
     }
 
 
 # ------------------------------------------------------------------ J-lens
-# Each model's lens is computed once, in the background, the first time the model loads; Stop is remembered (in
-# JLENS/stopped.json) so it doesn't start again on every load, and Inspect's Compute starts it by hand.
-jlens_job = {"model": None, "status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
+jlens_job: dict[str, Any] = {"model": None, "status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
 jlens_cancel = threading.Event()
-jlens_thread = None
+jlens_thread: threading.Thread | None = None
 JLENS_STOPPED = JLENS / "stopped.json"
 JLENS_ROOM = 4 * memory.GB  # free memory its backward passes need beside the model
 
 
-def _jlens_stopped():
+def _jlens_stopped() -> set[str]:
     try:
         return set(json.loads(JLENS_STOPPED.read_text()))
     except (OSError, ValueError):
         return set()
 
 
-def _jlens_mark_stopped(mid, stopped):
-    ids = _jlens_stopped() - {mid} | ({mid} if stopped else set())
-    JLENS.mkdir(parents=True, exist_ok=True)
-    JLENS_STOPPED.write_text(json.dumps(sorted(ids)))
+def _jlens_mark_stopped(mid: str, stopped: bool) -> None:
+    with _store_lock:
+        ids = _jlens_stopped() - {mid} | ({mid} if stopped else set())
+        atomic_write_json(JLENS_STOPPED, sorted(ids), indent=None)
 
 
-def _jlens_start():
-    """Computes the loaded model's J-lens in a background thread (minutes; see interp/jlens.py) and saves it. A
-    job for a model that has since been unloaded is let finish cancelling first."""
+def _jlens_start() -> None:
+    """Compute the loaded model's J-lens in a background thread and save it to disk."""
     global jlens_thread
     if jlens_thread is not None and jlens_thread.is_alive():
-        if jlens_job["model"] == eng.model_id:
-            return
+        with _state_lock:
+            if jlens_job["model"] == eng.model_id:
+                return
         jlens_cancel.set()
         jlens_thread.join()
 
     mid = eng.model_id
     jlens_cancel.clear()
-    jlens_job.update(model=mid, status="computing", done=0, total=eng.hidden, elapsed=0.0, short=False)
+    with _state_lock:
+        jlens_job.update(model=mid, status="computing", done=0, total=eng.hidden, elapsed=0.0, short=False)
 
-    def prog(done, total, elapsed):
-        jlens_job.update(done=done, total=total, elapsed=round(elapsed, 1))
-        if not memory.headroom(memory.GB):  # stop before the backward passes push macOS into swap
-            jlens_job["short"] = True
-            jlens_cancel.set()
+    def _prog(done: int, total: int, elapsed: float) -> None:
+        with _state_lock:
+            jlens_job.update(done=done, total=total, elapsed=round(elapsed, 1))
+            if not memory.headroom(memory.GB):  # stop before backward passes push macOS into swap
+                jlens_job["short"] = True
+                jlens_cancel.set()
 
-    def work():
+    def _work() -> None:
         try:
-            J = jlens_mod.compute(eng, jlens_cancel, prog)
-            jlens_mod.save(J, jlens_mod.path_for(JLENS, mid))
+            jacobians = jlens_mod.compute(eng, jlens_cancel, _prog)
+            jlens_mod.save(jacobians, jlens_mod.path_for(JLENS, mid))
             with eng.lock:
                 if eng.model_id == mid:
-                    eng.jlens = J.to(eng.dev, eng.model.dtype)
-            jlens_job["status"] = "done"
+                    eng.jlens = jacobians.to(eng.dev, eng.model.dtype)
+            with _state_lock:
+                jlens_job["status"] = "done"
         except Cancelled:
-            jlens_job["status"] = "error: Stopped: the Mac was running short of memory." if jlens_job.get("short") \
-                else "idle"
-        except Exception as e:
-            traceback.print_exc()
-            jlens_job["status"] = f"error: {e}"
-            _jlens_mark_stopped(mid, True)  # don't try again on every load
+            with _state_lock:
+                jlens_job["status"] = (
+                    "error: Stopped: the Mac was running short of memory." if jlens_job.get("short") else "idle"
+                )
+        except Exception as exc:
+            logger.exception("J-lens computation failed for %s", mid)
+            with _state_lock:
+                jlens_job["status"] = f"error: {exc}"
+            _jlens_mark_stopped(mid, True)
 
-    jlens_thread = threading.Thread(target=work, daemon=True)
+    jlens_thread = threading.Thread(target=_work, daemon=True)
     jlens_thread.start()
 
 
 @app.get("/api/jlens")
-def jlens_status():
-    job = jlens_job if jlens_job["model"] == eng.model_id else {"status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
+def jlens_status() -> dict[str, Any]:
+    with _state_lock:
+        job = dict(jlens_job) if jlens_job["model"] == eng.model_id else {"status": "idle", "done": 0, "total": 0, "elapsed": 0.0}
     return {"ready": eng.jlens is not None, **{k: v for k, v in job.items() if k not in ("model", "short")}}
 
 
 @app.post("/api/jlens/compute")
-def jlens_compute():
+def jlens_compute() -> dict[str, Any]:
     need_model()
     if not memory.headroom(JLENS_ROOM):
-        raise HTTPException(409, "Not enough free memory to compute the J-lens beside the model. Quit some apps and "
-                                 "try again.")
+        raise HTTPException(
+            409,
+            "Not enough free memory to compute the J-lens beside the model. Quit some apps and try again.",
+        )
     _jlens_mark_stopped(eng.model_id, False)
     _jlens_start()
     return jlens_status()
 
 
 @app.post("/api/jlens/cancel")
-def jlens_stop():
-    if jlens_job["status"] == "computing":
-        _jlens_mark_stopped(jlens_job["model"], True)
+def jlens_stop() -> dict[str, bool]:
+    with _state_lock:
+        computing_model = jlens_job["model"] if jlens_job["status"] == "computing" else None
+    if computing_model:
+        _jlens_mark_stopped(computing_model, True)
     jlens_cancel.set()
     return {"ok": True}
 
 
 # ------------------------------------------------------------------ architecture
-# The Architecture page: the model's real structure (described once per model), and text run through it.
-arch_cache = {}
+arch_cache: dict[str, dict[str, Any]] = {}
 
 
 @app.get("/api/arch")
-def arch_detail():
+def arch_detail() -> dict[str, Any]:
     need_model()
     if eng.model_id not in arch_cache:
         arch_cache.clear()
@@ -538,38 +600,37 @@ def arch_detail():
 
 
 @app.get("/api/arch/neurons")
-def arch_neurons(layer: int):
+def arch_neurons(layer: int) -> dict[str, Any]:
     need_model()
-    if not 0 <= layer < len(eng.layers):
-        raise HTTPException(400, f"layer must be 0..{len(eng.layers) - 1}")
+    if not 0 <= layer < eng.num_layers:
+        raise HTTPException(400, f"layer must be 0..{eng.num_layers - 1}")
     return {"layer": layer, "norms": archview.neuron_norms(eng, layer)}
 
 
 @app.post("/api/arch/run")
-async def arch_run(req: Request):
-    """The text as a chat message: the model's reply streams in as it's written, each piece with a frame of what every
-    layer did to choose it, then the prompt and the reply go through once more to record every layer at each token."""
+async def arch_run(req: Request) -> StreamingResponse:
+    """Stream a chat reply with live per-token layer frames, followed by a full traced forward pass."""
     need_model()
     text = (await req.json()).get("text", "").strip()
     if not text:
         raise HTTPException(400, "Type some text to run through the model.")
     pid = eng.chat_ids(text)
 
-    def gen():
-        reply = []
-        with archview.Live(eng) as live:  # each piece of text comes with what every layer did to choose it
-            for r, x in eng.generate([(pid, [])], max_new=archview.REPLY_TOKENS, cancel=cancel):
-                if r is None:
-                    reply = x[0]
+    def _gen() -> Iterator[dict[str, Any]]:
+        reply: list[int] = []
+        with archview.Live(eng) as live:
+            for row_idx, payload in eng.generate([(pid, [])], max_new=archview.REPLY_TOKENS, cancel=cancel):
+                if row_idx is None:
+                    reply = payload[0]
                 else:
-                    yield {"type": "delta", "text": x, "frame": live.frame()}
+                    yield {"type": "delta", "text": payload, "frame": live.frame()}
         yield {"type": "run", **archview.run(eng, pid + reply, len(pid))}
 
-    return sse(gen())
+    return sse(_gen())
 
 
 @app.get("/api/arch/acts")
-def arch_acts(t: int):
+def arch_acts(t: int) -> dict[str, Any]:
     need_model()
     out = archview.acts(eng, t)
     if out is None:
@@ -578,110 +639,124 @@ def arch_acts(t: int):
 
 
 @app.get("/api/arch/neuron")
-def arch_neuron(layer: int, n: int):
+def arch_neuron(layer: int, n: int) -> dict[str, Any]:
     need_model()
-    L, N = eng.dnorm.shape
-    if not (0 <= layer < L and 0 <= n < N):
-        raise HTTPException(400, f"layer must be 0..{L - 1}, neuron 0..{N - 1}")
+    num_layers, num_neurons = eng.num_layers, eng.num_neurons
+    if not (0 <= layer < num_layers and 0 <= n < num_neurons):
+        raise HTTPException(400, f"layer must be 0..{num_layers - 1}, neuron 0..{num_neurons - 1}")
     with eng.lock:
         norm = round(float(eng.dnorm[layer, n]), 4)
-    return {"layer": layer, "neuron": n, "norm": norm, "lens": eng.lens(layer, n, 10),
-            "acts": archview.neuron_trace(eng, layer, n)}
+    return {
+        "layer": layer,
+        "neuron": n,
+        "norm": norm,
+        "lens": eng.lens(layer, n, 10),
+        "acts": archview.neuron_trace(eng, layer, n),
+    }
 
 
 # ------------------------------------------------------------------ neurons
 @app.get("/api/neuron")
-def neuron(layer: int, n: int):
+def neuron(layer: int, n: int) -> dict[str, Any]:
     need_model()
-    L, N = eng.dnorm.shape
+    num_layers, num_neurons = eng.num_layers, eng.num_neurons
+    if not (0 <= layer < num_layers and 0 <= n < num_neurons):
+        raise HTTPException(400, f"layer must be 0..{num_layers - 1}, neuron 0..{num_neurons - 1}")
 
-    if not (0 <= layer < L and 0 <= n < N):
-        raise HTTPException(400, f"layer must be 0..{L - 1}, neuron 0..{N - 1}")
-
-    out = {"layer": layer, "neuron": n, "lens": eng.lens(layer, n, 16)}
-
+    out: dict[str, Any] = {"layer": layer, "neuron": n, "lens": eng.lens(layer, n, 16)}
     tr = eng.trace
     if tr is not None:
-        a = tr["acts"][layer, :, n].astype(np.float32)
-        out["trace"] = {"tokens": tr["tokens"], "n_prompt": tr["n_prompt"], "acts": np.round(a, 3).tolist()}
-
+        acts = tr["acts"][layer, :, n].astype(np.float32)
+        out["trace"] = {"tokens": tr["tokens"], "n_prompt": tr["n_prompt"], "acts": np.round(acts, 3).tolist()}
     return out
 
 
 @app.get("/api/examples")
-def examples():
+def examples() -> list[dict[str, Any]]:
     need_model()
-    name = eng.model_id.rstrip("/").split("/")[-1]
-    shipped = [{"name": e["name"], "note": e["about"], "prompt": (e["try"] or [""])[0], "items": [], "file": e["file"]}
-               for e in exp_mod.examples("steer") if exp_mod.model_name(e["model"]) == exp_mod.model_name(name)]
+    name = model_short_name(eng.model_id)
+    shipped = [
+        {"name": e["name"], "note": e["about"], "prompt": (e["try"] or [""])[0], "items": [], "file": e["file"]}
+        for e in exp_mod.examples("steer")
+        if exp_mod.model_name(e["model"]) == exp_mod.model_name(name)
+    ]
     return EXAMPLES.get(name, []) + shipped
 
 
 @app.get("/api/search")
-def search_word(word: str, k: int = 24, skip_last: int = 0):
-    """Neurons that push the model toward a word."""
+def search_word(word: str, k: int = 24, skip_last: int = 0) -> dict[str, Any]:
+    """Find neurons whose down-projection pushes the model toward ``word``."""
     need_model()
+    cleaned = word.strip()
 
     out = []
-    for l, n, sc in eng.neurons_for_word(word.strip(), k, skip_last):
-        lens = eng.lens(l, n, 6)
-        out.append({"layer": l, "neuron": n, "score": round(sc, 3), "lens": lens["up" if sc > 0 else "down"]})
+    for layer_idx, neuron_idx, score in eng.neurons_for_word(cleaned, k, skip_last):
+        lens = eng.lens(layer_idx, neuron_idx, 6)
+        out.append({"layer": layer_idx, "neuron": neuron_idx, "score": round(score, 3), "lens": lens["up" if score > 0 else "down"]})
 
-    first = eng.tok(" " + word.strip(), add_special_tokens=False).input_ids[0]
-    return {"results": out, "partial": eng.last_search_partial, "piece": eng.tok.decode([first]).strip()}
+    first_ids = eng.tok(" " + cleaned, add_special_tokens=False).input_ids
+    piece = eng.tok.decode([first_ids[0]]).strip() if first_ids else ""
+    return {"results": out, "partial": eng.last_search_partial, "piece": piece}
 
 
 # ------------------------------------------------------------------ steering
 @app.post("/api/steer")
-async def steer(req: Request):
-    """Side by side: the pushes as given, the unsteered model, and (optionally) every push reversed. With `history`,
-    the conversation so far (user and assistant turns) comes before the prompt."""
+async def steer(req: Request) -> StreamingResponse:
+    """Stream side-by-side steered, baseline, and optionally reversed/ablated replies."""
     need_model()
     body = await req.json()
     pushes = pushes_of(body)
-    history = [{"role": m["role"], "content": str(m["content"])} for m in body.get("history") or []
-               if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()]
-    pid = eng.messages_ids(history + [{"role": "user", "content": body["prompt"]}]) if history else eng.chat_ids(body["prompt"])
+    history = [
+        {"role": m["role"], "content": str(m["content"])}
+        for m in body.get("history") or []
+        if m.get("role") in ("user", "assistant") and str(m.get("content", "")).strip()
+    ]
+    pid = (
+        eng.messages_ids([*history, {"role": "user", "content": body["prompt"]}])
+        if history
+        else eng.chat_ids(body["prompt"])
+    )
 
     cols = body.get("columns", ["up", "base", "down"])
-    inv = [q for q in map(_reverse, pushes) if q is not None]
+    inv = [rev for p in pushes if (rev := _reverse(p)) is not None]
 
-    # "abl" erases the model's refusal direction with no neuron pushes; when ablation is on, the changed column
-    # carries it too and the normal/opposite columns stay untouched
     active = bool(abl_now().get("active"))
     ablated = {"abl": True, "up": active, "base": False, "down": False}
 
-    rows, flags = [], []
-    for c in cols:
-        rows.append((pid, {"up": pushes, "abl": [], "base": [], "down": inv}[c]))
-        flags.append(ablated[c])
+    rows: list[tuple[list[int], list[Push]]] = []
+    flags: list[bool] = []
+    for col in cols:
+        rows.append((pid, {"up": pushes, "abl": [], "base": [], "down": inv}[col]))
+        flags.append(ablated[col])
 
     abl_flags = flags if any(flags) else None
+    max_new = int(body.get("max_new", 160))
 
-    def gen():
-        for r, x in eng.generate(rows, max_new=int(body.get("max_new", 160)), cancel=cancel, abl=abl_flags):
-            if r is None:
+    def _gen() -> Iterator[dict[str, Any]]:
+        for row_idx, delta in eng.generate(rows, max_new=max_new, cancel=cancel, abl=abl_flags):
+            if row_idx is None:
                 break
-            yield {"type": "delta", "col": cols[r], "delta": x}
+            yield {"type": "delta", "col": cols[row_idx], "delta": delta}
 
-    return sse(gen())
+    return sse(_gen())
 
 
 @app.post("/api/chat")
-async def chat(req: Request):
-    """One assistant turn of a conversation, with the neurons that are on and (optionally) the refusal direction
-    erased. With `rows`, several versions of the conversation at once, each with its own pushes and erasure (Compare):
-    they decode in one batch and every delta says which row it belongs to. With `continue`, each conversation ends in
-    the reply so far, and the model carries on writing it. The last event says which replies ran out of length."""
+async def chat(req: Request) -> StreamingResponse:
+    """Stream one or more parallel chat completions with optional steering, ablation, continuation, and gauges."""
     need_model()
     body = await req.json()
     multi, more = "rows" in body, bool(body.get("continue"))
     specs = body["rows"] if multi else [body]
 
-    rows, flags = [], []
+    rows: list[tuple[list[int], list[Push]]] = []
+    flags: list[bool] = []
     for spec in specs:
-        msgs = [{"role": m["role"], "content": str(m["content"])} for m in spec.get("messages") or []
-                if m.get("role") in ("system", "user", "assistant") and str(m.get("content", "")).strip()]
+        msgs = [
+            {"role": m["role"], "content": str(m["content"])}
+            for m in spec.get("messages") or []
+            if m.get("role") in ("system", "user", "assistant") and str(m.get("content", "")).strip()
+        ]
 
         if more:
             if len(msgs) < 2 or msgs[-1]["role"] != "assistant":
@@ -696,162 +771,196 @@ async def chat(req: Request):
         flags.append(bool(spec.get("abl")) and eng.abl_vec is not None)
 
     max_new = int(body.get("max_new", 512))
-    read = [str(d) for d in body.get("read") or [] if str(d) in eng.dirs]  # gauges: directions to read as it writes
+    temperature = float(body.get("temperature", 0.7))
+    read = [str(d) for d in body.get("read") or [] if str(d) in eng.dirs]
 
-    def gen():
-        for r, x in eng.generate(rows, max_new=max_new, temperature=float(body.get("temperature", 0.7)),
-                                 cancel=cancel, seed=int(time.time()), abl=flags, read=read or None):
-            if r is None:
-                cut = [len(ids) >= max_new for ids in x]  # wrote to the limit without reaching its end
+    def _gen() -> Iterator[dict[str, Any]]:
+        for row_idx, payload in eng.generate(
+            rows,
+            max_new=max_new,
+            temperature=temperature,
+            cancel=cancel,
+            seed=int(time.time()),
+            abl=flags,
+            read=read or None,
+        ):
+            if row_idx is None:
+                cut = [len(ids) >= max_new for ids in payload]
                 yield {"type": "done", "cut": cut if multi else cut[0]}
                 break
 
-            ev = {"type": "delta", "row": r} if multi else {"type": "delta"}
+            ev: dict[str, Any] = {"type": "delta", "row": row_idx} if multi else {"type": "delta"}
             if read:
-                ev |= {"delta": x[0], "read": x[1]}  # per token in the delta, one reading per gauged direction
+                ev["delta"], ev["read"] = payload
             else:
-                ev["delta"] = x
+                ev["delta"] = payload
             yield ev
 
-    return sse(gen())
+    return sse(_gen())
 
 
 # ------------------------------------------------------------------ abliterate
-def _probes():
+def _probes() -> dict[str, list[str]]:
     custom = json.loads(PROBES_FILE.read_text()) if PROBES_FILE.exists() else {}
-    return {"harmful": custom.get("harmful") or abl_mod.DEFAULT_HARMFUL,
-            "harmless": custom.get("harmless") or abl_mod.DEFAULT_HARMLESS}
+    return {
+        "harmful": custom.get("harmful") or abl_mod.DEFAULT_HARMFUL,
+        "harmless": custom.get("harmless") or abl_mod.DEFAULT_HARMLESS,
+    }
 
 
-def _abl_all():
+def _abl_all() -> dict[str, Any]:
     return json.loads(ABL_FILE.read_text()) if ABL_FILE.exists() else {}
 
 
-def _abl_save(all_d):
-    ABL_FILE.write_text(json.dumps(all_d, indent=1))
+def _abl_save(all_data: dict[str, Any]) -> None:
+    atomic_write_json(ABL_FILE, all_data, indent=1, ensure_ascii=True)
 
 
-def abl_now():
-    """The stored direction + state for the currently loaded model ({} when none)."""
+def abl_now() -> dict[str, Any]:
+    """Return the stored refusal direction and state for the loaded model, or ``{}``."""
     return (_abl_all().get(eng.model_id) or {}) if eng.model_id else {}
 
 
-def _scoped(entry):
-    """The saved category when refusals are erased for it only, else None."""
+def _scoped(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the saved category config when refusal erasure is category-scoped, else ``None``."""
     cat = entry.get("category")
     return cat if cat and entry.get("scope") == "category" else None
 
 
-def _apply(entry):
-    """Put a saved entry on the engine: the refusal direction at its strength, gated to its category when scoped."""
+def _apply(entry: dict[str, Any]) -> None:
+    """Install a saved abliteration entry onto the live engine."""
     cat = _scoped(entry)
     eng.abl_of(entry["vec"], (cat or entry).get("coef", 1.0), entry.get("layer"))
     eng.gate_of(cat["gate"] if cat else None)
 
 
-def _baked(entry):
-    """What a saved copy erases from its weights, (vec, coef): the refusal direction, or with a category, the
-    weight-only version of it. None when that category has none."""
+def _baked(entry: dict[str, Any]) -> tuple[list[float], float] | None:
+    """Return ``(vec, coef)`` to orthogonalize into weights, or ``None`` if a category lacks weights."""
     cat = _scoped(entry)
     if not cat:
         return [float(x) for x in entry["vec"]], float(entry.get("coef", 1.0))
-    w = cat.get("weights")
-    return ([float(x) for x in w["vec"]], float(w["coef"])) if w else None
+    weights = cat.get("weights")
+    return ([float(x) for x in weights["vec"]], float(weights["coef"])) if weights else None
 
 
-def restore_for(mid):
-    """Re-apply a saved refusal direction after a model loads, so the state feels like a modified model."""
-    d = _abl_all().get(mid)
-    if d:
-        _apply(d)
+def restore_for(mid: str) -> None:
+    """Re-apply a saved refusal direction after loading ``mid``."""
+    entry = _abl_all().get(mid)
+    if entry:
+        _apply(entry)
 
 
-def _cat_info(cat):
-    """A saved category as the UI sees it: everything but the vectors."""
+def _cat_info(cat: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Format a saved category entry for the frontend without raw vectors."""
     if not cat:
         return None
-    w = cat.get("weights")
+    weights = cat.get("weights")
     return {k: cat.get(k) for k in ("name", "prompts", "coef", "test")} | {
-        "gate_layer": cat["gate"]["layer"], "weights": {k: v for k, v in w.items() if k != "vec"} if w else None}
+        "gate_layer": cat["gate"]["layer"],
+        "weights": {k: v for k, v in weights.items() if k != "vec"} if weights else None,
+    }
 
 
 @app.get("/api/abl")
-def abl_info():
+def abl_info() -> dict[str, Any]:
     entry = abl_now()
-    entry = entry if entry else {}
-    return {"model": eng.model_id, "probes": _probes(),
-            "defaults": {"harmful": abl_mod.DEFAULT_HARMFUL, "harmless": abl_mod.DEFAULT_HARMLESS},
-            "current": None if not entry else {"layer": entry.get("layer"), "coef": (_scoped(entry) or entry).get("coef", 1.0),
-                                               "active": entry.get("active", False), "clean": entry.get("clean", False),
-                                               "scope": "category" if _scoped(entry) else "all",
-                                               "category": _cat_info(entry.get("category"))},
-            "ready": bool(entry) and eng.abl_vec is not None}
+    return {
+        "model": eng.model_id,
+        "probes": _probes(),
+        "defaults": {"harmful": abl_mod.DEFAULT_HARMFUL, "harmless": abl_mod.DEFAULT_HARMLESS},
+        "current": None
+        if not entry
+        else {
+            "layer": entry.get("layer"),
+            "coef": (_scoped(entry) or entry).get("coef", 1.0),
+            "active": entry.get("active", False),
+            "clean": entry.get("clean", False),
+            "scope": "category" if _scoped(entry) else "all",
+            "category": _cat_info(entry.get("category")),
+        },
+        "ready": bool(entry) and eng.abl_vec is not None,
+    }
 
 
 @app.post("/api/abl/probes")
-async def abl_probes(req: Request):
+async def abl_probes(req: Request) -> dict[str, list[str]]:
     body = await req.json()
-    merger = json.loads(PROBES_FILE.read_text()) if PROBES_FILE.exists() else {}
-    merger.update({k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()]
-                   for k in ("harmful", "harmless")})
-    PROBES_FILE.write_text(json.dumps(merger, indent=1))
+    with _store_lock:
+        merger = json.loads(PROBES_FILE.read_text()) if PROBES_FILE.exists() else {}
+        merger.update(
+            {k: [str(x).strip() for x in body.get(k) or [] if str(x).strip()] for k in ("harmful", "harmless")}
+        )
+        atomic_write_json(PROBES_FILE, merger, indent=1, ensure_ascii=True)
     return _probes()
 
 
 @app.post("/api/abl/analyze")
-async def abl_analyze(req: Request):
+async def abl_analyze(req: Request) -> StreamingResponse:
     need_model()
     body = await req.json() if req.headers.get("content-length", "0") not in ("", "0", None) else {}
-    probes = {k: [str(x) for x in (body.get(k) or []) if str(x).strip()] for k in ("harmful", "harmless")}
-    probes = {k: v for k, v in probes.items()} if any(probes.values()) else _probes()
+    custom = {k: [str(x) for x in (body.get(k) or []) if str(x).strip()] for k in ("harmful", "harmless")}
+    probes = custom if any(custom.values()) else _probes()
 
-    def gen():
+    def _gen() -> Iterator[dict[str, Any]]:
         final = None
         for ev in abl_mod.analyze(eng, probes["harmful"], probes["harmless"], cancel):
             if ev.get("type") == "result":
                 final = ev
-                ev = {k: v for k, v in ev.items() if k != "vec"}  # the direction itself stays here
+                ev = {k: v for k, v in ev.items() if k != "vec"}
             yield ev
 
         if final:
-            all_d = _abl_all()
-            all_d[eng.model_id] = {"vec": final["vec"], "layer": final["layer"], "coef": final["coef"],
-                                   "active": True, "clean": final["clean"], "ts": time.time()}
-            _abl_save(all_d)  # a new refusal direction: a category gated on the old one starts over
-            _apply(all_d[eng.model_id])
+            with _store_lock:
+                all_d = _abl_all()
+                all_d[eng.model_id] = {
+                    "vec": final["vec"],
+                    "layer": final["layer"],
+                    "coef": final["coef"],
+                    "active": True,
+                    "clean": final["clean"],
+                    "ts": time.time(),
+                }
+                _abl_save(all_d)
+                _apply(all_d[eng.model_id])
 
-    return sse(gen())
+    return sse(_gen())
 
 
 @app.post("/api/abl/state")
-async def abl_state(req: Request):
-    """Turn the saved direction on/off or re-tune its strength. Requires an analyzed model."""
+async def abl_state(req: Request) -> dict[str, Any]:
+    """Toggle the saved refusal direction, switch scope, or adjust erasure strength."""
     need_model()
     body = await req.json()
-    all_d = _abl_all()
-    entry = all_d.get(eng.model_id)
 
-    if not entry:
-        raise HTTPException(409, "Run the analysis first.")
+    with _store_lock:
+        all_d = _abl_all()
+        entry = all_d.get(eng.model_id)
+        if not entry:
+            raise HTTPException(409, "Run the analysis first.")
 
-    if body.get("scope") in ("all", "category"):
-        if body["scope"] == "category" and not entry.get("category"):
-            raise HTTPException(409, "Find a category first.")
-        entry["scope"] = body["scope"]
-    if "coef" in body:
-        (_scoped(entry) or entry)["coef"] = max(0.1, min(2.0, float(body["coef"])))
-    if "active" in body:
-        entry["active"] = bool(body["active"])
+        if body.get("scope") in ("all", "category"):
+            if body["scope"] == "category" and not entry.get("category"):
+                raise HTTPException(409, "Find a category first.")
+            entry["scope"] = body["scope"]
+        if "coef" in body:
+            (_scoped(entry) or entry)["coef"] = max(0.1, min(2.0, float(body["coef"])))
+        if "active" in body:
+            entry["active"] = bool(body["active"])
 
-    _abl_save(all_d)
-    _apply(entry)
-    return {"ok": True, "coef": (_scoped(entry) or entry).get("coef", 1.0),
-            "scope": "category" if _scoped(entry) else "all", **{k: entry.get(k) for k in ("layer", "active")}}
+        _abl_save(all_d)
+        _apply(entry)
+
+    return {
+        "ok": True,
+        "coef": (_scoped(entry) or entry).get("coef", 1.0),
+        "scope": "category" if _scoped(entry) else "all",
+        **{k: entry.get(k) for k in ("layer", "active")},
+    }
 
 
 @app.post("/api/abl/category")
-async def abl_category(req: Request):
-    """Find a gate that erases refusals only for one category of requests, and a version of it for the weights."""
+async def abl_category(req: Request) -> StreamingResponse:
+    """Fit a category-scoped refusal gate and an experimental weight-only direction."""
     need_model()
     entry = abl_now()
     if not entry or not entry.get("vec"):
@@ -862,32 +971,42 @@ async def abl_category(req: Request):
     prompts = [str(p).strip() for p in body.get("prompts") or [] if str(p).strip()]
     probes = _probes()
 
-    def gen():
+    def _gen() -> Iterator[dict[str, Any]]:
         final = None
-        for ev in abl_mod.category(eng, prompts, probes["harmful"], probes["harmless"], entry["vec"],
-                                   float(entry.get("coef", 1.0)), cancel):
+        for ev in abl_mod.category(
+            eng, prompts, probes["harmful"], probes["harmless"], entry["vec"], float(entry.get("coef", 1.0)), cancel
+        ):
             if ev.get("type") == "result":
                 final = ev
                 ev = {k: v for k, v in ev.items() if k != "gate"} | {
-                    "weights": {k: v for k, v in ev["weights"].items() if k != "vec"}}
+                    "weights": {k: v for k, v in ev["weights"].items() if k != "vec"}
+                }
             yield ev
 
         if final:
-            all_d = _abl_all()
-            e = all_d[eng.model_id]
-            test = {k: final[k] for k in ("inside", "outside", "base_in", "base_out", "gate_test", "gate_acc")}
-            e["category"] = {"name": name, "prompts": prompts, "gate": final["gate"], "coef": final["coef"],
-                             "weights": final["weights"], "test": test, "ts": time.time()}
-            e["scope"], e["active"] = "category", True
-            _abl_save(all_d)
-            _apply(e)
+            with _store_lock:
+                all_d = _abl_all()
+                e = all_d[eng.model_id]
+                test = {k: final[k] for k in ("inside", "outside", "base_in", "base_out", "gate_test", "gate_acc")}
+                e["category"] = {
+                    "name": name,
+                    "prompts": prompts,
+                    "gate": final["gate"],
+                    "coef": final["coef"],
+                    "weights": final["weights"],
+                    "test": test,
+                    "ts": time.time(),
+                }
+                e["scope"], e["active"] = "category", True
+                _abl_save(all_d)
+                _apply(e)
 
-    return sse(gen())
+    return sse(_gen())
 
 
 @app.post("/api/abl/category/suggest")
-async def abl_category_suggest(req: Request):
-    """Have the model write requests in a category, refusals erased, to fill in the list the category is found from."""
+async def abl_category_suggest(req: Request) -> StreamingResponse:
+    """Ask the loaded model to write novel requests belonging to a named category."""
     need_model()
     body = await req.json()
     name = str(body.get("name") or "").strip()[:60]
@@ -898,99 +1017,109 @@ async def abl_category_suggest(req: Request):
 
 
 @app.post("/api/abl/test")
-async def abl_test(req: Request):
-    """Generate on a few probes, plain beside ablated, then measure refusal rates and the fluency cost."""
+async def abl_test(req: Request) -> StreamingResponse:
+    """Compare plain and ablated replies on test probes and measure refusal rates and fluency cost."""
     need_model()
     if eng.abl_vec is None:
         raise HTTPException(409, "Analyse the model first: there is no direction to erase yet.")
     body = await req.json()
     probes = [str(p).strip() for p in (body.get("probes") or []) if str(p).strip()][:4] or abl_mod.EXAMPLE_PROMPTS
 
-    n = len(probes)
-    rows = []
-    for p in probes:
-        pid = eng.chat_ids(p)
-        rows += [(pid, []), (pid, [])]
+    n_probes = len(probes)
+    rows: list[tuple[list[int], list[Push]]] = []
+    for prompt in probes:
+        pid = eng.chat_ids(prompt)
+        rows.extend([(pid, []), (pid, [])])
 
-    fl = [i % 2 == 1 for i in range(2 * n)]
+    flags = [i % 2 == 1 for i in range(2 * n_probes)]
 
-    def gen():
-        texts = [""] * (2 * n)
-        for r, dx in eng.generate(rows, max_new=160, temperature=0, cancel=cancel, abl=fl):
-            if r is None:
+    def _gen() -> Iterator[dict[str, Any]]:
+        texts = [""] * (2 * n_probes)
+        for row_idx, delta in eng.generate(rows, max_new=160, temperature=0, cancel=cancel, abl=flags):
+            if row_idx is None:
                 break
-            texts[r] += dx
-            yield {"type": "delta", "probe": r // 2, "kind": "base" if r % 2 == 0 else "abl", "delta": dx}
+            texts[row_idx] += delta
+            yield {"type": "delta", "probe": row_idx // 2, "kind": "base" if row_idx % 2 == 0 else "abl", "delta": delta}
 
-        opened = eng.last_gate[1::2] if eng.last_gate else None  # with a category: whether each probe was in it
-        refused = abl_mod.refused(texts)
+        opened = eng.last_gate[1::2] if eng.last_gate else None
+        verdicts = abl_mod.refused(texts)
         nll0 = float(eng.reference_nll([[]], cancel, abl=[False])[0])
-        # with a gate, ordinary text is outside its category and gets the model as it is
         nll1 = nll0 if eng.abl_gate is not None else float(eng.reference_nll([[]], cancel, abl=[True])[0])
-        yield {"type": "result", "refused": [refused[i::2] for i in (0, 1)], "nll": [nll0, nll1], "gate": opened}
+        yield {"type": "result", "refused": [verdicts[i::2] for i in (0, 1)], "nll": [nll0, nll1], "gate": opened}
 
-    return sse(gen())
-
-
-# saved copies of edited weights (refusals erased, steering built in), made from the currently loaded model
-export_job = {"kind": None, "name": None, "dst": None, "status": "idle", "done": 0, "total": 0, "msg": "",
-              "cancel": False}
+    return sse(_gen())
 
 
-def _clean_name(raw):
+export_job: dict[str, Any] = {
+    "kind": None,
+    "name": None,
+    "dst": None,
+    "status": "idle",
+    "done": 0,
+    "total": 0,
+    "msg": "",
+    "cancel": False,
+}
+
+
+def _clean_name(raw: Any) -> str:
     return re.sub(r"[^A-Za-z0-9._ -]+", "", str(raw or "")).strip(" .")
 
 
-def _start_export(kind, name, **edits):
-    """Write an edited copy of the loaded model into COPIES/name on a background thread; see abl_mod.bake."""
-    if export_job["status"] == "working":
-        raise HTTPException(409, f"Already writing {export_job['name']}.")
-    if eng.ink:
-        # its experts are 4-bit, and the loop's message gates and convs sit between every write and the stream, so
-        # an edit can't go into the weights exactly; it works live in the app and through the API instead
-        raise HTTPException(409, "Inkling can't be saved as an edited copy: use it live here or through the API.")
+def _start_export(kind: str, name: str, **edits: Any) -> dict[str, Any]:
+    """Bake an edited copy of the active model into ``COPIES/name`` on a background thread."""
+    with _state_lock:
+        if export_job["status"] == "working":
+            raise HTTPException(409, f"Already writing {export_job['name']}.")
+        if eng.ink:
+            raise HTTPException(409, "Inkling can't be saved as an edited copy: use it live here or through the API.")
+        export_job.update(kind=kind, name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
 
-    export_job.update(kind=kind, name=name, dst=None, status="working", done=0, total=0, msg="Starting…", cancel=False)
-
-    def work():
+    def _work() -> None:
         tmp, dst = COPIES / (name + ".partial"), COPIES / name
-
         try:
-            if dst.exists():
-                shutil.rmtree(dst)
             shutil.rmtree(tmp, ignore_errors=True)
             tmp.mkdir(parents=True)
 
-            def prog(done, total, msg):
+            def _prog(done: int, total: int, msg: str) -> None:
+                with _state_lock:
+                    if export_job["cancel"]:
+                        raise Cancelled()
+                    export_job.update(done=done, total=total, msg=msg)
+
+            abl_mod.bake(eng, tmp, _prog, cancel, **edits)
+            with _state_lock:
                 if export_job["cancel"]:
                     raise Cancelled()
-                export_job.update(done=done, total=total, msg=msg)
 
-            abl_mod.bake(eng, tmp, prog, cancel, **edits)
-            if export_job["cancel"]:
-                raise Cancelled()
-
+            # Replace any prior export only after the new copy finishes writing cleanly.
+            if dst.exists():
+                shutil.rmtree(dst)
             tmp.rename(dst)
-            export_job.update(dst=str(dst), status="done", msg="")
+            with _state_lock:
+                export_job.update(dst=str(dst), status="done", msg="")
         except Cancelled:
             shutil.rmtree(tmp, ignore_errors=True)
-            export_job["status"] = "idle"
-        except Exception as e:
-            traceback.print_exc()
+            with _state_lock:
+                export_job["status"] = "idle"
+        except Exception as exc:
+            logger.exception("Model export failed for %s", name)
             shutil.rmtree(tmp, ignore_errors=True)
-            export_job["status"] = f"error: {e}"
+            with _state_lock:
+                export_job["status"] = f"error: {exc}"
 
-    threading.Thread(target=work, daemon=True).start()
+    threading.Thread(target=_work, daemon=True).start()
     return abl_export_status()
 
 
 @app.get("/api/abl/export")
-def abl_export_status():
-    return {k: v for k, v in export_job.items() if k != "cancel"}
+def abl_export_status() -> dict[str, Any]:
+    with _state_lock:
+        return {k: v for k, v in export_job.items() if k != "cancel"}
 
 
 @app.post("/api/abl/export")
-async def abl_export(req: Request):
+async def abl_export(req: Request) -> dict[str, Any]:
     need_model()
     if eng.abl_vec is None:
         raise HTTPException(409, "Analyse the model first: there is no direction to bake in yet.")
@@ -1007,84 +1136,111 @@ async def abl_export(req: Request):
     if not _scoped(entry):
         coef = max(0.1, min(2.0, float(body.get("coef", coef))))
 
-    base = eng.model_id.rstrip("/").split("/")[-1]
+    base = model_short_name(eng.model_id)
     name = _clean_name(body.get("name")) or f"{base}-abliterated" + ("" if coef == 1.0 else f"-{coef:g}")
-
     return _start_export("abl", name, abl=(vec, coef))
 
 
 @app.post("/api/steer/export")
-async def steer_export(req: Request):
-    """Save the model with a recipe built into its weights, and its refusals erased too if that's switched on."""
+async def steer_export(req: Request) -> dict[str, Any]:
+    """Bake a steering recipe (and optionally active refusal erasure) into a new model copy."""
     need_model()
     body = await req.json()
     raw = body.get("items") or []
 
     if any(i.get("kind") == "dir" and i.get("op") == "erase" for i in raw):
-        raise HTTPException(409, "An erased direction can't be built into the weights yet. Switch it to a push or "
-                                 "turn it off first.")
+        raise HTTPException(
+            409,
+            "An erased direction can't be built into the weights yet. Switch it to a push or turn it off first.",
+        )
 
-    items = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"])}
-             for i in raw if i.get("kind") != "dir" and i.get("neuron") is not None and i.get("mode", "add") == "add"]
-    items += [{"kind": "dir", "dir": str(i["dir"]), "layers": [int(l) for l in i["layers"]], "dose": float(i["dose"])}
-              for i in raw if i.get("kind") == "dir"]
+    items = [
+        {"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"])}
+        for i in raw
+        if i.get("kind") != "dir" and i.get("neuron") is not None and i.get("mode", "add") == "add"
+    ]
+    items += [
+        {"kind": "dir", "dir": str(i["dir"]), "layers": [int(layer_idx) for layer_idx in i["layers"]], "dose": float(i["dose"])}
+        for i in raw
+        if i.get("kind") == "dir"
+    ]
 
-    pushes_of({"pushes": items})  # the directions must exist for this model
+    pushes_of({"pushes": items})
     if not items:
         raise HTTPException(409, "Turn on some neurons first: there is nothing to build in yet.")
 
     entry = abl_now()
     abl = _baked(entry) if body.get("abl") and entry.get("active") and entry.get("vec") else None
 
-    base = eng.model_id.rstrip("/").split("/")[-1]
+    base = model_short_name(eng.model_id)
     name = _clean_name(body.get("name")) or f"{base}-steered"
-    return _start_export("steer", name, steer=items, abl=abl, fit_prompts=discover.DEFAULT_PROMPTS[:6],
-                         recipe=str(body.get("recipe") or ""))
+    return _start_export(
+        "steer",
+        name,
+        steer=items,
+        abl=abl,
+        fit_prompts=discover.DEFAULT_PROMPTS[:6],
+        recipe=str(body.get("recipe") or ""),
+    )
 
 
 @app.post("/api/abl/export/cancel")
-def abl_export_cancel():
-    export_job["cancel"] = True
+def abl_export_cancel() -> dict[str, bool]:
+    with _state_lock:
+        export_job["cancel"] = True
     return {"ok": True}
 
 
 # ------------------------------------------------------------------ tuning
 @app.get("/api/tune/defaults")
-def tune_defaults():
+def tune_defaults() -> dict[str, list[str]]:
     return {"prompts": discover.DEFAULT_PROMPTS}
 
 
 @app.post("/api/tune/draft")
-async def tune_draft(req: Request):
+async def tune_draft(req: Request) -> StreamingResponse:
     need_model()
     body = await req.json()
     return sse(discover.draft_targets(eng, body["behavior"], body["prompts"], int(body.get("max_new", 72)), cancel))
 
 
 @app.post("/api/tune/search")
-async def tune_search(req: Request):
+async def tune_search(req: Request) -> StreamingResponse:
     need_model()
     body = await req.json()
-    s = body.get("settings", {})
-    budget = discover.budget_for(eng.n_params)  # sized to the model; "Neurons to test" in Options overrides
-    if s.get("candidates"):
-        budget["n_candidates"] = int(s["candidates"])
+    settings = body.get("settings", {})
+    budget = discover.budget_for(eng.n_params)
+    if settings.get("candidates"):
+        budget["n_candidates"] = int(settings["candidates"])
 
-    return sse(discover.search(
-        eng, body["pairs"], behavior=body.get("behavior") or None, **budget, max_neurons=int(s.get("max_neurons", 6)),
-        doses=tuple(float(d) for d in s.get("doses", (0.25, 0.5, 1.0))), contrast=float(s.get("contrast", 0.5)),
-        fluency_budget=float(s.get("fluency_budget", 0.35)), max_new=int(s.get("max_new", 72)),
-        focus=[w.strip() for w in re.split(r"[,\n]", s.get("focus") or "") if w.strip()],
-        focus_weight=float(s.get("focus_weight", 5.0)), cancel=cancel))
+    return sse(
+        discover.search(
+            eng,
+            body["pairs"],
+            behavior=body.get("behavior") or None,
+            **budget,
+            max_neurons=int(settings.get("max_neurons", 6)),
+            doses=tuple(float(d) for d in settings.get("doses", (0.25, 0.5, 1.0))),
+            contrast=float(settings.get("contrast", 0.5)),
+            fluency_budget=float(settings.get("fluency_budget", 0.35)),
+            max_new=int(settings.get("max_new", 72)),
+            focus=[w.strip() for w in re.split(r"[,\n]", settings.get("focus") or "") if w.strip()],
+            focus_weight=float(settings.get("focus_weight", 5.0)),
+            cancel=cancel,
+        )
+    )
 
 
 @app.post("/api/tune/refine")
-async def tune_refine(req: Request):
-    """Fix the recipe that's on from a complaint about one of its replies (see discover.refine)."""
+async def tune_refine(req: Request) -> StreamingResponse:
+    """Refine the active neuron recipe from user feedback on a steered reply."""
     need_model()
     body = await req.json()
-    recipe = [{"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"]), "lens": i.get("lens") or []}
-              for i in body.get("recipe") or [] if i.get("kind") != "dir"]
+    recipe = [
+        {"layer": int(i["layer"]), "neuron": int(i["neuron"]), "dose": float(i["dose"]), "lens": i.get("lens") or []}
+        for i in body.get("recipe") or []
+        if i.get("kind") != "dir"
+    ]
 
     if not recipe:
         raise HTTPException(409, "Turn on some neurons first: there is nothing to fix yet.")
@@ -1093,45 +1249,58 @@ async def tune_refine(req: Request):
 
     big = eng.n_params > 4e9
     budget = discover.budget_for(eng.n_params)
-    others = [p for p in body.get("prompts") or discover.DEFAULT_PROMPTS][: 2 if big else 4]
+    others = list(body.get("prompts") or discover.DEFAULT_PROMPTS)[: 2 if big else 4]
 
-    return sse(discover.refine(
-        eng, recipe, feedback=body["feedback"], prompt=body["prompt"], bad=body.get("bad") or "",
-        behavior=body.get("behavior") or None, prompts=others, abl=bool(abl_now().get("active")),
-        target_tokens=budget["target_tokens"] or 48, n_new=8 if big else 12, rounds=2 if big else 3, cancel=cancel))
+    return sse(
+        discover.refine(
+            eng,
+            recipe,
+            feedback=body["feedback"],
+            prompt=body["prompt"],
+            bad=body.get("bad") or "",
+            behavior=body.get("behavior") or None,
+            prompts=others,
+            abl=bool(abl_now().get("active")),
+            target_tokens=budget["target_tokens"] or 48,
+            n_new=8 if big else 12,
+            rounds=2 if big else 3,
+            cancel=cancel,
+        )
+    )
 
 
 # ------------------------------------------------------------------ directions
-def _dir_row(e):
-    d = eng.dirs.get(e["id"])
-    m = e.get("metrics") or {}
-    auc = m.get("auc") or []
-    band = e.get("band") or []
-
-    return {k: e.get(k) for k in ("id", "name", "kind", "band", "created", "pos", "neg")} | {
-        "ready": d is not None, "auc": round(min(auc[l] for l in band), 2) if auc and band else None}
+def _dir_row(entry: dict[str, Any]) -> dict[str, Any]:
+    direction = eng.dirs.get(entry["id"])
+    metrics = entry.get("metrics") or {}
+    auc = metrics.get("auc") or []
+    band = entry.get("band") or []
+    return {k: entry.get(k) for k in ("id", "name", "kind", "band", "created", "pos", "neg")} | {
+        "ready": direction is not None,
+        "auc": round(min(auc[layer_idx] for layer_idx in band), 2) if auc and band else None,
+    }
 
 
 @app.get("/api/directions")
-def directions_list():
+def directions_list() -> dict[str, Any]:
     need_model()
-    return {"directions": [_dir_row(e) for e in dirs.index()], "layers": len(eng.layers)}
+    return {"directions": [_dir_row(e) for e in dirs.index()], "layers": eng.num_layers}
 
 
 @app.get("/api/directions/defaults")
-def directions_defaults():
+def directions_defaults() -> dict[str, Any]:
     return {"example": dir_mod.EXAMPLE}
 
 
 @app.post("/api/directions/extract")
-async def directions_extract(req: Request):
+async def directions_extract(req: Request) -> StreamingResponse:
     need_model()
     body = await req.json()
     return sse(dir_mod.extract(eng, dirs, body, cancel))
 
 
 @app.post("/api/directions/import")
-async def directions_import(req: Request):
+async def directions_import(req: Request) -> dict[str, Any]:
     need_model()
     body = await req.json()
     path = Path(str(body.get("path") or "")).expanduser()
@@ -1141,41 +1310,41 @@ async def directions_import(req: Request):
 
     try:
         added = dirs.import_npz(path, cancel)
-    except (ValueError, KeyError) as e:
-        raise HTTPException(400, str(e))
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     return {"added": [_dir_row(e) for e in added]}
 
 
 @app.delete("/api/directions/{did}")
-def directions_delete(did: str):
+def directions_delete(did: str) -> dict[str, bool]:
     need_model()
     dirs.delete(did)
     return {"ok": True}
 
 
 # ------------------------------------------------------------------ probes and experiments
-def _probe(pid):
+def _probe(pid: str) -> dict[str, Any]:
     try:
         return probes.get(pid)
-    except KeyError:
-        raise HTTPException(404, "No such probe for this model.")
+    except KeyError as exc:
+        raise HTTPException(404, "No such probe for this model.") from exc
 
 
 @app.get("/api/probes")
-def probes_list():
+def probes_list() -> dict[str, Any]:
     need_model()
     return {"probes": probes.index(), "examples": exp_mod.examples()}
 
 
 @app.get("/api/probes/{pid}")
-def probes_get(pid: str):
+def probes_get(pid: str) -> dict[str, Any]:
     need_model()
     return _probe(pid)
 
 
 @app.delete("/api/probes/{pid}")
-def probes_delete(pid: str):
+def probes_delete(pid: str) -> dict[str, bool]:
     need_model()
     _probe(pid)
     probes.delete(pid)
@@ -1183,20 +1352,20 @@ def probes_delete(pid: str):
 
 
 @app.post("/api/probes/run")
-async def probes_run(req: Request):
-    """Build a probe from two sets of prompts ({name, a: {label, prompts}, b: {...}}): read, check, map, save."""
+async def probes_run(req: Request) -> StreamingResponse:
+    """Build a probe from two sets of prompts (``{name, a: {label, prompts}, b: {...}}``)."""
     need_model()
     spec = await req.json()
     try:
         probe_mod.parse_spec(spec)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     return sse(probe_mod.run(eng, probes, spec, cancel))
 
 
 @app.post("/api/probes/{pid}/score")
-async def probes_score(pid: str, req: Request):
-    """A new prompt through a saved probe: {prompt} -> {p, z, path}."""
+async def probes_score(pid: str, req: Request) -> dict[str, Any]:
+    """Score a new prompt through a saved probe: ``{prompt} -> {p, z, path}``."""
     need_model()
     _probe(pid)
     body = await req.json()
@@ -1205,373 +1374,417 @@ async def probes_score(pid: str, req: Request):
 
 
 @app.post("/api/probes/{pid}/experiment")
-async def probes_export(pid: str, req: Request):
-    """Write a saved probe as an experiment file in Downloads: {about, try} -> {path}."""
+async def probes_export(pid: str, req: Request) -> dict[str, str]:
+    """Write a saved probe as an experiment file in Downloads: ``{about, try} -> {path}``."""
     need_model()
     body = await req.json()
     exp = exp_mod.from_probe(_probe(pid), body.get("about", ""), body.get("try") or [])
     out = Path.home() / "Downloads" / f"{pid}.lodestar.json"
-    out.write_text(json.dumps(exp, indent=1, ensure_ascii=False))
+    atomic_write_json(out, exp, indent=1, ensure_ascii=False)
     return {"path": str(out)}
 
 
 @app.get("/api/experiments/{name}")
-def experiments_example(name: str):
-    """One of the experiments that ship with Lodestar, by file name or a word from it ("hive")."""
+def experiments_example(name: str) -> dict[str, Any]:
+    """Return one of the shipped experiments by file name or keyword (e.g. ``"hive"``)."""
     try:
         return exp_mod.find_example(name)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @app.post("/api/experiments/fetch")
-async def experiments_fetch(req: Request):
-    """An experiment from a link someone shared (a GitHub file, a gist, any URL to the file): {url} -> the file.
-    {clipboard: true} takes the link from the clipboard, as ⌘V outside a text field (WebKit won't deliver that paste
-    to the page), and gives null when the clipboard holds no experiment link."""
+async def experiments_fetch(req: Request) -> dict[str, Any] | None:
+    """Fetch an experiment from a URL or from the macOS clipboard when ``{clipboard: true}``."""
     body = await req.json()
     url = str(body.get("url") or "")
     if body.get("clipboard"):
-        url = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=5).stdout.strip()
+        url = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=5, check=False).stdout.strip()
         if not exp_mod.is_link(url):
             return None
     try:
         return await run_in_threadpool(exp_mod.fetch, url)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/api/experiments/steer")
-async def experiments_steer(req: Request):
-    """Open a steering experiment: its pushes as recipe items for the loaded model -> {items, mismatched}."""
+async def experiments_steer(req: Request) -> dict[str, Any]:
+    """Convert a steering experiment's pushes into recipe items for the loaded model."""
     need_model()
     exp = await req.json()
     try:
         items, mismatched = await run_in_threadpool(exp_mod.open_steer, eng, dirs, exp)
-    except (ValueError, KeyError) as e:
-        raise HTTPException(400, str(e))
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc)) from exc
     return {"items": items, "mismatched": mismatched}
 
 
 @app.post("/api/recipes/experiment")
-async def recipes_export(req: Request):
-    """Write the setup on now as an experiment file in Downloads: {name, about, items, try} -> {path}."""
+async def recipes_export(req: Request) -> dict[str, str]:
+    """Write the current steering setup as an experiment file in Downloads."""
     need_model()
     body = await req.json()
     name = str(body.get("name") or "Steering").strip()
     try:
         exp = exp_mod.from_steer(eng, body.get("items") or [], name, body.get("about", ""), body.get("try") or [])
-    except (ValueError, KeyError) as e:
-        raise HTTPException(400, str(e))
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(400, str(exc)) from exc
     out = Path.home() / "Downloads" / f"{dir_mod.make_id(name, set())}.lodestar.json"
-    out.write_text(json.dumps(exp, indent=1, ensure_ascii=False))
+    atomic_write_json(out, exp, indent=1, ensure_ascii=False)
     return {"path": str(out)}
 
 
 @app.post("/api/experiments/run")
-async def experiments_run(req: Request):
-    """Run an experiment file: build its probe and check the result against its `expect` ranges."""
+async def experiments_run(req: Request) -> StreamingResponse:
+    """Run an experiment file: build its probe and check results against its ``expect`` ranges."""
     need_model()
     exp = await req.json()
     try:
         exp_mod.validate(exp)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     if "steer" in exp:
         raise HTTPException(400, "This is a steering experiment: open it beside Saved.")
     return sse(exp_mod.run(eng, probes, exp, cancel))
 
 
 # ------------------------------------------------------------------ recipes
-def _recipes():
+def _recipes() -> list[dict[str, Any]]:
     return json.loads(RECIPES.read_text()) if RECIPES.exists() else []
 
 
 @app.get("/api/recipes")
-def recipes():
+def recipes() -> list[dict[str, Any]]:
     return _recipes()
 
 
 @app.post("/api/recipes")
-async def save_recipe(req: Request):
-    r = await req.json()
-    r.setdefault("id", f"r{int(time.time() * 1000)}")
-    r.setdefault("created", time.time())
-    r.setdefault("model", eng.model_id)
+async def save_recipe(req: Request) -> dict[str, Any]:
+    recipe = await req.json()
+    recipe.setdefault("id", f"r{int(time.time() * 1000)}")
+    recipe.setdefault("created", time.time())
+    recipe.setdefault("model", eng.model_id)
 
-    allr = [x for x in _recipes() if x["id"] != r["id"]] + [r]
-    RECIPES.write_text(json.dumps(allr, indent=1))
-    return r
+    with _store_lock:
+        all_recipes = [item for item in _recipes() if item["id"] != recipe["id"]] + [recipe]
+        atomic_write_json(RECIPES, all_recipes, indent=1, ensure_ascii=True)
+    return recipe
 
 
 @app.delete("/api/recipes/{rid}")
-def delete_recipe(rid: str):
-    RECIPES.write_text(json.dumps([x for x in _recipes() if x["id"] != rid], indent=1))
+def delete_recipe(rid: str) -> dict[str, bool]:
+    with _store_lock:
+        atomic_write_json(RECIPES, [item for item in _recipes() if item["id"] != rid], indent=1, ensure_ascii=True)
     return {"ok": True}
 
 
 # ------------------------------------------------------------------ chats
-def _chat_file(cid):
+def _chat_file(cid: str) -> Path:
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", cid):
         raise HTTPException(400, "Bad chat id.")
     return CHATS / f"{cid}.json"
 
 
-def _summary(c):
-    return {k: c.get(k) for k in ("id", "title", "model", "updated")} | {"turns": sum(m["role"] == "user" for m in c["messages"])}
+def _summary(chat_doc: dict[str, Any]) -> dict[str, Any]:
+    return {k: chat_doc.get(k) for k in ("id", "title", "model", "updated")} | {
+        "turns": sum(m["role"] == "user" for m in chat_doc["messages"])
+    }
 
 
 @app.get("/api/chats")
-def chats():
-    """Saved conversations, newest first."""
-    out = []
-    for f in CHATS.glob("*.json"):
+def chats() -> list[dict[str, Any]]:
+    """Return saved conversations sorted newest first."""
+    out: list[dict[str, Any]] = []
+    for path in CHATS.glob("*.json"):
         try:
-            out.append(_summary(json.loads(f.read_text())))
-        except (ValueError, KeyError):
+            out.append(_summary(json.loads(path.read_text())))
+        except (OSError, ValueError, KeyError):
             continue
-
     return sorted(out, key=lambda c: -(c["updated"] or 0))
 
 
 @app.get("/api/chats/{cid}")
-def chat_get(cid: str):
-    f = _chat_file(cid)
-    if not f.exists():
+def chat_get(cid: str) -> dict[str, Any]:
+    path = _chat_file(cid)
+    if not path.exists():
         raise HTTPException(404, "That chat is gone.")
-    return json.loads(f.read_text())
+    return json.loads(path.read_text())
 
 
 @app.post("/api/chats")
-async def chat_save(req: Request):
-    """Save a conversation with the settings, switches and recipe it ran under; the same id overwrites it."""
-    c = await req.json()
-    f = _chat_file(c.get("id", ""))
-
-    c["updated"] = time.time()
-    c.setdefault("model", eng.model_id)
-
-    CHATS.mkdir(exist_ok=True)
-    tmp = f.with_suffix(".tmp")
-    tmp.write_text(json.dumps(c, ensure_ascii=False))
-    tmp.replace(f)  # a crash mid-write leaves the old copy, not half a file
-    return _summary(c)
+async def chat_save(req: Request) -> dict[str, Any]:
+    """Atomically save or overwrite a conversation along with its active steering settings."""
+    chat_doc = await req.json()
+    path = _chat_file(chat_doc.get("id", ""))
+    chat_doc["updated"] = time.time()
+    chat_doc.setdefault("model", eng.model_id)
+    atomic_write_json(path, chat_doc, indent=None, ensure_ascii=False)
+    return _summary(chat_doc)
 
 
 @app.delete("/api/chats/{cid}")
-def chat_delete(cid: str):
+def chat_delete(cid: str) -> dict[str, bool]:
     _chat_file(cid).unlink(missing_ok=True)
     return {"ok": True}
 
 
 # ------------------------------------------------------------------ OpenAI-compatible API
-# The loaded model for other apps (chat front ends, editors, scripts, agents), at /v1 on this same local port. Each
-# model it lists is the loaded one under a different switch: as Lodestar has it set (the recipe Chat steers with, and
-# refusals erased when they are), plain, or with refusals erased and nothing else. The window tells the server what
-# it's steering with (/api/serve); the erasure is already the server's.
-serving = {"pushes": [], "log": deque(maxlen=12), "active": 0}
+serving: dict[str, Any] = {"pushes": [], "log": deque(maxlen=12), "active": 0}
 
 
 @app.post("/api/serve")
-async def serve_set(req: Request):
-    """What the window steers Chat with now, for "as set in Lodestar"."""
+async def serve_set(req: Request) -> dict[str, bool]:
+    """Update the active steering recipe mirrored by the OpenAI-compatible ``/v1`` endpoint."""
     body = await req.json()
-    serving["pushes"] = [p for p in body.get("pushes") or [] if isinstance(p, dict)]
+    with _state_lock:
+        serving["pushes"] = [p for p in body.get("pushes") or [] if isinstance(p, dict)]
     return {"ok": True}
 
 
 @app.get("/api/serve")
-def serve_get():
-    return {"models": _api_models(), "log": list(serving["log"]), "active": serving["active"]}
+def serve_get() -> dict[str, Any]:
+    with _state_lock:
+        log_copy = list(serving["log"])
+        active = serving["active"]
+    return {"models": _api_models(), "log": log_copy, "active": active}
 
 
-def _api_models():
-    """The ids /v1 serves, first the one that follows the app: [(id, plain or erased or None for as set, about)]."""
+def _api_models() -> list[dict[str, str]]:
+    """Return ``[{"id": ..., "about": ...}]`` served by ``/v1/models`` (active configuration first)."""
     if eng.model is None or eng.status != "ready":
         return []
 
-    name = eng.model_id.rstrip("/").split("/")[-1]
+    name = model_short_name(eng.model_id)
     out = [{"id": name, "about": "As set in Lodestar"}, {"id": f"{name}-plain", "about": "Plain"}]
     entry = abl_now()
     if entry.get("vec") is not None:
         cat = _scoped(entry)
-        out.append({"id": f"{name}-abliterated", "about": f"Refusals erased for {cat['name']}" if cat else "Refusals erased"})
+        about = f"Refusals erased for {cat['name']}" if cat else "Refusals erased"
+        out.append({"id": f"{name}-abliterated", "about": about})
     return out
 
 
-def _oai_error(status, msg, kind="invalid_request_error"):
-    return JSONResponse({"error": {"message": msg, "type": kind, "param": None, "code": None}}, status_code=status)
+def _oai_error(status_code: int, msg: str, kind: str = "invalid_request_error") -> JSONResponse:
+    return JSONResponse({"error": {"message": msg, "type": kind, "param": None, "code": None}}, status_code=status_code)
 
 
-def _text(content):
-    """A message's content as text: a string, or the text parts of a list of parts."""
+def _text(content: Any) -> str:
+    """Flatten OpenAI message content (plain string or content-part list) into a string."""
     if isinstance(content, list):
-        return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") in ("text", "input_text"))
+        return "".join(
+            part.get("text", "")
+            for part in content
+            if isinstance(part, dict) and part.get("type") in ("text", "input_text")
+        )
     return "" if content is None else str(content)
 
 
 @app.get("/v1/models")
-def api_models():
-    return {"object": "list", "data": [{"id": m["id"], "object": "model", "created": 0, "owned_by": "lodestar"}
-                                       for m in _api_models()]}
+def api_models() -> dict[str, Any]:
+    return {
+        "object": "list",
+        "data": [{"id": m["id"], "object": "model", "created": 0, "owned_by": "lodestar"} for m in _api_models()],
+    }
 
 
 @app.post("/v1/chat/completions")
-async def api_chat(req: Request):
+async def api_chat(req: Request) -> Any:
     try:
         body = await req.json()
     except ValueError:
         return _oai_error(400, "The body isn't JSON.")
 
-    models = {m["id"]: m for m in _api_models()}
-    if not models:
+    available = _api_models()
+    if not available:
         return _oai_error(503, "No model is loaded in Lodestar.", "server_error")
 
+    model_map = {m["id"]: m for m in available}
     want = str(body.get("model") or "")
-    first = next(iter(models))
-    if want and want not in models:
-        return _oai_error(404, f"No model called {want!r}. This server has: {', '.join(models)}.", "not_found_error")
+    first = available[0]["id"]
+    if want and want not in model_map:
+        return _oai_error(404, f"No model called {want!r}. This server has: {', '.join(model_map)}.", "not_found_error")
     if body.get("tools"):
         return _oai_error(400, "Tool calling isn't supported.")
     if int(body.get("n") or 1) != 1:
         return _oai_error(400, "Only n=1 is supported.")
 
-    msgs = []
-    for m in body.get("messages") or []:
-        role = {"developer": "system"}.get(m.get("role"), m.get("role"))
+    msgs: list[dict[str, str]] = []
+    for raw_msg in body.get("messages") or []:
+        role = {"developer": "system"}.get(raw_msg.get("role"), raw_msg.get("role"))
         if role not in ("system", "user", "assistant"):
-            return _oai_error(400, f"Messages with role {m.get('role')!r} aren't supported.")
-        text = _text(m.get("content"))
+            return _oai_error(400, f"Messages with role {raw_msg.get('role')!r} aren't supported.")
+        text = _text(raw_msg.get("content"))
         if text.strip():
             msgs.append({"role": role, "content": text})
     if not msgs or msgs[-1]["role"] != "user":
         return _oai_error(400, "The conversation must end with a user message.")
 
     mid = want or first
-    if mid.endswith("-plain"):
+    if mid == first:
+        with _state_lock:
+            pushes = list(serving["pushes"])
+        erase = bool(abl_now().get("active"))
+    elif mid == f"{first}-plain":
         pushes, erase = [], False
-    elif mid.endswith("-abliterated"):
-        pushes, erase = [], True
     else:
-        pushes, erase = serving["pushes"], bool(abl_now().get("active"))
+        pushes, erase = [], True
 
     try:
         row = (eng.messages_ids(msgs), pushes_of({"pushes": pushes}))
-    except (ValueError, KeyError) as e:
-        return _oai_error(400, str(e))
+    except HTTPException as exc:
+        return _oai_error(exc.status_code, str(exc.detail))
+    except (ValueError, KeyError) as exc:
+        return _oai_error(400, str(exc))
 
     max_new = max(1, min(int(body.get("max_completion_tokens") or body.get("max_tokens") or 1024), 8192))
     temp = float(body.get("temperature") if body.get("temperature") is not None else 0.7)
     seed = int(body["seed"]) if body.get("seed") is not None else int(time.time())
-    stops = body.get("stop") or []
-    stops = [stops] if isinstance(stops, str) else [str(x) for x in stops if x]
+    raw_stops = body.get("stop") or []
+    stops = [raw_stops] if isinstance(raw_stops, str) else [str(x) for x in raw_stops if x]
     erase = erase and eng.abl_vec is not None
 
     rid, made = f"chatcmpl-{uuid.uuid4().hex[:24]}", int(time.time())
     stop_ev = threading.Event()
 
-    def run():
-        """Yields text deltas, then (finish_reason, completion tokens) once."""
-        serving["active"] += 1
-        t0, text, n, finish = time.time(), "", 0, "stop"
+    def _run() -> Iterator[str | tuple[str, int]]:
+        with _state_lock:
+            serving["active"] += 1
+        t0, text, n_toks, finish = time.time(), "", 0, "stop"
         gen = eng.generate([row], max_new=max_new, temperature=temp, cancel=stop_ev, seed=seed, abl=[erase])
 
         try:
-            for r, x in gen:
-                if r is None:
-                    n = len(x[0])
-                    finish = "length" if n >= max_new else "stop"
+            for row_idx, delta in gen:
+                if row_idx is None:
+                    n_toks = len(delta[0])
+                    finish = "length" if n_toks >= max_new else "stop"
                     break
 
                 cut = None
-                for s in stops:  # end at the first stop sequence, which isn't sent
-                    i = (text + x).find(s, max(0, len(text) - len(s)))
-                    if i >= 0 and (cut is None or i < cut):
-                        cut = i
+                combined = text + delta
+                for stop_seq in stops:
+                    idx = combined.find(stop_seq, max(0, len(text) - len(stop_seq)))
+                    if idx >= 0 and (cut is None or idx < cut):
+                        cut = idx
                 if cut is not None:
                     if cut > len(text):
-                        yield (text + x)[len(text):cut]
-                    text, finish = (text + x)[:cut], "stop"
-                    n = len(eng.encode(text))
+                        yield combined[len(text) : cut]
+                    text, finish = combined[:cut], "stop"
+                    n_toks = len(eng.encode(text))
                     break
 
-                text += x
-                yield x
+                text = combined
+                yield delta
         except Cancelled:
-            finish, n = "stop", len(eng.encode(text))
+            finish, n_toks = "stop", len(eng.encode(text))
         finally:
             gen.close()
-            serving["active"] -= 1
-            serving["log"].appendleft({"at": time.time(), "model": mid, "prompt": len(row[0]), "tokens": n,
-                                       "seconds": round(time.time() - t0, 1), "finish": finish,
-                                       "stream": bool(body.get("stream"))})
+            with _state_lock:
+                serving["active"] -= 1
+                serving["log"].appendleft(
+                    {
+                        "at": time.time(),
+                        "model": mid,
+                        "prompt": len(row[0]),
+                        "tokens": n_toks,
+                        "seconds": round(time.time() - t0, 1),
+                        "finish": finish,
+                        "stream": bool(body.get("stream")),
+                    }
+                )
 
-        yield (finish, n)
+        yield (finish, n_toks)
 
-    usage = lambda n: {"prompt_tokens": len(row[0]), "completion_tokens": n, "total_tokens": len(row[0]) + n}
+    def _usage(completion_tokens: int) -> dict[str, int]:
+        prompt_tokens = len(row[0])
+        return {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        }
 
     if not body.get("stream"):
-        def whole():
-            parts, end = [], ("stop", 0)
-            for x in run():
-                if isinstance(x, tuple):
-                    end = x
+        def _whole() -> tuple[str, tuple[str, int]]:
+            parts: list[str] = []
+            end = ("stop", 0)
+            for item in _run():
+                if isinstance(item, tuple):
+                    end = item
                 else:
-                    parts.append(x)
+                    parts.append(item)
             return "".join(parts), end
 
-        text, (finish, n) = await run_in_threadpool(whole)
-        return {"id": rid, "object": "chat.completion", "created": made, "model": mid,
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": finish}],
-                "usage": usage(n)}
+        text, (finish, n_toks) = await run_in_threadpool(_whole)
+        return {
+            "id": rid,
+            "object": "chat.completion",
+            "created": made,
+            "model": mid,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": finish}],
+            "usage": _usage(n_toks),
+        }
 
-    def chunk(delta, finish=None, **extra):
-        return "data: " + json.dumps({"id": rid, "object": "chat.completion.chunk", "created": made, "model": mid,
-                                      "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], **extra},
-                                     ensure_ascii=False) + "\n\n"
+    def _chunk(delta: dict[str, Any], finish: str | None = None, **extra: Any) -> str:
+        payload = {
+            "id": rid,
+            "object": "chat.completion.chunk",
+            "created": made,
+            "model": mid,
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
+            **extra,
+        }
+        return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
-    # Generation runs on its own thread and hands its pieces over a queue. A client that goes away mid-reply cancels
-    # this coroutine, which stops the thread at its next token, so the model doesn't stay locked behind a reader
-    # that's gone (a plain generator would be left paused inside the engine's lock).
-    loop, q = asyncio.get_running_loop(), asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[str | tuple[str, int] | Exception] = asyncio.Queue()
 
-    def work():
+    def _work() -> None:
         try:
-            for x in run():
-                loop.call_soon_threadsafe(q.put_nowait, x)
-        except Exception as e:  # noqa: BLE001 — reported to the client as the stream's last word
-            loop.call_soon_threadsafe(q.put_nowait, e)
+            for item in _run():
+                loop.call_soon_threadsafe(queue.put_nowait, item)
+        except Exception as exc:
+            logger.exception("Streaming /v1/chat/completions failed")
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
 
-    async def events():
-        threading.Thread(target=work, daemon=True).start()
+    async def _events():
+        threading.Thread(target=_work, daemon=True).start()
         try:
-            yield chunk({"role": "assistant", "content": ""})
+            yield _chunk({"role": "assistant", "content": ""})
             while True:
-                x = await q.get()
-                if isinstance(x, Exception):
-                    yield "data: " + json.dumps({"error": {"message": str(x), "type": "server_error"}}) + "\n\n"
+                item = await queue.get()
+                if isinstance(item, Exception):
+                    yield "data: " + json.dumps({"error": {"message": str(item), "type": "server_error"}}) + "\n\n"
                     break
-                if isinstance(x, tuple):
-                    finish, n = x
-                    yield chunk({}, finish)
+                if isinstance(item, tuple):
+                    finish, n_toks = item
+                    yield _chunk({}, finish)
                     if (body.get("stream_options") or {}).get("include_usage"):
-                        yield "data: " + json.dumps({"id": rid, "object": "chat.completion.chunk", "created": made,
-                                                     "model": mid, "choices": [], "usage": usage(n)}) + "\n\n"
+                        usage_chunk = {
+                            "id": rid,
+                            "object": "chat.completion.chunk",
+                            "created": made,
+                            "model": mid,
+                            "choices": [],
+                            "usage": _usage(n_toks),
+                        }
+                        yield "data: " + json.dumps(usage_chunk) + "\n\n"
                     break
-                if x:
-                    yield chunk({"content": x})
+                if item:
+                    yield _chunk({"content": item})
             yield "data: [DONE]\n\n"
         finally:
             stop_ev.set()
 
-    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+    return StreamingResponse(_events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 # ------------------------------------------------------------------ ui
-@app.get("/")
-def index():
+@app.get("/", response_model=None)
+def index() -> Response:
     if not (UI / "index.html").exists():
-        return HTMLResponse("<p>The UI isn’t built yet: run <code>pnpm install && pnpm build</code> in web/, then reopen.</p>")
+        return HTMLResponse(
+            "<p>The UI isn’t built yet: run <code>pnpm install && pnpm build</code> in web/, then reopen.</p>"
+        )
     return FileResponse(UI / "index.html", headers={"Cache-Control": "no-store"})
 
 
@@ -1579,5 +1792,5 @@ app.mount("/", StaticFiles(directory=UI, check_dir=False), name="ui")
 
 
 @app.exception_handler(HTTPException)
-async def http_err(req, exc):
+async def http_err(_req: Request, exc: HTTPException) -> JSONResponse:
     return JSONResponse({"error": exc.detail}, status_code=exc.status_code)

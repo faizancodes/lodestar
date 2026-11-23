@@ -11,15 +11,17 @@ import { patchAt, removeAt, saveRecipe, setOp } from "./recipe";
 
 // a strength fills out from the middle: periwinkle when pushed up, red when pushed down. Painted from the range's
 // own value, which the browser snaps to its step.
-function usePaint() {
+function usePaint(dose: number, erase = false) {
   const ref = useRef<HTMLInputElement>(null);
 
   useLayoutEffect(() => {
-    const el = ref.current!, v = (+el.value - +el.min) / (+el.max - +el.min);
+    const el = ref.current;
+    if (!el) return;
+    const v = (+el.value - +el.min) / (+el.max - +el.min);
     el.style.setProperty("--lo", Math.min(v, 0.5) * 100 + "%");
     el.style.setProperty("--hi", Math.max(v, 0.5) * 100 + "%");
     el.style.setProperty("--fill", v < 0.5 ? "var(--bad)" : "var(--ascii)");
-  });
+  }, [dose, erase]);
 
   return ref;
 }
@@ -39,7 +41,7 @@ export function RecipeBox() {
 }
 
 function NeuronRow({ it, i }: { it: NeuronItem; i: number }) {
-  const range = usePaint(), anchor = `rc:${it.layer}:${it.neuron}`;
+  const range = usePaint(it.dose), anchor = `rc:${it.layer}:${it.neuron}`;
 
   return (
     <>
@@ -57,8 +59,9 @@ function NeuronRow({ it, i }: { it: NeuronItem; i: number }) {
 
 // a direction's row: its layers (editable), push or erase, and a wider strength range than a neuron's
 function DirRow({ it, i }: { it: DirItem; i: number }) {
-  const range = usePaint(), band = useRef<HTMLInputElement>(null);
-  const ok = useApp((s) => dirReady(it, s.dirs)), er = it.op === "erase";
+  const er = it.op === "erase";
+  const range = usePaint(it.dose, er), band = useRef<HTMLInputElement>(null);
+  const ok = useApp((s) => dirReady(it, s.dirs));
 
   // the layers are read when the field is committed (its change event), not on every keystroke
   useEffect(() => {
@@ -77,7 +80,7 @@ function DirRow({ it, i }: { it: DirItem; i: number }) {
 
   return (
     <div className={ok ? "rc-row dir" : "rc-row dir gone"} data-i={i}>
-      <span className="who static" title={ok ? String(it.name) : "Not on this model"}><b>{labelOf(it)}</b><span className="nid">direction</span></span>
+      <span className="who static" title={ok ? labelOf(it) : "Not on this model"}><b>{labelOf(it)}</b><span className="nid">direction</span></span>
       <span className="row tight"><input ref={band} className="band" data-k="band" defaultValue={it.layers.join(" ")} title="Layers" spellCheck="false" />
         <span className="seg"><button data-op="push" className={er ? undefined : "on"} onClick={() => setOp(i, "push")}>Push</button><button data-op="erase" className={er ? "on" : undefined} onClick={() => setOp(i, "erase")}>Erase</button></span></span>
       <input ref={range} className="lr" type="range" min={er ? 0 : -8} max={er ? 1 : 8} step={er ? 0.05 : 0.25} value={it.dose} data-k="dose" aria-label="Strength"

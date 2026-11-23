@@ -1,6 +1,6 @@
 // Save edited weights as a new model. One copy is written at a time; `p` is the page doing it: "abl" (refusals
 // erased) or "st" (steering built in).
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { sleep, steerDefaultName } from "../lib/format";
 import type { ExportJob } from "../lib/types";
 import { refreshModels } from "../shell/engine";
@@ -45,7 +45,7 @@ export async function pollExport(p: "abl" | "st") {
   }
 }
 
-export const cancelExport = () => api("/api/abl/export/cancel", {});
+export const cancelExport = () => api("/api/abl/export/cancel", {}).catch(() => {});
 
 export async function bakeSteer() {
   if (app().busy) return toast("Something is already running. Stop it first.", true);
@@ -54,6 +54,6 @@ export async function bakeSteer() {
   const name = (document.getElementById("st-name") as HTMLInputElement).value.trim() || steerDefaultName(info?.model, recipe.name);
   const keepAbl = !!abl?.current?.active && (document.getElementById("st-abl") as HTMLInputElement).checked;
 
-  try { await api("/api/steer/export", { items: recipe.items, name, abl: keepAbl, recipe: recipe.name }); } catch (e) { return toast((e as Error).message, true); }
-  pollExport("st");
+  try { await api("/api/steer/export", { items: recipe.items, name, abl: keepAbl, recipe: recipe.name }); } catch (e) { return toast(errorMessage(e), true); }
+  void pollExport("st");
 }

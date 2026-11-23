@@ -2,7 +2,7 @@
 // model and following its status, and what to fetch once one is ready. Views read what this writes to the store.
 import { flushSync } from "react-dom";
 import { finishScene, setLayers, setProgress, startScene, stopScene, wake } from "../art/loader";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { modelName, sleep } from "../lib/format";
 import type { Abl, CopyJob, Directions, Example, ExportJob, Fit, JLensJob, Memory, Models, Recipe, Status } from "../lib/types";
 import { useApp, type Tab } from "../store/app";
@@ -41,15 +41,15 @@ export function modelChoices(m: Models, job: CopyJob | null) {
     // a drive model that has a copy on this Mac is listed once, as the copy
     drives: (m.local || []).filter((x) => !x.copied).map((x): Choice => ({
       id: x.path, name: x.name, drive: x,
-      sub: copying(x) ? `Copying to this Mac… ${Math.floor((100 * job!.done) / job!.total)}%` : `On ${x.drive}`,
+      sub: copying(x) ? `Copying to this Mac… ${job!.total > 0 ? Math.floor((100 * job!.done) / job!.total) : 0}%` : `On ${x.drive}`,
     })),
     get: m.presets.filter((p) => !cached.has(p.id)).map((p): Choice => ({ id: p.id, name: modelName(p.id), sub: p.note, tag: p.size })),
   };
 }
 
 export async function startCopy(path: string) {
-  try { set({ copy: await api<CopyJob>("/api/models/copy", { path }) }); } catch (e) { return toast((e as Error).message, true); }
-  pollCopy();
+  try { set({ copy: await api<CopyJob>("/api/models/copy", { path }) }); } catch (e) { return toast(errorMessage(e), true); }
+  void pollCopy();
 }
 
 let copyPolling = false;
@@ -77,12 +77,12 @@ async function pollCopy() {
   }
 }
 
-export const cancelCopy = () => api("/api/models/copy/cancel", {});
+export const cancelCopy = () => api("/api/models/copy/cancel", {}).catch(() => {});
 
 export async function removeCopy(path: string) {
-  try { await api("/api/models/remove", { path }); } catch (err) { return toast((err as Error).message, true); }
+  try { await api("/api/models/remove", { path }); } catch (err) { return toast(errorMessage(err), true); }
   toast("Removed the copy. The model still loads from the drive.");
-  refreshModels();
+  void refreshModels().catch(() => {});
 }
 
 export function toggleModelMenu(open?: boolean) {
@@ -91,7 +91,7 @@ export function toggleModelMenu(open?: boolean) {
 
   const r = $("#model-pick")!.getBoundingClientRect(), side = $(".side")!.getBoundingClientRect();
   set({ menu: { open: true, left: side.right + 10, bottom: Math.max(12, innerHeight - r.bottom - 12), maxHeight: Math.min(620, r.bottom - 12) } });
-  refreshModels(); // a drive may have been plugged in since
+  void refreshModels().catch(() => {}); // a drive may have been plugged in since
 }
 
 // ------------------------------------------------------------------ tabs
@@ -109,29 +109,39 @@ export function setTab(t: Tab) {
 const setStart = (p: Partial<ReturnType<typeof get>["start"]>) => set({ start: { ...get().start, ...p } });
 const startArt = () => $<HTMLCanvasElement>("#start-art")!;
 
+let loadingModel = false;
+let wakeTimer: ReturnType<typeof setTimeout> | undefined;
+
 export async function loadModel(id: string, anyway = false) {
+  if (loadingModel) return;
+  loadingModel = true;
   toggleModelMenu(false);
 
-  // a model that won't fit beside what's running makes macOS swap, and everything crawls: say so first
-  if (!anyway) {
-    const fit = await api<Fit>("/api/memory/fit", { model: id }).catch(() => null);
-    if (fit && !fit.fits) return set({ fitWarn: { id, fit } });
-  }
-
-  const entered = enterLoading(id);
-
-  let s: Status;
   try {
-    s = await api<Status>("/api/load", { model: id });
-  } catch (e) {
-    await entered;
-    setStart({ loading: false, picked: null });
-    return toast((e as Error).message, true);
-  }
+    // a model that won't fit beside what's running makes macOS swap, and everything crawls: say so first
+    if (!anyway) {
+      const fit = await api<Fit>("/api/memory/fit", { model: id }).catch(() => null);
+      if (fit && !fit.fits) return set({ fitWarn: { id, fit } });
+    }
 
-  await entered;
-  applyStatus(s);
-  pollStatus();
+    const entered = enterLoading(id);
+
+    let s: Status;
+    try {
+      s = await api<Status>("/api/load", { model: id });
+    } catch (e) {
+      await entered;
+      clearTimeout(wakeTimer);
+      setStart({ loading: false, picked: null });
+      return toast(errorMessage(e), true);
+    }
+
+    await entered;
+    applyStatus(s);
+    void pollStatus();
+  } finally {
+    loadingModel = false;
+  }
 }
 
 export async function unloadModel() {
@@ -140,14 +150,14 @@ export async function unloadModel() {
   try {
     applyStatus(await api<Status>("/api/unload", {}));
   } catch (e) {
-    return toast((e as Error).message, true);
+    return toast(errorMessage(e), true);
   }
 
-  refreshMemory();
+  void refreshMemory();
 }
 
 // ------------------------------------------------------------------ memory
-export async function refreshMemory() {
+async function refreshMemory() {
   try { set({ memory: await api<Memory>("/api/memory") }); } catch {}
 }
 
@@ -191,7 +201,8 @@ async function enterLoading(id: string) {
     { transform: `translateY(${first.top - last.top - off}px)`, clipPath: `inset(${off}px 0 ${below}px 0)` },
     { transform: "none", clipPath: "inset(0 0 0 0)" },
   ], { duration: 950, easing: "cubic-bezier(0.65, 0, 0.2, 1)" });
-  setTimeout(wake, 650);
+  clearTimeout(wakeTimer);
+  wakeTimer = setTimeout(wake, 650);
 }
 
 let loadStart: number | null = null, loadTimer: ReturnType<typeof setInterval> | undefined, finishing = false;
@@ -209,7 +220,7 @@ export function statusLine(s: Status | null) {
 }
 
 /** What the start screen says a load is doing: opening, how much of the weights are in, then measuring. */
-export function loadLine(s: Status) {
+function loadLine(s: Status) {
   const name = modelName(s.status.replace(/^loading /, "")), ld = s.load;
   if (!ld) return `Loading ${name}…`;
 
@@ -325,15 +336,16 @@ async function onModelReady() {
   if (recipe.items.length && recipe.model && modelName(recipe.model) !== modelName(info!.model)) newRecipe(); // neuron numbers are per model
 
   set({ recipe: { ...get().recipe, model: info!.model } });
-  useChat.getState().set({ messages: [], lens: {} }); // neuron numbers mean nothing in another model
+  useChat.getState().set({ id: null, messages: [], lens: {}, found: null }); // neuron numbers and saved chat ids are per model
+  useSteer.setState({ tl: null, results: null, panels: [] });
   redrawn();
   resetAbl();
   if (get().tab === "chat") onChatShown();
 
-  refreshSaved();
-  refreshAbl();
-  refreshDirs();
-  watchJlens();
+  void refreshSaved();
+  void refreshAbl();
+  void refreshDirs();
+  void watchJlens();
   set({ examples: await api<Example[]>("/api/examples").catch((): Example[] => []) });
 }
 
@@ -361,8 +373,8 @@ export async function watchJlens() {
 }
 
 export async function computeJlens() {
-  try { set({ jlens: await api<JLensJob>("/api/jlens/compute", {}) }); } catch (e) { return toast((e as Error).message, true); }
-  watchJlens();
+  try { set({ jlens: await api<JLensJob>("/api/jlens/compute", {}) }); } catch (e) { return toast(errorMessage(e), true); }
+  void watchJlens();
 }
 
 export const stopJlens = () => api("/api/jlens/cancel", {}).catch(() => {});
@@ -375,9 +387,13 @@ export async function refreshSaved() {
 }
 
 export async function deleteSaved(id: string) {
-  await api(`/api/recipes/${id}`, null, "DELETE");
+  try {
+    await api(`/api/recipes/${id}`, null, "DELETE");
+  } catch (e) {
+    return toast(errorMessage(e), true);
+  }
   if (get().recipe.id === id) set({ recipe: { ...get().recipe, id: null } });
-  refreshSaved();
+  void refreshSaved();
 }
 
 export function openSaved(r: Recipe) {
@@ -434,6 +450,6 @@ async function start() {
     if (ex.status === "working") pollExport(ex.kind === "steer" ? "st" : "abl");
     if (!get().info!.loaded && get().info!.status !== "idle") pollStatus();
   } catch (e) {
-    toast("Can’t reach the Lodestar engine: " + (e as Error).message, true);
+    toast("Can’t reach the Lodestar engine: " + errorMessage(e), true);
   }
 }

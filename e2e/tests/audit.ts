@@ -41,7 +41,7 @@ function measure() {
       }
     }
     // a text field squeezed too narrow to use
-    if ((el.tagName === "INPUT" && /text|search|^$/.test((el as HTMLInputElement).type) || el.tagName === "TEXTAREA") && el.getBoundingClientRect().width < 150)
+    if ((el.tagName === "INPUT" && /text|search/.test((el as HTMLInputElement).type) || el.tagName === "TEXTAREA") && el.getBoundingClientRect().width < 150)
       out.push({ kind: "text field squeezed", el: name(el), text: (el as HTMLInputElement).placeholder || "", by: Math.round(el.getBoundingClientRect().width) });
   }
   return out;
@@ -51,15 +51,19 @@ export async function audit(page: Page, step: string) {
   const size = page.viewportSize()!;
   // WebKit crashes if the window is resized while a text field has focus
   const focused = await page.evaluateHandle(() => { const a = document.activeElement as HTMLElement | null; a?.blur(); return a; });
-  for (const w of WIDTHS) {
-    await page.setViewportSize({ width: w, height: size.height });
-    await page.waitForTimeout(120);
-    const found = await page.evaluate(measure);
-    for (const f of found) appendFileSync(AUDIT!, JSON.stringify({ step, w, ...f }) + "\n");
-    if (process.env.AUDIT_SHOTS && (w === 1100 || w === 1920))
-      await page.screenshot({ path: `${process.env.AUDIT_SHOTS}/${step}-${w}.png`, fullPage: true, animations: "disabled" });
+  try {
+    for (const w of WIDTHS) {
+      await page.setViewportSize({ width: w, height: size.height });
+      await page.waitForTimeout(120);
+      const found = await page.evaluate(measure);
+      for (const f of found) appendFileSync(AUDIT!, JSON.stringify({ step, w, ...f }) + "\n");
+      if (process.env.AUDIT_SHOTS && (w === 1100 || w === 1920))
+        await page.screenshot({ path: `${process.env.AUDIT_SHOTS}/${step}-${w}.png`, fullPage: true, animations: "disabled" });
+    }
+  } finally {
+    await page.setViewportSize(size);
+    await page.waitForTimeout(80);
+    await focused.evaluate((a) => (a as HTMLElement | null)?.focus()).catch(() => {});
+    await focused.dispose();
   }
-  await page.setViewportSize(size);
-  await page.waitForTimeout(80);
-  await focused.evaluate((a) => (a as HTMLElement | null)?.focus());
 }

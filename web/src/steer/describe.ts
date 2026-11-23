@@ -1,7 +1,7 @@
 // Change how it acts: one box. A word or two searches by word; a sentence is described as a behaviour and a live
 // steering plan finds the neurons for it.
 import { flushSync } from "react-dom";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { instruction, isWord, searchDose, styleShift } from "../lib/format";
 import { stream } from "../lib/stream";
 import type { WordSearch } from "../lib/types";
@@ -46,7 +46,7 @@ async function searchWord(w: string) {
     const rows = r.results.map((x) => ({ ...x, dose: searchDose(x.score) }));
     set({ results: { n, word: rows.slice(0, 6) } });
   } catch (e) {
-    set({ note: (e as Error).message });
+    set({ note: errorMessage(e) });
   }
 }
 
@@ -54,11 +54,11 @@ async function searchWord(w: string) {
 // The model first answers with the instruction (so you can see how it read it), then every neuron is scored by
 // gradient, the strongest are actually tested, and the best are combined.
 export const STAGES = [
-  { key: "examples", label: "Examples", of: ["draft"] },
-  { key: "find", label: "Find", of: ["baseline", "attribute", "patch"] },
-  { key: "test", label: "Test", of: ["verify", "hits"] },
-  { key: "combine", label: "Combine", of: ["combine", "scale"] },
-  { key: "check", label: "Check", of: ["proof"] },
+  { label: "Examples", of: ["draft"] },
+  { label: "Find", of: ["baseline", "attribute", "patch"] },
+  { label: "Test", of: ["verify", "hits"] },
+  { label: "Combine", of: ["combine", "scale"] },
+  { label: "Check", of: ["proof"] },
 ];
 
 /** Draws the plan again in full, now, as each event arrives. */
@@ -118,6 +118,7 @@ async function describe(goal: string) {
       return noEffect(plan);
     }
 
+    clearInterval(clock); // runSearch manages its own timer from the same start timestamp
     await runSearch(plan, behavior, p, started);
   } finally {
     clearInterval(clock);
@@ -148,7 +149,11 @@ async function runSearch(plan: Plan, behavior: string, pairs: Pairs, started = D
       const key = (c: Cand) => `${c.layer}:${c.neuron}`;
       const cands = ev.candidates as Cand[];
       if (ev.type === "stage") setStage(ev.stage as string, ev.label as string);
-      else if (ev.type === "progress") ((plan.frac = (ev.done as number) / (ev.total as number)), touchPlan());
+      else if (ev.type === "progress") {
+        const total = ev.total as number;
+        plan.frac = total > 0 ? (ev.done as number) / total : 0;
+        touchPlan();
+      }
       else if (ev.type === "candidates") (cands.forEach((c) => plan.cands.set(key(c), c)), renderPlan(plan));
       else if (ev.type === "measured" || ev.type === "verified")
         (cands.forEach((c) => plan.cands.set(key(c), { ...plan.cands.get(key(c))!, ...c, tested: c.dj !== undefined })), renderPlan(plan));

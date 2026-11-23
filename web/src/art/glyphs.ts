@@ -2,10 +2,10 @@
 // figure set in type: a dot where it's faint, then a plus, an ×, and a solid block where it's brightest.
 const DOT = 0.3, PLUS = 0.55, CROSS = 0.8;
 
-/** Draws `grid` (cols × rows of brightness 0..1) as marks in the canvas's current fill colour. */
 /** Writes brightness b at cell (x, y) of a scene's grid, keeping the brighter of what's there. */
 export type Put = (x: number, y: number, b: number) => void;
 
+/** Draws `grid` (cols × rows of brightness 0..1) as marks in the canvas's current fill colour. */
 export function drawMarks(ctx: CanvasRenderingContext2D, grid: Float32Array, cols: number, rows: number, cell: number) {
   ctx.clearRect(0, 0, cols * cell, rows * cell);
   const plus = new Path2D(), cross = new Path2D();
@@ -60,6 +60,7 @@ export function startSideArt(canvas: HTMLCanvasElement) {
     canvas.height = Math.round(h * dpr);
     ctx = canvas.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = getComputedStyle(canvas).color;
 
     cols = Math.ceil(w / cell);
     rows = Math.ceil(h / cell);
@@ -98,7 +99,6 @@ export function startSideArt(canvas: HTMLCanvasElement) {
       put(x, y, (0.12 + hash(i, 13) ** 3 * 0.45) * (0.65 + 0.35 * Math.sin(t * (0.6 + hash(i, 14)) + i)));
     }
 
-    ctx.fillStyle = getComputedStyle(canvas).color;
     drawMarks(ctx, grid, cols, rows, cell);
   };
 
@@ -118,7 +118,7 @@ export function startSideArt(canvas: HTMLCanvasElement) {
   if (size()) run();
 
   let resizeT: ReturnType<typeof setTimeout> | undefined;
-  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => size() && (still ? draw(0) : null), 200); };
+  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (size()) run(); }, 200); };
   const onVisible = () => !document.hidden && run();
   addEventListener("resize", onResize);
   document.addEventListener("visibilitychange", onVisible);

@@ -48,7 +48,7 @@
     import { markSVG } from "../web/src/art/mark";
     import { startLodestar } from "./src/lodestar";
     const el = document.querySelector("[data-mark]");
-    el.innerHTML = markSVG(34, 31);
+    el.innerHTML = markSVG(+el.dataset.mark, 31);
     startLodestar(document.querySelector("#og-art"), { at: () => [0.74, 0.5] });
   </script>
 </body>

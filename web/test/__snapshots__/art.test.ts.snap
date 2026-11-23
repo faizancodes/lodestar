@@ -37,8 +37,8 @@ exports[`canvas art draws what ui/ drew (reduced motion: false) > scan 1`] = `
 
 exports[`canvas art draws what ui/ drew (reduced motion: false) > sideArt 1`] = `
 {
-  "length": 51613,
-  "sha256": "70a21993cc2d4c75c0383ea0fd1413a256e82d57e54994f90f5dc8b406d5eddd",
+  "length": 51541,
+  "sha256": "f931b1cd0faa47a05eaa407dd5963859a8ce145c81913738b21735840cf5d9e5",
 }
 `;
 

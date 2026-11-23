@@ -1,7 +1,7 @@
 // Abliterate: find the model's refusal direction, switch it on and off, try it, and save it as a new model.
 import { flushSync } from "react-dom";
 import { startAblScene } from "../art/ablscene";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { ablDefaultName, modelName } from "../lib/format";
 import { stream } from "../lib/stream";
 import type { Abl } from "../lib/types";
@@ -53,37 +53,38 @@ export function resetAbl() {
 }
 
 async function setAblCoef(v: number) {
-  const a = app().abl!;
   const r = await api<{ coef: number }>("/api/abl/state", { coef: v });
-  useApp.setState({ abl: { ...a, current: { ...a.current!, coef: r.coef } } });
+  const a = app().abl;
+  if (a?.current) useApp.setState({ abl: { ...a, current: { ...a.current, coef: r.coef } } });
   renderAbl();
 }
 
 export const setName = (v: string) => set({ name: v, nameTouched: !!v.trim() });
 
 export async function setAblActive(on: boolean) {
-  const a = app().abl;
-  if (!a?.current) return;
+  if (!app().abl?.current) return;
 
   try {
     const r = await api<{ active: boolean }>("/api/abl/state", { active: on });
-    useApp.setState({ abl: { ...a, current: { ...a.current, active: r.active } } });
+    const a = app().abl;
+    if (a?.current) useApp.setState({ abl: { ...a, current: { ...a.current, active: r.active } } });
     renderAbl();
-  } catch (e) { toast((e as Error).message, true); }
+  } catch (e) { toast(errorMessage(e), true); }
 }
 
 export const toggleAbl = () => setAblActive(!ablActive(app()));
 
 /** Erase refusals for every request, or only for the saved category's. */
 export async function setScope(scope: "all" | "category") {
-  const a = app().abl;
-  if (!a?.current || a.current.scope === scope) return;
+  const cur = app().abl?.current;
+  if (!cur || cur.scope === scope) return;
 
   try {
     const r = await api<{ scope: "all" | "category"; coef: number; active: boolean }>("/api/abl/state", { scope });
-    useApp.setState({ abl: { ...a, current: { ...a.current, scope: r.scope, coef: r.coef, active: r.active } } });
+    const a = app().abl;
+    if (a?.current) useApp.setState({ abl: { ...a, current: { ...a.current, scope: r.scope, coef: r.coef, active: r.active } } });
     renderAbl();
-  } catch (e) { toast((e as Error).message, true); }
+  } catch (e) { toast(errorMessage(e), true); }
 }
 
 export const editCat = (p: { name?: string; prompts?: string }) => setCat({ ...p, touched: true });
@@ -119,7 +120,10 @@ export async function findCategory() {
   try {
     const ok = await stream("/api/abl/category", { name: name.trim(), prompts: lines(prompts) }, (ev) => {
       if (ev.type === "stage") setCat({ live: { text: ev.label + "…", running: true } });
-      else if (ev.type === "progress") setCat({ width: Math.round((100 * (ev.done as number)) / (ev.total as number)) + "%" });
+      else if (ev.type === "progress") {
+        const total = ev.total as number;
+        setCat({ width: (total > 0 ? Math.round((100 * (ev.done as number)) / total) : 0) + "%" });
+      }
       else if (ev.type === "result") found = true;
     });
     setCat({ live: ok && found ? null : { text: "Stopped. Nothing was changed.", running: false } });
@@ -133,11 +137,11 @@ export async function findCategory() {
 }
 
 export async function saveProbes() {
-  const a = app().abl!;
   try {
     const probes = await api<Abl["probes"]>("/api/abl/probes", { harmful: lines(get().harmful), harmless: lines(get().harmless) });
-    useApp.setState({ abl: { ...a, probes } });
-  } catch (e) { return toast((e as Error).message, true); }
+    const a = app().abl;
+    if (a) useApp.setState({ abl: { ...a, probes } });
+  } catch (e) { return toast(errorMessage(e), true); }
 
   set({ dirty: false });
   toast("Probe lists saved. They apply to every model.");
@@ -186,23 +190,25 @@ export async function analyze() {
         scene!.set(at);
         say(ev.label + "…", true);
       } else if (ev.type === "progress") {
-        setPlan({ widths: get().plan.widths.map((w, i) => (i === at ? Math.round((100 * (ev.done as number)) / (ev.total as number)) + "%" : w)) });
+        const total = ev.total as number;
+        const pct = total > 0 ? Math.round((100 * (ev.done as number)) / total) : 0;
+        setPlan({ widths: get().plan.widths.map((w, i) => (i === at ? pct + "%" : w)) });
       } else if (ev.type === "exdelta") {
         // the two example answers stream straight into the try-it thread, which opens for them
         if (!get().at) flushSync(() => set({ at: ABL_EX_PROMPTS.map((p) => entry(p)) }));
         const e = get().at![ev.index as number];
         if (e) streamInto(ev.kind === "abl" ? e.text : e.normal, ev.delta as string);
-      } else if (ev.type === "result") result = ev as never;
+      } else if (ev.type === "result") result = ev as unknown as Found;
     });
 
     setPlan({ steps: steps(4), widths: ["0%", "0%", "0%", "0%"], scene: false });
     if (!ok || !result) return say("Stopped. Nothing was changed.", false);
 
     const r: Found = result;
-    set((s) => ({
+    set({
       at: r.examples.map((x) => entry(x.prompt, { coef: r.coef, text: filled(x.after), normal: filled(x.before), refused: x.refused_after, refusedNormal: x.refused_before, typing: false })),
-      rank: r, rankN: s.rankN + 1,
-    }));
+      rank: r,
+    });
     setPlan({ done: true });
 
     setPlan({ live: null }); // the result shows what it did
@@ -233,7 +239,7 @@ export async function ablAsk(prompt: string, change: Entry["change"] = null) {
   let result = null as Tested | null;
   const ok = await stream("/api/abl/test", { probes: [prompt] }, (ev) => {
     if (ev.type === "delta") streamInto(ev.kind === "abl" ? e.text : e.normal, ev.delta as string);
-    else if (ev.type === "result") result = ev as never;
+    else if (ev.type === "result") result = ev as unknown as Tested;
   });
 
   e.typing = false;
@@ -249,32 +255,40 @@ export async function ablAsk(prompt: string, change: Entry["change"] = null) {
 
 /** A stronger or weaker erase, then the latest question again. */
 export async function nudge(dir: 1 | -1) {
-  const last = get().at!.at(-1)!, from = ablCoef();
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
+  const last = get().at?.at(-1);
+  if (!last) return;
+  const from = ablCoef();
   const to = Math.round(Math.max(0.2, Math.min(2, from + dir * 0.25)) * 100) / 100;
   if (to === from) return toast(dir > 0 ? "That’s already the strongest it goes." : "That’s already the weakest it goes.");
-  try { await setAblCoef(to); } catch (err) { return toast((err as Error).message, true); }
-  ablAsk(last.prompt, { from, to });
+  try { await setAblCoef(to); } catch (err) { return toast(errorMessage(err), true); }
+  void ablAsk(last.prompt, { from, to });
 }
 
 /** Back to the strength before the last nudge, dropping the answer it made. */
 export async function undoNudge() {
-  const at = get().at!, e = at.at(-1)!;
-  try { await setAblCoef(e.change!.from); } catch (err) { return toast((err as Error).message, true); }
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
+  const at = get().at, e = at?.at(-1);
+  if (!at || !e?.change) return;
+  try { await setAblCoef(e.change.from); } catch (err) { return toast(errorMessage(err), true); }
   set({ at: at.slice(0, -1) });
 }
 
 /** Back to an older answer's strength, asking the latest question again with it. */
 export async function backToCoef(coef: number) {
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
+  const last = get().at?.at(-1);
+  if (!last) return;
   const from = ablCoef();
-  try { await setAblCoef(coef); } catch (err) { return toast((err as Error).message, true); }
-  ablAsk(get().at!.at(-1)!.prompt, { from, to: coef });
+  try { await setAblCoef(coef); } catch (err) { return toast(errorMessage(err), true); }
+  void ablAsk(last.prompt, { from, to: coef });
 }
 
 // ------------------------------------------------------------------ save it
 export async function bakeAbl() {
   if (app().busy) return toast("Something is already running. Stop it first.", true);
   const name = get().name.trim() || defaultName();
-  try { await api("/api/abl/export", { coef: ablCoef(), name }); } catch (e) { return toast((e as Error).message, true); }
+  try { await api("/api/abl/export", { coef: ablCoef(), name }); } catch (e) { return toast(errorMessage(e), true); }
   pollExport("abl");
 }
 

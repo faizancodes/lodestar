@@ -17,15 +17,16 @@ import type { ArchDetail, ArchLive, ArchRun } from "../lib/types";
 // heads can be picked. Running text lights each head and neuron by what it did at the chosen token, sweeping from
 // the first layer to the last.
 
-export const S = 1.8; // layer spacing along the stream
-export const W = 2.2; // the width of a layer's sheets (z)
+const S = 1.8; // layer spacing along the stream
+const W = 2.2; // the width of a layer's sheets (z)
 const GAP = 1.1; // how far an opened layer's neighbours move aside, each way
 const OFF = { norm1: -0.6, attn: -0.32, norm2: -0.04, mlp: 0.28 } as const; // where each block sits within a layer
 const MLP_TOP = -0.42, ATTN_BOT = 0.42;
 const DUR = 1100;
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
 
 export type Part = keyof typeof OFF;
-export type End = "embed" | "unembed";
+type End = "embed" | "unembed";
 export type Focus =
   | { level: "model" }
   | { level: "layer"; layer: number }
@@ -38,7 +39,7 @@ export type Pick =
   | { kind: "neuron"; layer: number; neuron: number }
   | { kind: "head"; layer: number; head: number };
 
-export type Hooks = { hover?: (p: Pick | null, x: number, y: number) => void; click?: (p: Pick) => void };
+type Hooks = { hover?: (p: Pick | null, x: number, y: number) => void; click?: (p: Pick) => void };
 
 const VERT = /* glsl */ `
 uniform float uPx, uSize, uFx, uGap, uS, uMin;
@@ -207,7 +208,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     const ap: number[] = [], ab: number[] = [], ranges: [number, number][] = [];
     for (let hd = 0; hd < n; hd++) {
       const c = hd % tc, r = Math.floor(hd / tc);
-      const z0 = W / 2 - c * cell - Math.floor(c / gs) * ga - cell * 0.12, y0 = top - r * cell - cell * 0.12, st = (cell * 0.76) / (g - 1);
+      const z0 = W / 2 - c * cell - Math.floor(c / gs) * ga - cell * 0.12, y0 = top - r * cell - cell * 0.12, st = (cell * 0.76) / Math.max(1, g - 1);
       const base = ld.heads.length ? 0.2 + 0.42 * (ld.heads[hd] / headMax) : 0.3;
       const s0 = ap.length / 3;
       for (let i = 0; i < g; i++)
@@ -588,6 +589,8 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     outTok.textContent = "";
   }
 
+  const liveTimers = new Set<ReturnType<typeof setTimeout>>();
+
   /** Sends one token down the model; resolves once it has come out at the unembedding. */
   function liveFrame(f: ArchLive, text: string) {
     if (!live) liveStart();
@@ -600,15 +603,19 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     });
     pulses.push(t0);
     const word = text.trim() ? text : JSON.stringify(text).slice(1, -1);
-    return new Promise<void>((done) => setTimeout(() => {
-      if (live) {
-        outTok.textContent = word;
-        outTok.classList.remove("pop");
-        void outTok.offsetWidth;
-        outTok.classList.add("pop");
-      }
-      done();
-    }, TRAVEL * 1000));
+    return new Promise<void>((done) => {
+      const tid = setTimeout(() => {
+        liveTimers.delete(tid);
+        if (alive && live) {
+          outTok.textContent = word;
+          outTok.classList.remove("pop");
+          void outTok.offsetWidth;
+          outTok.classList.add("pop");
+        }
+        done();
+      }, TRAVEL * 1000);
+      liveTimers.add(tid);
+    });
   }
 
   function arrive(l: number) {
@@ -735,7 +742,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
       // Home's preview: turns slowly round the model while hovered
       if (spinning) spin += dt * 0.25;
       const p = pose({ level: "model" }), off = p.pos.clone().sub(p.at);
-      off.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(spin) * 0.5);
+      off.applyAxisAngle(UP_AXIS, Math.sin(spin) * 0.5);
       camera.position.copy(p.at).add(off);
       camera.lookAt(p.at);
     }
@@ -757,7 +764,7 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
     (stream.geo.attributes.b as THREE.BufferAttribute).needsUpdate = true;
 
     if (!preview) labelsFrame();
-    renderer.render(scene, camera);
+    if (!document.hidden) renderer.render(scene, camera);
   }
 
   // start: the Home preview's pose, then fly in
@@ -775,21 +782,19 @@ export function createScene(host: HTMLElement, m: ArchDetail, hooks: Hooks = {},
 
   return {
     setFocus,
-    focusNow: () => focus,
     setNorms,
     setRun,
     setToken,
-    liveStart,
     liveFrame,
-    liveEnd,
     select,
     setSpin: (on: boolean) => (spinning = on),
-    /** Re-centres the camera on what's in focus, after the user has orbited away. */
-    reset: () => flyTo(pose(focus), 700),
     dispose() {
       if (!alive) return;
       alive = false;
       cancelAnimationFrame(raf);
+      liveTimers.forEach((tid) => clearTimeout(tid));
+      liveTimers.clear();
+      liveEnd();
       ro.disconnect();
       controls?.dispose();
       el.removeEventListener("pointermove", onMove);

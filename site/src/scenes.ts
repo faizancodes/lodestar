@@ -1,5 +1,6 @@
 import type { Put } from "../../web/src/art/glyphs";
 import { compassStar } from "../../web/src/art/mark";
+import { clamp, cross3, dot, ease, hash, norm, type V3 } from "./util";
 
 // The scroll sequence's scenes, in the app's ASCII marks. Each tells its feature's story as u runs 0 → 1 (how far
 // the reader has scrolled through that step); t keeps the ambient motion going (twinkle, flow, traffic).
@@ -14,9 +15,6 @@ import { compassStar } from "../../web/src/art/mark";
 
 export type Frame = { put: Put; cols: number; rows: number; t: number; u: number; pointer: { x: number; y: number } | null };
 
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
-const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
-const ease = (x: number) => { x = clamp(x); return x * x * (3 - 2 * x); };
 const gauss = (i: number, k: number) => { // a standard normal sample, fixed per (i, k)
   const u = Math.max(1e-6, hash(i, k, 1)), v = hash(i, k, 2);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
@@ -37,11 +35,6 @@ const star = (put: Put, cx: number, cy: number, S: number, k = 1) => {
 };
 
 // ---------------------------------------------------------------- erase: the refusal direction, projected out
-type V3 = [number, number, number];
-const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const norm = (a: V3): V3 => { const l = Math.hypot(...a); return [a[0] / l, a[1] / l, a[2] / l]; };
-const cross3 = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-
 const DIR = norm([1, 0.35, 0.25]);            // the refusal direction
 const U = norm(cross3(DIR, [0, 1, 0])), W = cross3(DIR, U); // the plane it's erased against
 const CLOUD = Array.from({ length: 900 }, (_, i) => ({
@@ -106,6 +99,9 @@ export function erase({ put, cols, rows, t, u }: Frame) {
 
 // ---------------------------------------------------------------- layers: a token climbing the stack
 const SHEETS = 12, NI = 16, NJ = 9;
+const LAYER_LIT = Array.from({ length: SHEETS }, (_, k) =>
+  Array.from({ length: 3 }, (_, n) => [Math.floor(hash(7, k, n) * NI), Math.floor(hash(7, k, n, 1) * NJ), 0.55 + 0.45 * hash(7, k, n, 2)] as const),
+);
 
 export function layers({ put, cols, rows, t, u }: Frame) {
   const unfold = ease(u / 0.3);
@@ -115,7 +111,6 @@ export function layers({ put, cols, rows, t, u }: Frame) {
   const at = (i: number, j: number, k: number): [number, number] => [ox + (i - j) * a, oy + (i + j) * b - k * gap];
 
   const head = ease((u - 0.2) / 0.62) * (SHEETS + 0.6) - 0.5; // the sheet the token has reached
-  const lit = (k: number) => Array.from({ length: 3 }, (_, n) => [Math.floor(hash(7, k, n) * NI), Math.floor(hash(7, k, n, 1) * NJ), 0.55 + 0.45 * hash(7, k, n, 2)]);
 
   for (let k = 0; k < SHEETS; k++) {
     const near = Math.exp(-((head - k) ** 2) / 0.8);
@@ -131,7 +126,7 @@ export function layers({ put, cols, rows, t, u }: Frame) {
   }
 
   for (let k = 0; k < SHEETS && k <= head; k++) { // the token's path
-    const here = lit(k), pulse = Math.exp(-((head - k) ** 2) / 0.6);
+    const here = LAYER_LIT[k], pulse = Math.exp(-((head - k) ** 2) / 0.6);
     for (const [i, j, act] of here) {
       const [x, y] = at(i, j, k);
       put(x, y, 0.6 + 0.4 * act);
@@ -139,7 +134,7 @@ export function layers({ put, cols, rows, t, u }: Frame) {
       if (pulse > 0.3) for (let d = -2; d <= 2; d++) (put(x + d, y + d, pulse * act), put(x + d, y - d, pulse * act));
     }
     if (k + 1 < SHEETS) {
-      const up = lit(k + 1), grow = clamp(head - k);
+      const up = LAYER_LIT[k + 1], grow = clamp(head - k);
       here.forEach(([i, j], n) => {
         const [x0, y0] = at(i, j, k), [x1, y1] = at(up[n][0], up[n][1], k + 1);
         line(put, x0, y0, x0 + (x1 - x0) * grow, y0 + (y1 - y0) * grow, 0.5);
@@ -150,15 +145,25 @@ export function layers({ put, cols, rows, t, u }: Frame) {
 
 // ---------------------------------------------------------------- steer: a push parting the stream
 const LINES = 23;
-let push = { x: 0, y: 0, set: false };
+const steerPush = new WeakMap<Put, { x: number; y: number; active: boolean }>();
 
 export function steer({ put, cols, rows, t, u, pointer }: Frame) {
   const enter = ease(u / 0.55);
   const drift = { x: cols * (0.12 + 0.34 * enter + 0.04 * Math.sin(t * 0.31)), y: rows * (0.5 + 0.14 * Math.sin(t * 0.47 + 1)) };
-  const aim = pointer ?? drift;
-  if (!push.set) push = { ...aim, set: true };
-  push.x += (aim.x - push.x) * 0.14;
-  push.y += (aim.y - push.y) * 0.14;
+  let push = drift;
+  let state = steerPush.get(put);
+  if (pointer) {
+    if (!state) ((state = { ...drift, active: true }), steerPush.set(put, state));
+    state.active = true;
+    state.x += (pointer.x - state.x) * 0.14;
+    state.y += (pointer.y - state.y) * 0.14;
+    push = state;
+  } else if (state?.active) {
+    state.x += (drift.x - state.x) * 0.14;
+    state.y += (drift.y - state.y) * 0.14;
+    if (Math.hypot(drift.x - state.x, drift.y - state.y) < 0.5) state.active = false;
+    push = state;
+  }
 
   const A = rows * 0.13 * ease((u - 0.1) / 0.55), w = rows * 0.2, s = cols * 0.03;
   const bend = (x: number, y0: number) => { // most for the nearest line, never so much that two lines cross
@@ -218,6 +223,7 @@ export function chat({ put, cols, rows, t, u }: Frame) {
     toks.push({ x, w, off: cum, d: diff(k) });
     x += w + 2;
   }
+  if (!toks.length) return;
   const spread = (rows * 0.3) / Math.max(1, cum);
   const yOf = (k: number, s: number) => cy + (s ? 1 : -1) * (3 + toks[k].off * spread);
   const wOf = (k: number, s: number) => (k < AGREE ? toks[k].w : Math.max(1, toks[k].w + Math.round((hash(s, k, 5) - 0.5) * 3)));
@@ -269,7 +275,7 @@ export function chat({ put, cols, rows, t, u }: Frame) {
       const ty = back ? cy : yOf(Math.floor(hash(s, n, a, 12) * n), s);
       const lift = (s ? Math.max(hy, ty) : Math.min(hy, ty)) + dir * (6 + a * 3 + Math.abs(hx - tx) * 0.05);
       const ph = (t * 0.7 + a / 4) % 1;
-      bez(hx, hy - dir, tx, ty + (back ? -dir : -dir), (hx + tx) / 2, lift, (q) => (0.1 + 0.75 * Math.exp(-((q - ph) ** 2) / 0.003)) * (s ? 1 : 0.6), 2);
+      bez(hx, hy - dir, tx, ty - dir, (hx + tx) / 2, lift, (q) => (0.1 + 0.75 * Math.exp(-((q - ph) ** 2) / 0.003)) * (s ? 1 : 0.6), 2);
     }
   });
 }

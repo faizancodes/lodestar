@@ -1,6 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { drawHomeArt } from "../art/home";
-import { api } from "../lib/api";
+import { api, cancelRun } from "../lib/api";
 import { bandText, isDir, steerDefaultName } from "../lib/format";
 import { loadModel } from "../shell/engine";
 import { openSteer } from "../shell/experiments";
@@ -17,7 +17,6 @@ import { addItems, replaceRecipe } from "../steer/recipe";
 import { newChat, PROMPTS, send, submit } from "../steer/refine";
 import { Thread } from "../steer/Thread";
 
-const cancel = () => api("/api/cancel", {});
 const n3 = { "--n": 3 } as CSSProperties;
 
 // the status panel: how many neurons are on, under which recipe
@@ -29,8 +28,14 @@ function StatusCard() {
 
   useEffect(() => {
     if (!shown) return;
-    const raf = requestAnimationFrame(() => drawHomeArt(art.current!, "steer", panel.current));
-    return () => cancelAnimationFrame(raf);
+    let cleanup = () => {};
+    const raf = requestAnimationFrame(() => {
+      if (art.current) cleanup = drawHomeArt(art.current, "steer", panel.current);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      cleanup();
+    };
   }, [shown, n, nd, name]);
 
   // the recipe's name is the headline, so a long one wraps across the panel instead of squeezing the facts
@@ -103,7 +108,7 @@ function NewDirection() {
         <label className="field">Toward <span className="opt" id="dn-pos-opt">{hint}</span><textarea id="dn-pos" rows={4} spellCheck="false" value={d.pos} onChange={(e) => setDn({ pos: e.target.value })} /></label>
         <label className="field">Away from <span className="opt" id="dn-neg-opt">{hint}</span><textarea id="dn-neg" rows={4} spellCheck="false" value={d.neg} onChange={(e) => setDn({ neg: e.target.value })} /></label>
       </div>
-      <div className="row tight"><button id="dn-go" className="btn" onClick={findDirection}>Find direction</button><button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>
+      <div className="row tight"><button id="dn-go" className="btn" onClick={findDirection}>Find direction</button><button className="btn ghost" data-cancel="" onClick={cancelRun}>Stop</button>
         <span className="grow" />
         <input id="dn-path" className="dn-path" placeholder="or import a .npz path" spellCheck="false" value={d.path} onChange={(e) => setDn({ path: e.target.value })} />
         <button id="dn-import" className="btn ghost sm" onClick={importDirs}>Import</button></div>
@@ -144,7 +149,7 @@ function Step1() {
         <div className="ask">
           <input id="c-input" placeholder="How should it act? e.g. talk like a pirate, or a word like cookie" spellCheck="false" autoComplete="off"
             value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") findChanges(); }} />
-          <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>
+          <button className="btn ghost" data-cancel="" onClick={cancelRun}>Stop</button>
           <button id="c-go" className="btn" onClick={findChanges}>Find</button>
         </div>
         <Examples />
@@ -186,7 +191,7 @@ function Step2() {
           <input id="t-prompt" spellCheck="false" placeholder={started ? "Reply" : "Ask it something"} value={input}
             onChange={(e) => useSteer.setState({ tInput: e.target.value })} />
           <button type="button" className="tl-newq" id="tl-new" hidden={!started} onClick={newChat}>New chat</button>
-          <button type="button" className="send stop" id="tl-stop" aria-label="Stop" onClick={cancel}><i /></button>
+          <button type="button" className="send stop" id="tl-stop" aria-label="Stop" onClick={cancelRun}><i /></button>
           <button type="submit" className="send" id="t-go" aria-label="Send">{SEND}</button>
         </div>
         {!started && <div className="tl-sugg" id="t-chips">{PROMPTS.map((p) => <button key={p} type="button" className="chip" onClick={() => send(p)}>{p}</button>)}</div>}

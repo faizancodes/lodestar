@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { loadDetail, useArch } from "../arch3d/state";
 import { drawHomeArt, type HomeArt } from "../art/home";
 import { api } from "../lib/api";
@@ -23,14 +23,20 @@ export function Home({ hidden }: { hidden: boolean }) {
 
   useEffect(() => {
     if (!shown) return;
-    const raf = requestAnimationFrame(() => document.querySelectorAll<HTMLCanvasElement>(".home-art")
-      .forEach((c) => drawHomeArt(c, c.dataset.art as HomeArt, c.closest<HTMLElement>(".home-card"))));
-    return () => cancelAnimationFrame(raf);
+    let cleanups: (() => void)[] = [];
+    const raf = requestAnimationFrame(() => {
+      cleanups = [...document.querySelectorAll<HTMLCanvasElement>(".home-art")]
+        .map((c) => drawHomeArt(c, c.dataset.art as HomeArt, c.closest<HTMLElement>(".home-card")));
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      cleanups.forEach((fn) => fn());
+    };
   }, [shown, s?.model, cur, mine]);
 
   const dev = s?.device && ({ mps: "Apple GPU", cuda: "GPU", cpu: "CPU" }[s.device] || s.device);
   const specs: [string, unknown][] = [["Parameters", s?.params && `${(s.params / 1e9).toFixed(1)}B`], ["Layers", s?.layers], ["Runs on", dev], ["Precision", s?.dtype]];
-  const status: Record<HomeArt, JSX.Element | string> = {
+  const status: Record<HomeArt, ReactElement | string> = {
     abliterate: cur?.active ? <><i className="hc-on" />Refusals erased at layer {cur.layer}</> : cur ? "Direction saved, switched off" : "",
     steer: mine ? `${mine} saved` : "",
     chat: "",
@@ -81,8 +87,12 @@ function Architecture() {
       const on = () => sc.setSpin(true), off = () => sc.setSpin(false);
       box.addEventListener("mouseenter", on);
       box.addEventListener("mouseleave", off);
-      dispose = () => (box.removeEventListener("mouseenter", on), box.removeEventListener("mouseleave", off), sc.dispose());
-    });
+      dispose = () => {
+        box.removeEventListener("mouseenter", on);
+        box.removeEventListener("mouseleave", off);
+        sc.dispose();
+      };
+    }).catch(() => {});
     return () => ((gone = true), dispose());
   }, [d]);
 
@@ -126,6 +136,7 @@ const clock = (t: number) => new Date(t * 1000).toLocaleTimeString([], { hour: "
 function Api() {
   const [s, setS] = useState<Serve | null>(null);
   const [copied, setCopied] = useState<string | null>(null), [pick, setPick] = useState<string | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const items = useApp((a) => a.recipe.items), erased = useApp(ablActive), steer = useChat((c) => c.steer);
   const url = `${location.origin}/v1`;
 
@@ -134,10 +145,20 @@ function Api() {
     const poll = () => api<Serve>("/api/serve").then((r) => live && setS(r)).catch(() => {});
     poll();
     const t = setInterval(poll, 2500);
-    return () => ((live = false), clearInterval(t));
+    return () => {
+      live = false;
+      clearInterval(t);
+      clearTimeout(copyTimer.current);
+    };
   }, []);
 
-  const copy = (k: string, text: string) => navigator.clipboard.writeText(text).then(() => (setCopied(k), setTimeout(() => setCopied(null), 1400)));
+  const copy = (k: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(k);
+      clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(null), 1400);
+    }).catch(() => {});
+  };
   const models = s?.models ?? [];
   const model = models.find((m) => m.id === pick)?.id ?? models[0]?.id ?? "";
   const changed = (steer && items.length > 0) || erased;
@@ -168,8 +189,8 @@ function Api() {
         </div>
         {!!s?.log.length && <div className="api-sec">
           <div className="api-l">Recent requests{!!s.active && <i className="hc-on" title="Answering a request" />}</div>
-          <div className="api-log" id="api-log">{s.log.map((r) => (
-            <div key={r.at}><span>{clock(r.at)}</span><b>{r.model}</b><span>{r.prompt} → {r.tokens} tokens</span><span>{r.seconds} s</span></div>
+          <div className="api-log" id="api-log">{s.log.map((r, i) => (
+            <div key={`${r.at}-${i}`}><span>{clock(r.at)}</span><b>{r.model}</b><span>{r.prompt} → {r.tokens} tokens</span><span>{r.seconds} s</span></div>
           ))}</div>
         </div>}
       </div>

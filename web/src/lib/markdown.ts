@@ -2,11 +2,11 @@ import { esc } from "./format";
 
 // a small, safe markdown pass for replies: code blocks, inline code, bold, italics, headings, lists
 export function md(src: string) {
-  const parts = src.split(/```([^\n`]*)\n?([\s\S]*?)(?:```|$)/g);
+  const parts = src.split(/```[^\n`]*\n?([\s\S]*?)(?:```|$)/g);
   let html = "";
-  for (let i = 0; i < parts.length; i += 3) {
+  for (let i = 0; i < parts.length; i += 2) {
     html += mdBlocks(parts[i]);
-    if (i + 2 < parts.length) html += `<pre><code>${esc(parts[i + 2].replace(/\n$/, ""))}</code></pre>`;
+    if (i + 1 < parts.length) html += `<pre><code>${esc(parts[i + 1].replace(/\n$/, ""))}</code></pre>`;
   }
 
   return html;

@@ -28,16 +28,15 @@ export async function snap(target: Page | Locator, name: string) {
 
   const page = "page" in target ? target.page() : target;
   if (AUDIT) return audit(page, name);
-  const tag = await page.addStyleTag({ content: STILL });
-
-  // WebKit paints only what's inside the window, so a panel taller than it would come out blank at the bottom:
-  // grow the window to fit it for the shot, then put it back
   const size = page.viewportSize()!;
-  const box = "page" in target ? await target.boundingBox() : null;
-  const tall = box && box.height + 120 > size.height;
-  if (tall) await page.setViewportSize({ width: size.width, height: Math.ceil(box.height + 240) });
-
+  let tall = false;
+  const tag = await page.addStyleTag({ content: STILL });
   try {
+    // WebKit paints only what's inside the window, so a panel taller than it would come out blank at the bottom:
+    // grow the window to fit it for the shot, then put it back
+    const box = "page" in target ? await target.boundingBox() : null;
+    tall = Boolean(box && box.height + 120 > size.height);
+    if (tall && box) await page.setViewportSize({ width: size.width, height: Math.ceil(box.height + 240) });
     await expect(target).toHaveScreenshot(`${name}.png`);
   } finally {
     if (tall) await page.setViewportSize(size);

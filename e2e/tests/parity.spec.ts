@@ -161,9 +161,13 @@ test("steer: search by word, turn neurons on, try it, inspect, fix, save", async
 
   // the word's details replace the first word's: wait until the old rows are gone before clicking one
   const old = await page.locator('.panel[data-kind="inspect"] .in-detail .found-row').first().elementHandle();
-  await words.nth(2).click();
-  await expect(words.nth(2)).toHaveClass(/\bsel\b/);
-  await page.waitForFunction((el) => !el?.isConnected, old, { timeout: T });
+  try {
+    await words.nth(2).click();
+    await expect(words.nth(2)).toHaveClass(/\bsel\b/);
+    await page.waitForFunction((el) => !el?.isConnected, old, { timeout: T });
+  } finally {
+    await old?.dispose();
+  }
   await page.locator('.panel[data-kind="inspect"] .in-detail .found-row .who').first().click();
 
   const neuron = page.locator('.panel[data-kind="neuron"]');
@@ -412,7 +416,7 @@ test("abliterate: only one category", async ({ page }) => {
   await page.locator("#abl-cat-prompts").fill(SECURITY[0]);
   await page.locator("#abl-cat-write").click();
   const lines = async () => (await page.locator("#abl-cat-prompts").inputValue()).split("\n");
-  await expect.poll(async () => (await lines()).length, { timeout: 120_000 }).toBeGreaterThanOrEqual(12);
+  await expect.poll(async () => (await lines()).length, { timeout: T }).toBeGreaterThanOrEqual(12);
   await expect(page.locator("#abl-cat-write")).toHaveText("Write some");
   const written = await lines();
   expect(written[0]).toBe(SECURITY[0]);

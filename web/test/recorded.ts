@@ -20,7 +20,7 @@ export type Exchange = {
   type: "json" | "sse"; response?: unknown; events?: { dt: number; data: { type: string; [k: string]: unknown } }[];
 };
 
-export const fixtures: Record<string, Exchange[]> = Object.fromEntries(
+const fixtures: Record<string, Exchange[]> = Object.fromEntries(
   readdirSync(FIXTURES).filter((f) => f.endsWith(".json")).map((f) => [f.replace(/\.json$/, ""), JSON.parse(readFileSync(join(FIXTURES, f), "utf8"))]),
 );
 export const exchanges = Object.values(fixtures).flat();

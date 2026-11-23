@@ -1,5 +1,5 @@
-import { drawMarks } from "./glyphs";
-import type { Put } from "./glyphs";
+import { drawMarks, type Put } from "./glyphs";
+import { hash } from "./math";
 
 // "Reading every neuron" scene in the same ASCII-mark style as the loading scene: a small network of layers,
 // a scan line sweeping through it, neurons lighting up by how strongly they fire, and signals passing
@@ -7,8 +7,6 @@ import type { Put } from "./glyphs";
 const COLS = 110, ROWS = 86, CELL = 4.2;
 const LAYER_SIZES = [5, 7, 8, 8, 8, 7, 4];
 const PERIOD = 3.4; // seconds per sweep
-
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 
 // layers as columns of neurons
 const LAYERS = LAYER_SIZES.map((n, l) => {
@@ -109,8 +107,8 @@ function draw(ctx: CanvasRenderingContext2D, t: number) {
   drawMarks(ctx, grid, COLS, ROWS, CELL);
 }
 
-/** Runs until the canvas leaves the page. */
-export function startScan(canvas: HTMLCanvasElement) {
+/** Runs until the canvas leaves the page or the returned cleanup function is called. */
+export function startScan(canvas: HTMLCanvasElement): () => void {
   const dpr = devicePixelRatio || 1;
   canvas.width = COLS * CELL * dpr;
   canvas.height = ROWS * CELL * dpr;
@@ -122,16 +120,21 @@ export function startScan(canvas: HTMLCanvasElement) {
 
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const t0 = performance.now();
-  let last = 0;
+  let last = 0, raf = 0, stopped = false;
 
   const tick = (now: number) => {
-    if (!canvas.isConnected) return;
-    requestAnimationFrame(tick);
+    if (stopped || !canvas.isConnected) return;
+    raf = requestAnimationFrame(tick);
     if (now - last < 66) return; // ~15 fps
     last = now;
     draw(ctx, (now - t0) / 1000 + 0.8);
   };
 
   if (still) draw(ctx, 1.6);
-  else requestAnimationFrame(tick);
+  else raf = requestAnimationFrame(tick);
+
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(raf);
+  };
 }

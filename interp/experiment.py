@@ -46,6 +46,7 @@ import numpy as np
 from . import directions as dir_mod
 from . import probe as probe_mod
 
+
 FORMAT = "experiment/1"
 EXAMPLES = Path(__file__).resolve().parent.parent / "experiments"
 METRICS = ("separation", "new_groups", "words_only", "words_only_new_groups", "shuffled", "caught", "layer")
@@ -100,13 +101,31 @@ def run(eng, lib, exp, cancel=None):
 def from_probe(entry, about="", tries=()):
     """A saved probe written as an experiment, expecting the separation numbers it got to within 0.03."""
     m = entry["metrics"]
-    expect = {k: [round(max(0.0, m[k] - 0.03), 2), round(min(1.0, m[k] + 0.03), 2)]
-              for k in ("separation", "new_groups", "words_only") if k in m}
-    side = lambda s: {"label": entry["labels"][1 - s], "prompts": [
-        {"text": it["text"], "group": it["group"]} if it["group"] else it["text"] for it in entry["items"] if it["side"] == s]}
+    expect = {
+        k: [round(max(0.0, m[k] - 0.03), 2), round(min(1.0, m[k] + 0.03), 2)]
+        for k in ("separation", "new_groups", "words_only")
+        if k in m
+    }
 
-    return {"lodestar": FORMAT, "name": entry["name"], "about": about, "model": model_ref(entry["model"]),
-            "probe": {"a": side(1), "b": side(0)}, "try": list(tries), "expect": expect}
+    def _side(s):
+        return {
+            "label": entry["labels"][1 - s],
+            "prompts": [
+                {"text": it["text"], "group": it["group"]} if it["group"] else it["text"]
+                for it in entry["items"]
+                if it["side"] == s
+            ],
+        }
+
+    return {
+        "lodestar": FORMAT,
+        "name": entry["name"],
+        "about": about,
+        "model": model_ref(entry["model"]),
+        "probe": {"a": _side(1), "b": _side(0)},
+        "try": list(tries),
+        "expect": expect,
+    }
 
 
 def examples(kind="probe"):
@@ -158,13 +177,13 @@ def from_steer(eng, items, name, about="", tries=()):
                                "unit": base64.b64encode(d["unit"].float().cpu().numpy().tobytes()).decode()}
             continue
 
-        l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
-        p = {"layer": l, "neuron": n}
+        layer_idx, neuron_idx, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
+        p = {"layer": layer_idx, "neuron": neuron_idx}
         if it.get("mode") == "mul":
             p["times"] = dose
         else:
-            p["add"] = round(dose * float(eng.unit[l, n]), 4)
-        p["weight"] = round(float(eng.dnorm[l, n]), 5)
+            p["add"] = round(dose * float(eng.unit[layer_idx, neuron_idx]), 4)
+        p["weight"] = round(float(eng.dnorm[layer_idx, neuron_idx]), 5)
         if it.get("label"):
             p["label"] = it["label"]
         pushes.append(p)
@@ -201,22 +220,30 @@ def open_steer(eng, lib, exp):
     for p in exp["steer"]:
         if "direction" in p:
             d = exp["directions"][p["direction"]]
-            items.append({"kind": "dir", "dir": ids[p["direction"]], "name": d.get("name"),
-                          "layers": [int(l) for l in p["layers"]], "op": p.get("op", "push"), "dose": float(p["dose"])})
+            items.append(
+                {
+                    "kind": "dir",
+                    "dir": ids[p["direction"]],
+                    "name": d.get("name"),
+                    "layers": [int(layer_idx) for layer_idx in p["layers"]],
+                    "op": p.get("op", "push"),
+                    "dose": float(p["dose"]),
+                }
+            )
             continue
 
-        l, n = int(p["layer"]), int(p["neuron"])
-        if not (0 <= l < L and 0 <= n < N):
-            raise ValueError(f"L{l} N{n} isn't in this model, which has {L} layers of {N} neurons.")
-        w = float(eng.dnorm[l, n])
+        layer_idx, neuron_idx = int(p["layer"]), int(p["neuron"])
+        if not (0 <= layer_idx < L and 0 <= neuron_idx < N):
+            raise ValueError(f"L{layer_idx} N{neuron_idx} isn't in this model, which has {L} layers of {N} neurons.")
+        w = float(eng.dnorm[layer_idx, neuron_idx])
         if p.get("weight") and abs(w / p["weight"] - 1) > 0.01:
-            mismatched.append(f"L{l} N{n}")
+            mismatched.append(f"L{layer_idx} N{neuron_idx}")
 
-        it = {"layer": l, "neuron": n}
+        it = {"layer": layer_idx, "neuron": neuron_idx}
         if "times" in p:
             it |= {"dose": float(p["times"]), "mode": "mul"}
         else:
-            it["dose"] = float(p["add"]) / float(eng.unit[l, n])
+            it["dose"] = float(p["add"]) / float(eng.unit[layer_idx, neuron_idx])
         if p.get("label"):
             it["label"] = p["label"]
         items.append(it)

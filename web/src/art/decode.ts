@@ -87,7 +87,7 @@ export function createDecoder() {
       for (let k = 0; k < fresh; k++) arrivals.push(now + k * gap); // a token's letters arrive in a quick ripple
 
       wrap(now);
-      if (!raf) raf = requestAnimationFrame(paint);
+      if (raf) cancelAnimationFrame(raf);
       paint();
     },
   };

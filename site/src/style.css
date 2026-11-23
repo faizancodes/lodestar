@@ -3,7 +3,6 @@
    text and controls; Geist Mono only for data and code. Tokens are the app's (web/src/styles/style.css). */
 :root {
   --bg: #0a0a0a;
-  --night: #070707;
   --panel: #111111;
   --panel-2: #1a1a1a;
   --text: #ededed;
@@ -12,16 +11,11 @@
   --accent: #f2f2f2;
   --accent-hi: #ffffff;
   --ascii: #c3cff5;
-  --good: #3ddc84;
-  --g-pos: #f0b45a;
-  --g-neg: #7aa2f7;
   --rule: rgba(255, 255, 255, 0.08);
   --rule-2: rgba(255, 255, 255, 0.14);
-  --wash: rgba(255, 255, 255, 0.05);
   --well: rgba(255, 255, 255, 0.03);
   --sans: "Geist", -apple-system, system-ui, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --radius: 6px;
   --r-sm: 4px;
   --w: 1120px;
   --gut: clamp(16px, 4vw, 40px);
@@ -41,7 +35,7 @@ body {
 }
 ::selection { background: var(--ascii); color: var(--bg); }
 a { color: inherit; text-decoration: none; }
-h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.035em; }
+h1, h2 { margin: 0; font-weight: 600; letter-spacing: -0.035em; }
 p { margin: 0; }
 .art { display: block; color: var(--ascii); }
 

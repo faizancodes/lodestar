@@ -21,9 +21,8 @@ export type Entry = {
   open: boolean; // an older answer, unfolded
 };
 
-type Rank = { layer: number; score: number; tried: number; refused: number };
 export type AblResult = {
-  layer: number; coef: number; top_score: number; ranking: Rank[];
+  coef: number;
   tried: number; refused_before?: number; refused_left: number; // of the new bad requests, how many it refused before and after
 };
 
@@ -47,7 +46,6 @@ type Abl = {
     done: boolean; // finished: the steps fold away
   };
   rank: AblResult | null;
-  rankN: number; // a new ranking is a new list
   at: Entry[] | null; // the try-it thread
   cat: { name: string; prompts: string; running: boolean; writing: boolean; live: Live; width: string; touched: boolean };
 };
@@ -62,7 +60,6 @@ export const useAbl = create<Abl>(() => ({
   nameTouched: false,
   plan: { shown: false, goal: "", steps: null, widths: ["", "", "", ""], scene: false, clock: "0:00", live: null, running: false, done: false },
   rank: null,
-  rankN: 0,
   at: null,
   cat: { name: "", prompts: "", running: false, writing: false, live: null, width: "0%", touched: false },
 }));

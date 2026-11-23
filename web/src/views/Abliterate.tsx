@@ -4,16 +4,16 @@ import {
   undoNudge,
 } from "../abl/engine";
 import { drawHomeArt } from "../art/home";
-import { api } from "../lib/api";
+import { cancelRun } from "../lib/api";
 import { loadModel } from "../shell/engine";
 import { touchAbl, useAbl, type Entry } from "../store/abl";
 import { ablActive, useApp } from "../store/app";
 import { useSteer } from "../store/steer";
+import { lines } from "../steer/describe";
 import { cancelExport } from "../steer/exporting";
 import { Ans, LiveLine, SEND } from "../steer/Live";
 import { setCompare } from "../steer/refine";
 
-const cancel = () => api("/api/cancel", {});
 const xs = (c: number | null) => (c == null ? "" : `${(+c).toFixed(2)}×`);
 const STEPS = ["Read", "Compare", "Try layers", "Check"];
 
@@ -24,7 +24,7 @@ const verdict = (ref: boolean | null, worse = false) => ref == null ? null
 const useReady = () => useApp((s) => !!s.abl?.ready && !!s.abl.current);
 const useCat = () => useApp((s) => s.abl?.current?.category ?? null);
 const useScoped = () => useApp((s) => (s.abl?.current?.scope === "category" ? s.abl.current.category : null));
-const count = (text: string) => text.split("\n").filter((l) => l.trim()).length;
+const count = (text: string) => lines(text).length;
 const MIN_INSIDE = 12;
 
 // the status panel: where the direction is, how strongly it's erased, and the switch for it
@@ -36,8 +36,14 @@ function StatusCard() {
 
   useEffect(() => {
     if (!shown) return;
-    const raf = requestAnimationFrame(() => drawHomeArt(art.current!, "abliterate", panel.current));
-    return () => cancelAnimationFrame(raf);
+    let cleanup = () => {};
+    const raf = requestAnimationFrame(() => {
+      if (art.current) cleanup = drawHomeArt(art.current, "abliterate", panel.current);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      cleanup();
+    };
   }, [shown, c?.active, c?.layer, c?.coef]);
 
   return (
@@ -104,7 +110,7 @@ function Step1() {
               {editing ? "Done" : "Edit"}
             </button>
           </div>
-          {plan.running && <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>}
+          {plan.running && <button className="btn ghost" data-cancel="" onClick={cancelRun}>Stop</button>}
           <button id="abl-go" className={ready ? "btn ghost" : "btn"} disabled={plan.running} onClick={analyze}>{ready ? "Find it again" : "Find it"}</button>
         </div>
 
@@ -156,7 +162,7 @@ function Answer({ e, i, last, cmp, cur, busy }: { e: Entry; i: number; last: boo
     : e.coef != null && e.coef !== cur && !busy && act(`Go back to ${xs(e.coef)}`, () => backToCoef(e.coef!));
 
   // an older answer folds to two lines; a click (not on its buttons) unfolds it
-  const fold = (ev: React.MouseEvent) => !(ev.target as Element).closest("button") && ((e.open = !e.open), touchAbl());
+  const fold = (ev: React.MouseEvent) => ev.target instanceof Element && !ev.target.closest("button") && ((e.open = !e.open), touchAbl());
 
   return (
     <>
@@ -217,7 +223,7 @@ function StepCat() {
         </label>
         <div className="abl-find">
           <div className="abl-q"><span><b>{n}</b> requests</span></div>
-          {(cat.running || cat.writing) && <button className="btn ghost" data-cancel="" onClick={cancel}>Stop</button>}
+          {(cat.running || cat.writing) && <button className="btn ghost" data-cancel="" onClick={cancelRun}>Stop</button>}
           <button id="abl-cat-write" className="btn ghost" disabled={cat.running || cat.writing || !cat.name.trim()}
             onClick={writeRequests}>{cat.writing ? "Writing…" : "Write some"}</button>
           <button id="abl-cat-go" className={found ? "btn ghost" : "btn"} disabled={cat.running || cat.writing || n < MIN_INSIDE || !cat.name.trim()}
@@ -244,11 +250,11 @@ function Step2() {
       <form id="abl-form" className="tl-comp" autoComplete="off" onSubmit={(e) => (e.preventDefault(), ablAsk(q))}>
         <div className="composer">
           <input id="abl-q" spellCheck="false" placeholder="Ask it something" value={q} onChange={(e) => useAbl.setState({ q: e.target.value })} />
-          <button type="button" className="send stop" id="abl-stop" aria-label="Stop" onClick={cancel}><i /></button>
+          <button type="button" className="send stop" id="abl-stop" aria-label="Stop" onClick={cancelRun}><i /></button>
           <button type="submit" className="send" aria-label="Send">{SEND}</button>
         </div>
-        <div className="tl-sugg" id="abl-sugg">{(sugg || []).slice(-3).map((p) => (
-          <button key={p} type="button" className="chip" title={p} onClick={() => ablAsk(p)}>{p}</button>
+        <div className="tl-sugg" id="abl-sugg">{(sugg || []).slice(-3).map((p, i) => (
+          <button key={`${p}-${i}`} type="button" className="chip" title={p} onClick={() => ablAsk(p)}>{p}</button>
         ))}</div>
       </form>
     </div>
@@ -292,7 +298,7 @@ export function Abliterate({ hidden }: { hidden: boolean }) {
       <header className="page-h">
         <h2>Abliterate</h2>
         <p>Erase the model’s refusal direction, check the result, then save it as a new model{" "}
-          (<a href="https://arxiv.org/abs/2406.11717" target="_blank">Arditi et al.</a>).</p>
+          (<a href="https://arxiv.org/abs/2406.11717" target="_blank" rel="noopener noreferrer">Arditi et al.</a>).</p>
       </header>
       <StatusCard />
       <div className="flow">
