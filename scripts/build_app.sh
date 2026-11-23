@@ -18,8 +18,9 @@ RES="$APP/Contents/Resources"
 rm -rf "$APP" "$DEST/Lodestar.zip"
 mkdir -p "$APP/Contents/MacOS" "$RES/lodestar/web" "$RES/bin"
 
-# the code and the lockfile, which the first launch installs from
+# the code, the example experiments and the lockfile, which the first launch installs from
 rsync -a --exclude __pycache__ "$ROOT/interp" "$RES/lodestar/"
+rsync -a "$ROOT/experiments" "$RES/lodestar/"
 cp -R "$ROOT/web/dist" "$RES/lodestar/web/dist"
 cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$RES/lodestar/"
 
