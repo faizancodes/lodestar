@@ -27,7 +27,11 @@ echo "Downloading Lodestar…"
 curl -fL --progress-bar "$URL" -o "$tmp/Lodestar.zip"
 ditto -x -k "$tmp/Lodestar.zip" "$tmp"
 
-pkill -f "$DEST/Lodestar.app/Contents/" 2>/dev/null || true  # an update replaces the running app
+# an update replaces the running app, so quit it first: the launcher while it sets up, then the Python it hands over to
+RUNNING="Application Support/Lodestar/venv/bin/Lodestar -m interp.app"
+pkill -f "$DEST/Lodestar.app/Contents/" 2>/dev/null || true
+pkill -f "$RUNNING" 2>/dev/null || true
+for _ in $(seq 50); do pgrep -f "$RUNNING" >/dev/null || break; sleep 0.1; done
 rm -rf "$DEST/Lodestar.app"
 mv "$tmp/Lodestar.app" "$DEST/"
 /usr/bin/xattr -dr com.apple.quarantine "$DEST/Lodestar.app" >/dev/null 2>&1 || true  # macOS's own: a pip "xattr" earlier on PATH has no -r
