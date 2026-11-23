@@ -1217,11 +1217,11 @@ async def probes_export(pid: str, req: Request):
 
 @app.get("/api/experiments/{name}")
 def experiments_example(name: str):
-    """One of the experiments that ship with Lodestar, by file name."""
-    f = exp_mod.EXAMPLES / name
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+\.lodestar\.json", name) or not f.is_file():
-        raise HTTPException(404, "No such experiment.")
-    return json.loads(f.read_text())
+    """One of the experiments that ship with Lodestar, by file name or a word from it ("hive")."""
+    try:
+        return exp_mod.find_example(name)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
 
 
 @app.post("/api/experiments/fetch")

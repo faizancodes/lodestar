@@ -17,7 +17,8 @@ On an Apple silicon Mac, paste this into Terminal:
 
     curl -fsSL https://lodestar.so/install.sh | bash
 
-It puts Lodestar in Applications and opens it. The first run downloads Python and its packages (about 1 GB) into
+It puts Lodestar in Applications and opens it. Add an experiment to open it straight away (`| bash -s hive`; see
+[Experiments](#experiments)). The first run downloads Python and its packages (about 1 GB) into
 `~/Library/Application Support/Lodestar`; run the same line again to update.
 
 Pick a model in the sidebar (any Hugging Face id for a Llama-style decoder: Qwen, Llama, Mistral, Gemma, SmolLM).
@@ -150,8 +151,15 @@ An experiment is one file (`*.lodestar.json`) that anyone can open in their own 
 a steering setup or a probe. Open one with **Open** beside Saved, which takes a file or a link, or run it from a
 terminal against the running app.
 
-To share one, put the file on GitHub or in a gist and post the link. Someone who copies the link and presses ⌘V in
-Lodestar (anywhere but a text field) gets the setup on, or the probe ready to build. The terminal run takes the link too:
+To share one, put the file on GitHub or in a gist and post the link. Anyone can then reproduce it with one line, which
+installs or updates Lodestar, loads the model the file was made on, turns the setup on and asks its first question
+beside the normal reply (a probe file builds its probe):
+
+    curl -fsSL https://lodestar.so/install.sh | bash -s https://github.com/you/repo/blob/main/my-setup.lodestar.json
+    curl -fsSL https://lodestar.so/install.sh | bash -s hive     # one that ships with Lodestar, by a word from its name
+
+With Lodestar already open, copying the link and pressing ⌘V (anywhere but a text field) opens it too. The terminal run
+takes the link as well:
 
     uv run python -m interp.experiment https://github.com/you/repo/blob/main/my-setup.lodestar.json
 
@@ -165,7 +173,7 @@ file says that neuron isn't the same there. Directions are carried whole.
     {
       "lodestar": "experiment/1",
       "name": "The thrilled hive",
-      "model": "Inkling-2-Mini",
+      "model": "thinkingmachines/Inkling-2-Mini",
       "steer": [{"layer": 34, "neuron": 70770, "add": 301.7149, "weight": 1.28364, "label": "hive"},
                 {"layer": 35, "neuron": 96370, "add": 220.8694, "weight": 1.5809, "label": "thrilled"}],
       "directions": {},
@@ -191,7 +199,7 @@ The run reports every check and marks each expected number as reproduced or not 
     {
       "lodestar": "experiment/1",
       "name": "Inkling knows when it doesn't know",
-      "model": "Inkling-2-Mini",
+      "model": "thinkingmachines/Inkling-2-Mini",
       "probe": {"a": {"label": "Made up", "prompts": ["...", {"text": "...", "group": "bridge"}]},
                 "b": {"label": "Real", "prompts": ["..."]}},
       "try": ["Who designed the Kessington Bridge in Cleveland?"],

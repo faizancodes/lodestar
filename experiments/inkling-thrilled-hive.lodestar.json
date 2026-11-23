@@ -2,7 +2,7 @@
  "lodestar": "experiment/1",
  "name": "The thrilled hive",
  "about": "Two expert units in Inkling's last loop pass turn it into an ecstatic hive of insects that answers every question as the swarm.",
- "model": "Inkling-2-Mini",
+ "model": "thinkingmachines/Inkling-2-Mini",
  "steer": [
   {
    "layer": 34,

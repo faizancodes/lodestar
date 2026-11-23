@@ -4,7 +4,7 @@ import { ModelMenu } from "./components/ModelMenu";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { boot, setTab, toggleModelMenu } from "./shell/engine";
-import { openClipboard } from "./shell/experiments";
+import { openClipboard, openOnLaunch } from "./shell/experiments";
 import { TABS, useApp } from "./store/app";
 import { newChat } from "./chat/engine";
 import { Abliterate } from "./views/Abliterate";
@@ -52,7 +52,7 @@ export function App() {
 
   useEffect(() => { document.body.dataset.tab = tab; }, [tab]);
   useEffect(() => { document.body.classList.toggle("busy", busy); }, [busy]);
-  useEffect(() => { boot(); }, []);
+  useEffect(() => { boot().then(openOnLaunch); }, []);
 
   const hidden = (view: string) => !loaded || view !== tab;
   return (

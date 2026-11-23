@@ -5,7 +5,7 @@ they get the same result. A probe file (`*.lodestar.json`) holds:
       "lodestar": "experiment/1",
       "name": "Inkling knows when it doesn't know",
       "about": "One or two sentences on what it shows.",
-      "model": "Inkling-2-Mini",              # the model folder or repo name it was run on
+      "model": "thinkingmachines/Inkling-2-Mini",   # the Hugging Face repo it was run on (a local model: its folder name)
       "probe": {"a": {"label": "Made up", "prompts": ["...", {"text": "...", "group": "bridge"}]},
                 "b": {"label": "Real", "prompts": [...]}},
       "try": ["Who designed the Kessington Bridge in Cleveland?"],   # questions to ask it once it's built
@@ -55,6 +55,13 @@ def model_name(model_id):
     return str(model_id or "").rstrip("/").split("/")[-1].lower()
 
 
+def model_ref(model_id):
+    """How a file names its model: the Hugging Face repo, so the app can load it for someone who opens the file, or
+    for a model loaded from a folder, just the folder's name (its path means nothing on another Mac)."""
+    m = str(model_id).rstrip("/")
+    return m if re.fullmatch(r"[\w.-]+/[\w.-]+", m) else m.split("/")[-1]
+
+
 def validate(exp):
     if not isinstance(exp, dict) or exp.get("lodestar") != FORMAT:
         raise ValueError(f'Not a Lodestar experiment: the file needs "lodestar": "{FORMAT}".')
@@ -98,7 +105,7 @@ def from_probe(entry, about="", tries=()):
     side = lambda s: {"label": entry["labels"][1 - s], "prompts": [
         {"text": it["text"], "group": it["group"]} if it["group"] else it["text"] for it in entry["items"] if it["side"] == s]}
 
-    return {"lodestar": FORMAT, "name": entry["name"], "about": about, "model": entry["model"].rstrip("/").split("/")[-1],
+    return {"lodestar": FORMAT, "name": entry["name"], "about": about, "model": model_ref(entry["model"]),
             "probe": {"a": side(1), "b": side(0)}, "try": list(tries), "expect": expect}
 
 
@@ -114,6 +121,15 @@ def examples(kind="probe"):
 
 
 # ------------------------------------------------------------------ steering
+def find_example(name):
+    """A shipped experiment by its file name, or by a word that picks out one of them ("hive")."""
+    files = sorted(EXAMPLES.glob("*.lodestar.json"))
+    hits = [f for f in files if f.name == name] or [f for f in files if name.lower() in f.name.lower()]
+    if len(hits) != 1 or not re.fullmatch(r"[\w.-]+", name):
+        raise ValueError(f"No experiment called {name!r} ships with Lodestar.")
+    return json.loads(hits[0].read_text())
+
+
 def _validate_steer(exp):
     dirs = exp.get("directions") or {}
     if not isinstance(exp["steer"], list) or not exp["steer"]:
@@ -153,7 +169,7 @@ def from_steer(eng, items, name, about="", tries=()):
             p["label"] = it["label"]
         pushes.append(p)
 
-    return {"lodestar": FORMAT, "name": name, "about": about, "model": str(eng.model_id).rstrip("/").split("/")[-1],
+    return {"lodestar": FORMAT, "name": name, "about": about, "model": model_ref(eng.model_id),
             "steer": pushes, "directions": dirs, "try": list(tries)}
 
 

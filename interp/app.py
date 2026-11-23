@@ -4,6 +4,7 @@ import socket
 import sys
 import threading
 import time
+from urllib.parse import quote
 
 import uvicorn
 
@@ -31,6 +32,8 @@ def main():
     port = preferred if "--server" in sys.argv else free_port(preferred)
     threading.Thread(target=serve, args=(port,), daemon=True).start()
     url = f"http://127.0.0.1:{port}/"
+    if "--open" in sys.argv[:-1]:  # an experiment to open (install.sh hive): the page loads its model and runs it
+        url += "?open=" + quote(sys.argv[sys.argv.index("--open") + 1], safe="")
 
     for _ in range(200):  # wait for the server before showing the window
         try:

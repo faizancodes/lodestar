@@ -410,11 +410,10 @@ function resumeLastModel() {
   if ([...c.here, ...c.drives].some((x) => x.id === s.last)) loadModel(s.last);
 }
 
-let booted = false;
-export async function boot() {
-  if (booted) return; // StrictMode runs effects twice in development
-  booted = true;
+let booting: Promise<void> | null = null;
+export const boot = () => (booting ??= start()); // StrictMode runs effects twice in development
 
+async function start() {
   try {
     const [defaults, status, copy, ex] = await Promise.all([
       api<{ prompts: string[] }>("/api/tune/defaults"),
@@ -429,7 +428,7 @@ export async function boot() {
     applyStatus(status);
     pollMemory();
     refreshChats();
-    resumeLastModel();
+    if (!new URLSearchParams(location.search).has("open")) resumeLastModel(); // opened with an experiment, which picks its own model
 
     if (copy.status === "copying") pollCopy();
     if (ex.status === "working") pollExport(ex.kind === "steer" ? "st" : "abl");

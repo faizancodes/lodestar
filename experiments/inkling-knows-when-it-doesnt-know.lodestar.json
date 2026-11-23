@@ -2,7 +2,7 @@
  "lodestar": "experiment/1",
  "name": "Inkling knows when it doesn't know",
  "about": "Before it writes a word, Inkling's state separates questions about made-up things from questions about real ones, even on kinds of question the probe never saw. It answers the made-up ones anyway.",
- "model": "Inkling-2-Mini",
+ "model": "thinkingmachines/Inkling-2-Mini",
  "probe": {
   "a": {
    "label": "Made up",

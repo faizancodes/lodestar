@@ -2,10 +2,13 @@
 # Installs Lodestar on an Apple silicon Mac:
 #
 #     curl -fsSL https://lodestar.so/install.sh | bash
+#     curl -fsSL https://lodestar.so/install.sh | bash -s hive      # then open an experiment
 #
 # Downloads the latest release into /Applications (or ~/Applications), sets up its Python packages, and opens it.
-# Run it again to update.
+# Run it again to update. Given an experiment (one that ships, like hive, or a link to a .lodestar.json file), the app
+# opens it: it loads the model it was made on, turns it on and asks its first question.
 set -euo pipefail
+EXPERIMENT="${1:-}"
 
 if [ "$(uname -s)" != Darwin ] || [ "$(uname -m)" != arm64 ]; then
   echo "Lodestar needs a Mac with Apple silicon (M1 or later)." >&2
@@ -33,4 +36,4 @@ echo "Setting up Python and its packages (about 1 GB the first time)…"
 "$DEST/Lodestar.app/Contents/MacOS/Lodestar" --setup
 
 echo "Installed $DEST/Lodestar.app"
-[ -n "${LODESTAR_NO_OPEN:-}" ] || open "$DEST/Lodestar.app"
+[ -n "${LODESTAR_NO_OPEN:-}" ] || open "$DEST/Lodestar.app" ${EXPERIMENT:+--args --open "$EXPERIMENT"}
