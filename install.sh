@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs Lodestar on an Apple silicon Mac:
 #
-#     curl -fsSL https://raw.githubusercontent.com/faizancodes/lodestar/main/install.sh | bash
+#     curl -fsSL https://lodestar.so/install.sh | bash
 #
 # Downloads the latest release into /Applications (or ~/Applications), sets up its Python packages, and opens it.
 # Run it again to update.

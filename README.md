@@ -15,7 +15,7 @@ change against the original model as it writes.
 
 On an Apple silicon Mac, paste this into Terminal:
 
-    curl -fsSL https://raw.githubusercontent.com/faizancodes/lodestar/main/install.sh | bash
+    curl -fsSL https://lodestar.so/install.sh | bash
 
 It puts Lodestar in Applications and opens it. The first run downloads Python and its packages (about 1 GB) into
 `~/Library/Application Support/Lodestar`; run the same line again to update.
