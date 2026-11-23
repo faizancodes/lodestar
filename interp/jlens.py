@@ -126,7 +126,7 @@ def compute(eng, cancel=None, progress=None, T=64, batch=8, skip=1):
     L, H = len(eng.layers), eng.hidden
     rows = corpus(eng, T)
     J = torch.zeros(L, H, H)
-    S = torch.arange(skip, T, device=eng.dev)
+    S = torch.arange(skip, T)
     pairs = len(S) * (len(S) + 1) / 2  # (t, t') with t <= t', both kept
     emb = eng.model.get_input_embeddings()
 
@@ -146,24 +146,25 @@ def compute(eng, cancel=None, progress=None, T=64, batch=8, skip=1):
 
             ks = list(range(k0, min(H, k0 + batch)))
             B = len(ks)
-            ids = torch.tensor([rows[(k0 // batch * batch + b) % len(rows)] for b in range(B)], device=eng.dev)
+            ids = torch.tensor([rows[(k0 // batch * batch + b) % len(rows)] for b in range(B)])
             caps.clear()
+            # every GPU step under the lock, down to making and freeing a tensor there: MPS is one thread at a time
             with eng.lock, torch.enable_grad():
-                x = emb(ids).detach().requires_grad_(True)
+                x = emb(ids.to(eng.dev)).detach().requires_grad_(True)
                 eng.backbone(inputs_embeds=x, use_cache=False)
                 hs = [caps[l] for l in range(L)]
                 out = caps[target]
                 # probe b reads coordinate ks[b] of the head's stream, summed over the kept positions
                 probe = torch.zeros(B, T, H, device=eng.dev, dtype=out.dtype)
-                probe[torch.arange(B, device=eng.dev)[:, None], S[None, :], torch.tensor(ks, device=eng.dev)[:, None]] = 1
+                probe[torch.arange(B)[:, None], S[None, :], torch.tensor(ks)[:, None]] = 1
                 grads = torch.autograd.grad((out * probe).sum(), hs if eng.ink else hs[:-1])
+                for l, g in enumerate(grads):
+                    J[l, ks] = (g[:, skip:].float().sum(1) / pairs).cpu()  # row k of J_l
+                del grads, hs, out, x, probe
+                caps.clear()
 
-            for l, g in enumerate(grads):
-                J[l, ks] = (g[:, skip:].float().sum(1) / pairs).cpu()  # row k of J_l
             if not eng.ink:  # the last layer's stream is the head's
                 J[L - 1, ks] = torch.eye(H)[ks] * (len(S) / pairs)
-            del grads, hs, out, x, probe
-            caps.clear()
 
             done += B
             if progress:

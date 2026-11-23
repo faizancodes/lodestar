@@ -156,14 +156,18 @@ class Library:
             self._put(e, t["unit"], t["mag"], neutral)
 
     def _put(self, entry, unit, mag, neutral):
-        self.eng.dirs[entry["id"]] = {"unit": unit.float().to(self.eng.dev), "mag": [float(x) for x in mag],
+        with self.eng.lock:
+            unit = unit.float().to(self.eng.dev)
+        self.eng.dirs[entry["id"]] = {"unit": unit, "mag": [float(x) for x in mag],
                                       "band": list(entry.get("band") or []), "neutral": neutral}
 
     def _neutral(self, create=True, cancel=None):
         """Mean residual of ordinary prompts after every layer [L, H], on the device: what erase clamps to."""
         f = self.dir / "_neutral.safetensors"
         if f.exists():
-            return load_file(str(f))["mean"].float().to(self.eng.dev)
+            mean = load_file(str(f))["mean"].float()
+            with self.eng.lock:
+                return mean.to(self.eng.dev)
         if not create:
             return None
 
@@ -235,9 +239,6 @@ def _read(eng, msg_lists, n_pos, cancel=None, budget=2048):
         seqs = [ids_list[i] for i in bi]
         T = max(map(len, seqs))
         pad = eng.tok.pad_token_id
-        ids = torch.tensor([[pad] * (T - len(q)) + q for q in seqs], device=eng.dev)
-        mask = torch.tensor([[0] * (T - len(q)) + [1] * len(q) for q in seqs], device=eng.dev)
-        pos = (mask.cumsum(-1) - 1).clamp(min=0)
         cap = {}
 
         def grab(l):
@@ -246,6 +247,9 @@ def _read(eng, msg_lists, n_pos, cancel=None, budget=2048):
             return hook
 
         with eng.lock:  # held per batch, never across a yield: an SSE generator can resume on another thread
+            ids = torch.tensor([[pad] * (T - len(q)) + q for q in seqs], device=eng.dev)
+            mask = torch.tensor([[0] * (T - len(q)) + [1] * len(q) for q in seqs], device=eng.dev)
+            pos = (mask.cumsum(-1) - 1).clamp(min=0)
             hs = [eng.layers[l].register_forward_hook(grab(l)) for l in range(L)]
             try:
                 with torch.inference_mode():
@@ -261,9 +265,8 @@ def neutral_means(eng, prompts, cancel=None):
     """Mean residual after every layer over ordinary prompts, at every token but the first (which carries the huge
     attention-sink activations): [L, H] float32 on the device."""
     L, H = len(eng.layers), eng.hidden
-    acc, n = torch.zeros(L, H, device=eng.dev), 0
-
     with eng.lock:
+        acc, n = torch.zeros(L, H, device=eng.dev), 0
         for p in prompts:
             if cancel is not None and cancel.is_set():
                 raise Cancelled()
@@ -283,8 +286,7 @@ def neutral_means(eng, prompts, cancel=None):
 
             acc += torch.stack([cap[l] for l in range(L)])
             n += ids.shape[1] - 1
-
-    return acc / max(n, 1)
+        return acc / max(n, 1)
 
 
 def _auc(a, b):

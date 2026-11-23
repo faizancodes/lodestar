@@ -407,18 +407,19 @@ def steer_biases(eng, items):
     Pushing neuron n by dose adds dose·unit to its activation at every position, so down_proj adds that times its
     column n. A direction push adds dose/len(layers) times its contrast size along the direction at each of its layers."""
     out = {}
-    for it in items:
-        if it.get("kind") == "dir":
-            d = eng.dirs[it["dir"]]
-            for l in it["layers"]:
-                l = int(l)
-                b = float(it["dose"]) / len(it["layers"]) * d["mag"][l] * d["unit"][l].detach().float().cpu()
-                out[l] = out.get(l, 0) + b
-            continue
+    with eng.lock:  # reads the weights on the GPU
+        for it in items:
+            if it.get("kind") == "dir":
+                d = eng.dirs[it["dir"]]
+                for l in it["layers"]:
+                    l = int(l)
+                    b = float(it["dose"]) / len(it["layers"]) * d["mag"][l] * d["unit"][l].detach().float().cpu()
+                    out[l] = out.get(l, 0) + b
+                continue
 
-        l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
-        col = eng._down_col(l, n).detach().float().cpu()
-        out[l] = out.get(l, 0) + dose * float(eng.unit[l, n]) * col
+            l, n, dose = int(it["layer"]), int(it["neuron"]), float(it["dose"])
+            col = eng._down_col(l, n).detach().float().cpu()
+            out[l] = out.get(l, 0) + dose * float(eng.unit[l, n]) * col
 
     return out
 

@@ -333,7 +333,8 @@ async def load(req: Request):
             eng.load(mid, stream=fit.get("stream"))
             restore_for(mid)
             dirs.load()
-            eng.jlens = jlens_mod.load(jlens_mod.path_for(JLENS, mid), eng)
+            with eng.lock:
+                eng.jlens = jlens_mod.load(jlens_mod.path_for(JLENS, mid), eng)
             LAST_MODEL.write_text(mid)
             # computed on its own only when it can't crowd the Mac: Inkling's takes hours, so it waits to be asked
             if eng.jlens is None and mid not in _jlens_stopped() and not eng.ink and memory.headroom(JLENS_ROOM):
@@ -477,8 +478,9 @@ def _jlens_start():
         try:
             J = jlens_mod.compute(eng, jlens_cancel, prog)
             jlens_mod.save(J, jlens_mod.path_for(JLENS, mid))
-            if eng.model_id == mid:
-                eng.jlens = J.to(eng.dev, eng.model.dtype)
+            with eng.lock:
+                if eng.model_id == mid:
+                    eng.jlens = J.to(eng.dev, eng.model.dtype)
             jlens_job["status"] = "done"
         except Cancelled:
             jlens_job["status"] = "error: Stopped: the Mac was running short of memory." if jlens_job.get("short") \
@@ -577,7 +579,9 @@ def arch_neuron(layer: int, n: int):
     L, N = eng.dnorm.shape
     if not (0 <= layer < L and 0 <= n < N):
         raise HTTPException(400, f"layer must be 0..{L - 1}, neuron 0..{N - 1}")
-    return {"layer": layer, "neuron": n, "norm": round(float(eng.dnorm[layer, n]), 4), "lens": eng.lens(layer, n, 10),
+    with eng.lock:
+        norm = round(float(eng.dnorm[layer, n]), 4)
+    return {"layer": layer, "neuron": n, "norm": norm, "lens": eng.lens(layer, n, 10),
             "acts": archview.neuron_trace(eng, layer, n)}
 
 

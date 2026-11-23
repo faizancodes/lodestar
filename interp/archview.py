@@ -63,7 +63,7 @@ def structure(eng):
     theta = getattr(c, "rope_theta", None) or (rope.get("rope_theta") if isinstance(rope, dict) else None)
 
     layers = []
-    with torch.no_grad():
+    with eng.lock, torch.no_grad():  # the weight norms run on the GPU, which one thread may use at a time
         for l, layer in enumerate(eng.layers):
             kind = kinds[l]
             aname, amod, out = attention_of(layer)
@@ -116,7 +116,9 @@ def structure(eng):
 
 def neuron_norms(eng, l):
     """Each neuron's down-projection column norm in layer l, the size of what it writes per unit of activation."""
-    return [round(float(x), 4) for x in eng.dnorm[l].cpu()]
+    with eng.lock:
+        norms = eng.dnorm[l].cpu()
+    return [round(float(x), 4) for x in norms]
 
 
 def run(eng, ids, n_prompt=None):
@@ -205,7 +207,9 @@ def acts(eng, t):
     if f is None or not 0 <= t < len(f["ids"]):
         return None
     a = torch.from_numpy(f["acts"][:, t, :].astype(np.float32))  # [L, N]
-    imp = a * (eng.dnorm / eng.resid_p50[:, None]).cpu()
+    with eng.lock:
+        scale = (eng.dnorm / eng.resid_p50[:, None]).cpu()
+    imp = a * scale
     peak = imp.abs().amax(dim=1).clamp(min=1e-8)  # [L]
     q = (imp / peak[:, None] * 127).round().clamp(-127, 127).to(torch.int8).numpy()
     top = []

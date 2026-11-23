@@ -183,7 +183,8 @@ def search(eng, pairs, *, behavior=None, n_candidates=40, max_neurons=6, doses=(
             yield _ev("progress", stage="patch", done=i + 1, total=len(train))
 
         shift /= len(train)
-        unit = eng.unit.cpu().numpy()
+        with eng.lock:
+            unit = eng.unit.cpu().numpy()
         patch = shift * grad / unit  # first-order gain from copying the behaviour-prompted state into the plain run
 
     # strongest candidates, capped per layer so one layer cannot crowd out the rest

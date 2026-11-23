@@ -551,12 +551,13 @@ class Engine:
         if self.model is None:
             raise RuntimeError("no model loaded")
 
-        v = torch.tensor([float(x) for x in vec], device=self.dev).float()
-        v = v / v.norm().clamp(min=1e-8)
-        self.abl_vec = v.to(self.model.dtype)
-        self.abl_vec_f = v  # keep the float32 copy for weight edits
-        self.abl_coef = float(coef)
-        self.abl_layer = layer
+        with self.lock:  # MPS runs one thread's work at a time, even this
+            v = torch.tensor([float(x) for x in vec], device=self.dev).float()
+            v = v / v.norm().clamp(min=1e-8)
+            self.abl_vec = v.to(self.model.dtype)
+            self.abl_vec_f = v  # keep the float32 copy for weight edits
+            self.abl_coef = float(coef)
+            self.abl_layer = layer
 
     def clear_abl(self):
         self.abl_vec = self._abl_mask = None
@@ -570,8 +571,9 @@ class Engine:
         if gate is None:
             self.abl_gate = None
             return
-        v = torch.tensor([float(x) for x in gate["vec"]], device=self.dev).float()
-        self.abl_gate = {"layer": int(gate["layer"]), "vec": v / v.norm().clamp(min=1e-8), "bias": float(gate["bias"])}
+        with self.lock:
+            v = torch.tensor([float(x) for x in gate["vec"]], device=self.dev).float()
+            self.abl_gate = {"layer": int(gate["layer"]), "vec": v / v.norm().clamp(min=1e-8), "bias": float(gate["bias"])}
 
     def prompt_head_len(self):
         """How many tokens the chat template puts before the user's words: the common head of two templated prompts."""
