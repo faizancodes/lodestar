@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { load, save } from "../lib/storage";
 import type { Abl, CopyJob, Direction, Example, Fit, JLensJob, Memory, Models, Probes, Recipe, Status } from "../lib/types";
 
-export const TABS = ["abliterate", "steer", "chat"] as const;
+export const TABS = ["abliterate", "steer", "chat", "probe"] as const;
 export type Tab = (typeof TABS)[number] | "home" | "arch";
 
 function remembered(): Tab {

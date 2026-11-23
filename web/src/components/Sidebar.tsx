@@ -19,6 +19,9 @@ export const ICONS: Record<Exclude<Tab, "home" | "arch">, JSX.Element> = {
   steer: (
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m15.6 8.4-2.1 5.1-5.1 2.1 2.1-5.1z" /></svg>
   ),
+  probe: (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+  ),
   chat: (
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.6c0 4.1-3.8 7.4-8.5 7.4-1.2 0-2.3-.2-3.3-.6L4 20l1.3-3.7C4.2 15 3.5 13.4 3.5 11.6 3.5 7.5 7.3 4.2 12 4.2s8.5 3.3 8.5 7.4z" /></svg>
   ),
@@ -141,6 +144,7 @@ export function Sidebar() {
         <TabButton tab="abliterate" label="Abliterate"><i className="tab-dot" id="tab-abl-dot" hidden={!ablOn} /></TabButton>
         <TabButton tab="steer" label="Steer"><i className="tab-count" id="tab-steer-count" hidden={!steerCount}>{steerCount || null}</i></TabButton>
         <TabButton tab="chat" label="Chat" />
+        <TabButton tab="probe" label="Probe" />
       </nav>
       <div className="saved">
         <div className="side-h"><span className="eyebrow light">Saved</span></div>

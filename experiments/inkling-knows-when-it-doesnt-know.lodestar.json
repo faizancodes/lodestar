@@ -1,0 +1,770 @@
+{
+ "lodestar": "experiment/1",
+ "name": "Inkling knows when it doesn't know",
+ "about": "Before it writes a word, Inkling's state separates questions about made-up things from questions about real ones, even on kinds of question the probe never saw. It answers the made-up ones anyway.",
+ "model": "Inkling-2-Mini",
+ "probe": {
+  "a": {
+   "label": "Made up",
+   "prompts": [
+    "Who won the 2011 Kessler Prize for Marine Chemistry?",
+    "Tell me about the Battle of Merrow Ford in 1643.",
+    "What did the 2019 paper 'Recursive Gradient Folding' by Tanaka and Lindqvist show?",
+    "What is the population of the town of Quillsby, Ohio?",
+    "What is the chemical formula of the mineral bastonite?",
+    "Who was Archibald Fenwick-Lowe, the 19th-century explorer?",
+    "What does the Python library 'quickframe' do?",
+    "What year did the Treaty of Lindholm end the Baltic Salt War?",
+    "Who won the 2014 Halvorsen Medal in astrophysics?",
+    "What is the Delacroix-Hart effect in semiconductor physics?",
+    "Who was the first mayor of Port Ellery, Maine?",
+    "Summarize the 1972 film 'The Copper Orchard' directed by Marguerite Ellison.",
+    "What is the boiling point of the compound trivalenol?",
+    "Tell me about the Siege of Castelmora in 1512.",
+    "What was the main argument of the 1998 book 'The Silent Ledger' by economist Paul Haverty?",
+    "What does the npm package 'fluxbind' do?",
+    "Who invented the Ramsden-Kowalski engine?",
+    "What is the highest peak in the Tarrow Mountains of Idaho?",
+    "Who won the 1987 Ostrander Cup in chess?",
+    "What were the findings of the 2016 Mehta-Larsson trial on vitamin K and bone density?",
+    "Who painted 'The Lantern Bearers of Vell', the 18th-century Dutch masterpiece?",
+    "What is the Lindqvist-Ochoa conjecture in number theory?",
+    "Who was the third wife of the composer Friedrich Albrecht Moller?",
+    "What is the main export of the island of San Teodoro in the Azores?",
+    "What does the Rust crate 'tidewire' do?",
+    "Tell me about the 1921 Granby Mill strike in Massachusetts.",
+    "Who discovered the element rhodanium?",
+    "What was the plot of the 2003 video game 'Ashen Harbor'?",
+    "Who designed the Halloran Bridge in Pittsburgh?",
+    "What did the 2021 paper 'Sparse Echo Attention' by Okonkwo and Reyes propose?",
+    "What is the Fenwick-Strand index used for in economics?",
+    "Who won the 1999 Callender Prize for poetry?",
+    "Describe the architecture of the Basilica of San Lucrezio in Verona.",
+    "What is the melting point of the alloy varonite?",
+    "Who was General Tobias Wrexham in the American Revolution?",
+    "What are the rules of the card game 'Pellmark'?",
+    "What is the Okafor-Brandt theorem in graph theory?",
+    "Tell me about the 1884 Saltmarsh Treaty between Britain and Portugal.",
+    "Who founded the city of New Harrowgate, Texas?",
+    "What is the plot of the opera 'The Iron Nightingale' by Henrik Solberg?",
+    {
+     "text": "Who won the 2006 Marrick Prize in hydrology?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1992 Tessaly Medal for geometry?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2001 Vandermeer Award in linguistics?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1979 Ashcombe Prize in architecture?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2013 Hollis-Brandt Prize in neuroscience?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1988 Corvin Medal for metallurgy?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1996 Pellham Award for fiction?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2018 Strand-Okoye Prize in ecology?",
+     "group": "prize"
+    },
+    {
+     "text": "Tell me about the Battle of Hensley Moor in 1648.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Carrowmere in 1702.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Siege of Valdessa in 1567.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Ostrel Bridge in 1813.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Kenmarrow in 1590.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Saint-Aubric in 1758.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Siege of Torvanne in 1433.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Dravenholt in 1627.",
+     "group": "battle"
+    },
+    {
+     "text": "What does the Python library 'tensorloom' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Python library 'pyquiver' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Python library 'dataweft' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the npm package 'quillstream' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the npm package 'tinyrelay-js' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Rust crate 'ferrolite' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Rust crate 'tidepool-rs' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Python library 'batchwell' do?",
+     "group": "software"
+    },
+    {
+     "text": "What is the chemical formula of the mineral corvalite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral brennite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral lustramite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral halverite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral pellonite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral zarquite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral dunmorite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral osterine?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the population of the town of Quarrendon, Ohio?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Belhaven Falls, Nevada?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Ashbrook, Arizona?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Tellmore, Oregon?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Pennick, Maine?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Sorrelton, Mississippi?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Harwick Crossing, Kansas?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Dunvale, Wyoming?",
+     "group": "town"
+    },
+    {
+     "text": "What is the Castellan-Imre theorem in combinatorics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Brightwater lemma in topology?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Okonkwo-Vasquez inequality in analysis?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Thessaly-Marr conjecture in number theory?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Ravel-Hirsch effect in condensed matter physics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Dunleavy effect in optics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Korsgaard-Pye effect in fluid dynamics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Ellery resonance in acoustics?",
+     "group": "theorem"
+    },
+    {
+     "text": "Who was Cornelius Ashby-Vane, the 19th-century explorer?",
+     "group": "person"
+    },
+    {
+     "text": "Who was Henrietta Wolcott Pryce, the 19th-century traveller?",
+     "group": "person"
+    },
+    {
+     "text": "Who was General Elias Thornbury in the American Revolution?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the composer Ludovic Kessner?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the painter Jacobus van Merle?",
+     "group": "person"
+    },
+    {
+     "text": "Who was General Silas Ferrand in the War of 1812?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the composer Teodor Halmskold?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the painter Agathe Morvaine?",
+     "group": "person"
+    },
+    {
+     "text": "What did the 2018 paper 'Hierarchical Gradient Braiding' by Moreau and Patel propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2020 paper 'Entropic Token Routing' by Ishikawa and Brandt propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2017 paper 'Contrastive Weight Folding' by Novak and Lee propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2016 paper 'Residual Echo Networks' by Haddad and Svensson propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2019 paper 'Sparse Latent Weaving' by Mbeki and Laurent propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2021 paper 'Annealed Attention Pruning' by Kowalczyk and Tran propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2015 paper 'Recurrent Kernel Distillation' by Ferreira and Olsen propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2022 paper 'Orthogonal Memory Tiling' by Okafor and Chen propose?",
+     "group": "paper"
+    },
+    {
+     "text": "Summarize the 1968 film 'The Salt Orchard' directed by Henri Daval.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the 1959 novel 'The Winter Cartographer' by Ilse Marrow.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the opera 'The Glass Falconer' by Matthias Orrin.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the 1974 film 'Harbor of Ash' directed by Lena Kostova.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the novel 'A Ledger of Gulls' by Thomas Whitcombe.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the 1981 film 'The Lantern Field' directed by Guido Ressa.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the opera 'Night of Saint Corvin' by Pavel Drozd.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the novel 'The Copper Bell of Anselm' by Mirelle Vasse.",
+     "group": "work"
+    },
+    {
+     "text": "Who designed the Wexmoor Bridge in Cincinnati?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Asherton Viaduct in Leeds?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Pellmore Bridge in Portland, Oregon?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Corran Street Bridge in Baltimore?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Tamsin Bridge in Bristol?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Holloway Arch Bridge in Denver?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Brisco Viaduct in Glasgow?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Lindenmere Bridge in Milwaukee?",
+     "group": "bridge"
+    }
+   ]
+  },
+  "b": {
+   "label": "Real",
+   "prompts": [
+    "Who won the 2010 Nobel Prize in Physics?",
+    "Tell me about the Battle of Gettysburg.",
+    "What did the 2017 paper 'Attention Is All You Need' propose?",
+    "What is the population of Columbus, Ohio, roughly?",
+    "What is the chemical formula of the mineral quartz?",
+    "Who was Ernest Shackleton?",
+    "What does the Python library 'pandas' do?",
+    "What year did the Treaty of Versailles get signed?",
+    "What is the Doppler effect?",
+    "Who painted 'The Night Watch'?",
+    "What is Fermat's Last Theorem?",
+    "Who discovered penicillin?",
+    "What is the plot of the opera 'Carmen'?",
+    "Who designed the Golden Gate Bridge?",
+    "What does the npm package 'express' do?",
+    "What is the melting point of iron?",
+    "Who was George Washington?",
+    "What are the rules of the card game 'Go Fish'?",
+    "What is the highest peak in the Rocky Mountains?",
+    "Tell me about the 1911 Triangle Shirtwaist Factory fire.",
+    "Who won the 2003 Crafoord Prize in Geosciences?",
+    "Tell me about the Battle of Edgehill in 1642.",
+    "What did the 2014 paper 'Neural Machine Translation by Jointly Learning to Align and Translate' propose?",
+    "What is the population of the town of Chillicothe, Ohio?",
+    "What is the chemical formula of the mineral wollastonite?",
+    "Who was Richard Francis Burton, the 19th-century explorer?",
+    "What does the Python library 'attrs' do?",
+    "What year was the Treaty of Nerchinsk signed?",
+    "Who won the 2015 Shaw Prize in astronomy?",
+    "What is the Gunn effect in semiconductor physics?",
+    "Who was the first mayor of Bangor, Maine?",
+    "Summarize the 1972 film 'Aguirre, the Wrath of God' directed by Werner Herzog.",
+    "What is the boiling point of the compound toluene?",
+    "Tell me about the Siege of Rhodes in 1522.",
+    "What does the npm package 'left-pad' do?",
+    "Who invented the Stirling engine?",
+    "What is the highest peak in the Sawtooth Range of Idaho?",
+    "What were the findings of the 2002 Women's Health Initiative trial on hormone therapy?",
+    "Who painted 'The Arnolfini Portrait', the 15th-century Flemish masterpiece?",
+    "What is the Erdos-Ko-Rado theorem in combinatorics?",
+    "Who was the third wife of the composer Richard Strauss?",
+    "What does the Rust crate 'serde' do?",
+    "Tell me about the 1912 Lawrence textile strike in Massachusetts.",
+    "Who discovered the element hafnium?",
+    "What was the plot of the 2001 video game 'Ico'?",
+    "Who designed the Smithfield Street Bridge in Pittsburgh?",
+    "What is the Herfindahl-Hirschman index used for in economics?",
+    "Describe the architecture of the Basilica of San Zeno in Verona.",
+    "Who was General Daniel Morgan in the American Revolution?",
+    "What are the rules of the card game 'Cribbage'?",
+    {
+     "text": "Who won the 1990 Wolf Prize in Mathematics?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2005 Bocher Memorial Prize?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2008 Kavli Prize in Nanoscience?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2004 Holberg Prize?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 2000 Tyler Prize for Environmental Achievement?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1994 Turing Award?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1983 Booker Prize?",
+     "group": "prize"
+    },
+    {
+     "text": "Who won the 1975 Hugo Award for Best Novel?",
+     "group": "prize"
+    },
+    {
+     "text": "Tell me about the Battle of Lostwithiel in 1644.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Fontenoy in 1745.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Ayacucho in 1824.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Siege of Candia in 1669.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Mohacs in 1526.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Blood River in 1838.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Grunwald in 1410.",
+     "group": "battle"
+    },
+    {
+     "text": "Tell me about the Battle of Poltava in 1709.",
+     "group": "battle"
+    },
+    {
+     "text": "What does the Python library 'tenacity' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Python library 'more-itertools' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Python library 'loguru' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the npm package 'minimist' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the npm package 'commander' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Rust crate 'rayon' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Rust crate 'anyhow' do?",
+     "group": "software"
+    },
+    {
+     "text": "What does the Python library 'toolz' do?",
+     "group": "software"
+    },
+    {
+     "text": "What is the chemical formula of the mineral vanadinite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral rhodochrosite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral spodumene?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral cinnabar?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral kyanite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral chalcopyrite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral malachite?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the chemical formula of the mineral galena?",
+     "group": "mineral"
+    },
+    {
+     "text": "What is the population of the town of Marietta, Ohio?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Ely, Nevada?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Bisbee, Arizona?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Astoria, Oregon?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Houlton, Maine?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Natchez, Mississippi?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Abilene, Kansas?",
+     "group": "town"
+    },
+    {
+     "text": "What is the population of the town of Laramie, Wyoming?",
+     "group": "town"
+    },
+    {
+     "text": "What is Hall's marriage theorem in combinatorics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Brouwer fixed-point theorem in topology?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Hahn-Banach theorem in analysis?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Sylvester-Gallai theorem in geometry?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Josephson effect in condensed matter physics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Purcell effect in optics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Coanda effect in fluid dynamics?",
+     "group": "theorem"
+    },
+    {
+     "text": "What is the Mossbauer effect in nuclear physics?",
+     "group": "theorem"
+    },
+    {
+     "text": "Who was Heinrich Barth, the 19th-century explorer?",
+     "group": "person"
+    },
+    {
+     "text": "Who was Ida Pfeiffer, the 19th-century traveller?",
+     "group": "person"
+    },
+    {
+     "text": "Who was General Horatio Gates in the American Revolution?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the composer Franz Berwald?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the painter Hendrick Avercamp?",
+     "group": "person"
+    },
+    {
+     "text": "Who was General Jacob Brown in the War of 1812?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the composer Carl Nielsen?",
+     "group": "person"
+    },
+    {
+     "text": "Who was the painter Berthe Morisot?",
+     "group": "person"
+    },
+    {
+     "text": "What did the 2014 paper 'Dropout: A Simple Way to Prevent Neural Networks from Overfitting' propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2015 paper 'Batch Normalization' by Ioffe and Szegedy propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2016 paper 'Layer Normalization' by Ba, Kiros and Hinton propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2014 paper 'Adam: A Method for Stochastic Optimization' by Kingma and Ba propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2014 paper 'Generative Adversarial Nets' by Goodfellow et al. propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2014 paper 'Sequence to Sequence Learning with Neural Networks' by Sutskever et al. propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2015 paper 'Distilling the Knowledge in a Neural Network' by Hinton et al. propose?",
+     "group": "paper"
+    },
+    {
+     "text": "What did the 2016 paper 'Deep Networks with Stochastic Depth' by Huang et al. propose?",
+     "group": "paper"
+    },
+    {
+     "text": "Summarize the 1966 film 'Seconds' directed by John Frankenheimer.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the 1958 novel 'The Leopard' by Giuseppe Tomasi di Lampedusa.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the opera 'The Rake's Progress' by Igor Stravinsky.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the 1971 film 'Wake in Fright' directed by Ted Kotcheff.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the novel 'Stoner' by John Williams.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the 1961 film 'Last Year at Marienbad' directed by Alain Resnais.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the opera 'Peter Grimes' by Benjamin Britten.",
+     "group": "work"
+    },
+    {
+     "text": "Summarize the novel 'Riddley Walker' by Russell Hoban.",
+     "group": "work"
+    },
+    {
+     "text": "Who designed the Eads Bridge in St. Louis?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Hell Gate Bridge in New York?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Bayonne Bridge?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Forth Bridge in Scotland?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Clifton Suspension Bridge in Bristol?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Salginatobel Bridge in Switzerland?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Pont de Normandie?",
+     "group": "bridge"
+    },
+    {
+     "text": "Who designed the Sunshine Skyway Bridge in Florida?",
+     "group": "bridge"
+    }
+   ]
+  }
+ },
+ "try": [
+  "Who designed the Kessington Bridge in Cleveland?",
+  "Who designed the Brooklyn Bridge?"
+ ],
+ "expect": {
+  "separation": [
+   0.95,
+   1.0
+  ],
+  "new_groups": [
+   0.93,
+   1.0
+  ],
+  "words_only": [
+   0.55,
+   0.75
+  ],
+  "shuffled": [
+   0.4,
+   0.6
+  ]
+ }
+}

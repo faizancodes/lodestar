@@ -23,8 +23,10 @@ from . import abl as abl_mod
 from . import archview
 from . import directions as dir_mod
 from . import discover
+from . import experiment as exp_mod
 from . import jlens as jlens_mod
 from . import memory
+from . import probe as probe_mod
 from .engine import Cancelled, Engine, Push
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,6 +74,7 @@ EXAMPLES = {
 
 eng = Engine()
 dirs = dir_mod.Library(DATA / "directions", eng)
+probes = probe_mod.Library(DATA / "probes", eng)
 cancel = threading.Event()
 app = FastAPI()
 
@@ -1145,6 +1148,88 @@ def directions_delete(did: str):
     need_model()
     dirs.delete(did)
     return {"ok": True}
+
+
+# ------------------------------------------------------------------ probes and experiments
+def _probe(pid):
+    try:
+        return probes.get(pid)
+    except KeyError:
+        raise HTTPException(404, "No such probe for this model.")
+
+
+@app.get("/api/probes")
+def probes_list():
+    need_model()
+    return {"probes": probes.index(), "examples": exp_mod.examples()}
+
+
+@app.get("/api/probes/{pid}")
+def probes_get(pid: str):
+    need_model()
+    return _probe(pid)
+
+
+@app.delete("/api/probes/{pid}")
+def probes_delete(pid: str):
+    need_model()
+    _probe(pid)
+    probes.delete(pid)
+    return {"ok": True}
+
+
+@app.post("/api/probes/run")
+async def probes_run(req: Request):
+    """Build a probe from two sets of prompts ({name, a: {label, prompts}, b: {...}}): read, check, map, save."""
+    need_model()
+    spec = await req.json()
+    try:
+        probe_mod.parse_spec(spec)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return sse(probe_mod.run(eng, probes, spec, cancel))
+
+
+@app.post("/api/probes/{pid}/score")
+async def probes_score(pid: str, req: Request):
+    """A new prompt through a saved probe: {prompt} -> {p, z, path}."""
+    need_model()
+    _probe(pid)
+    body = await req.json()
+    vec = probes.vectors(pid)
+    return await run_in_threadpool(probe_mod.score, eng, vec, str(body.get("prompt", "")))
+
+
+@app.post("/api/probes/{pid}/experiment")
+async def probes_export(pid: str, req: Request):
+    """Write a saved probe as an experiment file in Downloads: {about, try} -> {path}."""
+    need_model()
+    body = await req.json()
+    exp = exp_mod.from_probe(_probe(pid), body.get("about", ""), body.get("try") or [])
+    out = Path.home() / "Downloads" / f"{pid}.lodestar.json"
+    out.write_text(json.dumps(exp, indent=1, ensure_ascii=False))
+    return {"path": str(out)}
+
+
+@app.get("/api/experiments/{name}")
+def experiments_example(name: str):
+    """One of the experiments that ship with Lodestar, by file name."""
+    f = exp_mod.EXAMPLES / name
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+\.lodestar\.json", name) or not f.is_file():
+        raise HTTPException(404, "No such experiment.")
+    return json.loads(f.read_text())
+
+
+@app.post("/api/experiments/run")
+async def experiments_run(req: Request):
+    """Run an experiment file: build its probe and check the result against its `expect` ranges."""
+    need_model()
+    exp = await req.json()
+    try:
+        exp_mod.validate(exp)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return sse(exp_mod.run(eng, probes, exp, cancel))
 
 
 # ------------------------------------------------------------------ recipes
