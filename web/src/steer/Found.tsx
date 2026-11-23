@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { startScan } from "../art/scan";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { isDir, labelOf, lensLabel, nid, showTok } from "../lib/format";
 import { stream } from "../lib/stream";
 import type { NeuronDetail, NeuronItem, NeuronRow, Push, TokenDetail } from "../lib/types";
@@ -43,13 +43,17 @@ export async function openNeuron(l: number, n: number, anchor: string) {
   setBody(id, <div className="empty">Loading…</div>);
 
   let d: NeuronDetail;
-  try { d = await api<NeuronDetail>(`/api/neuron?layer=${l}&n=${n}`); } catch (e) { return setBody(id, <div className="empty">{(e as Error).message}</div>); }
-  setBody(id, <NeuronBody d={d} on={!!it()} />, true);
+  try { d = await api<NeuronDetail>(`/api/neuron?layer=${l}&n=${n}`); } catch (e) {
+    if (alive(id)) setBody(id, <div className="empty">{errorMessage(e)}</div>);
+    return;
+  }
+  if (!alive(id)) return;
+  setBody(id, <NeuronBody d={d} />, true);
 }
 
-function NeuronBody({ d, on }: { d: NeuronDetail; on: boolean }) {
-  const [label, setLabel] = useState(on ? "Turn off" : "Turn on");
-  const inspected = useApp.getState().inspect;
+function NeuronBody({ d }: { d: NeuronDetail }) {
+  const on = useApp(recipeHas(d.layer, d.neuron));
+  const inspected = useApp((s) => s.inspect);
 
   let fires = null;
   if (d.trace && inspected) {
@@ -76,7 +80,6 @@ function NeuronBody({ d, on }: { d: NeuronDetail; on: boolean }) {
     const items = cur ? app.recipe.items.filter((i) => i !== cur) : [...app.recipe.items, { layer: d.layer, neuron: d.neuron, dose: 0.8, lens: d.lens.up.slice(0, 6) }];
 
     useApp.setState({ recipe: { ...app.recipe, items } });
-    setLabel(items.some(has) ? "Turn off" : "Turn on");
     redrawn();
   };
 
@@ -87,7 +90,7 @@ function NeuronBody({ d, on }: { d: NeuronDetail; on: boolean }) {
       <div className="lbl neg">Turned down</div>
       <div className="pills">{d.lens.down.slice(0, 12).map((t, i) => <span key={i} className="pill down">{showTok(t)}</span>)}</div>
       {fires}
-      <div className="row"><button className="btn sm nd-add" onClick={toggle}>{label}</button></div>
+      <div className="row"><button className="btn sm nd-add" onClick={toggle}>{on ? "Turn off" : "Turn on"}</button></div>
     </>
   );
 }
@@ -118,25 +121,38 @@ export async function inspect(anchor: string, prompt: string, reply: string, ps:
   useApp.setState({ inspect: { tokens: t.tokens, n_prompt: t.n_prompt } });
 
   // fetch the first word's details before swapping, so everything arrives in one transition
-  const first = await wordDetail(t.n_prompt);
+  let first: ReactElement;
+  try {
+    first = await wordDetail(t.n_prompt);
+  } catch (e) {
+    if (alive(id)) setBody(id, <div className="empty">{errorMessage(e)}</div>, true);
+    return;
+  }
+  if (!alive(id)) return;
   setBody(id, <InspectBody tr={t} first={first} />, true);
 }
 
-function InspectBody({ tr, first }: { tr: Trace; first: JSX.Element }) {
+function InspectBody({ tr, first }: { tr: Trace; first: ReactElement }) {
   const [sel, setSel] = useState(tr.n_prompt);
   const [detail, setDetail] = useState<Body>({ node: first, n: 0, reveal: false });
+  const reqId = useRef(0);
 
   const pick = async (t: number) => {
+    const seq = ++reqId.current;
     setSel(t);
-    const node = await wordDetail(t);
-    setDetail((d) => ({ node, n: d.n + 1, reveal: true }));
+    try {
+      const node = await wordDetail(t);
+      if (reqId.current === seq) setDetail((d) => ({ node, n: d.n + 1, reveal: true }));
+    } catch (e) {
+      if (reqId.current === seq) setDetail((d) => ({ node: <div className="empty">{errorMessage(e)}</div>, n: d.n + 1, reveal: true }));
+    }
   };
 
   return (
     <>
       <h4>Click a word</h4>
       <div className="tokens in-words">{tr.tokens.map((t, i) => i < tr.n_prompt ? null : (
-        <span key={i} className={"tok" + (t.includes("\n") ? " nl" : "") + (i === sel ? " sel" : "")} data-t={i} onClick={() => pick(i)}>{t.replace(/\n/g, "")}</span>
+        <span key={i} className={"tok" + (t.includes("\n") ? " nl" : "") + (i === sel ? " sel" : "")} data-t={i} onClick={() => void pick(i)}>{t.replace(/\n/g, "")}</span>
       ))}</div>
       <RevealBox className="in-detail" body={detail} />
     </>
@@ -145,7 +161,7 @@ function InspectBody({ tr, first }: { tr: Trace; first: JSX.Element }) {
 
 async function wordDetail(t: number) {
   const d = await api<TokenDetail>(`/api/trace/token?t=${t}`);
-  const rows = d.neurons.slice(0, 12).map((x) => ({ ...x, dose: ((x.act as number) >= 0 ? 1 : -1) * 0.8 }));
+  const rows = d.neurons.slice(0, 12).map((x) => ({ ...x, dose: ((x.act ?? 0) >= 0 ? 1 : -1) * 0.8 }));
 
   return (
     <div className="in-cols">
@@ -177,7 +193,9 @@ function LayerLens({ t, lens, jlens: j0 }: { t: number; lens: TokenDetail["lens"
         <tr key={l}><td className="l">{l}</td><td className="t">{showTok(row[0].tok)}</td>
           {mode === "j" && <td className="more">{row.slice(1, 3).map((x) => showTok(x.tok)).join("  ")}</td>}
           <td><div className="bar"><i data-w={`${Math.round(row[0].p * 100)}%`} style={moved ? { width: `${Math.round(row[0].p * 100)}%` } : undefined} /></div></td></tr>
-      ))}</tbody></table> : <JLensSetup onReady={async () => setJ((await api<TokenDetail>(`/api/trace/token?t=${t}`)).jlens)} />}
+      ))}</tbody></table> : <JLensSetup onReady={async () => {
+        try { setJ((await api<TokenDetail>(`/api/trace/token?t=${t}`)).jlens); } catch {}
+      }} />}
     </div>
   );
 }

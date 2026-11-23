@@ -36,6 +36,11 @@ import numpy as np
 import torch
 from torch import nn
 
+from .utils import get_logger
+
+
+logger = get_logger(__name__)
+
 MODEL_TYPES = ("inkling2_loop",)
 
 # the reply starts as a text message, which skips the thinking block the model would otherwise open
@@ -228,7 +233,7 @@ class ExpertCache:
         and parallel reads go about twice as fast as one at a time (preadv lets go of the GIL)."""
         missing = [(k, r) for k, r in items if k not in self.held]
         if missing:
-            for (k, _), ts in zip(missing, _readers.map(lambda kr: kr[1](), missing)):
+            for (k, _), ts in zip(missing, _readers.map(lambda kr: kr[1](), missing), strict=True):
                 self.get(k, lambda ts=ts: ts)
 
 
@@ -571,7 +576,7 @@ def load(model_id, dev, on_layer=None, cache_bytes=None):
                 layer.mlp = PackedMoe(layer.mlp, store, i, tracker)
                 if on_layer:
                     on_layer(i, len(text.layers))
-    print(f"inkling: {'streamed' if cache else 'packed'} experts in {time.perf_counter() - t0:.1f}s", flush=True)
+    logger.info("inkling: %s experts in %.1fs", "streamed" if cache else "packed", time.perf_counter() - t0)
 
     model.eval()
     model.requires_grad_(False)

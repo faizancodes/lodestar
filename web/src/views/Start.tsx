@@ -18,7 +18,7 @@ export function Start() {
 
   const card = (x: Choice, go: string) => (
     <div className={start.picked === x.id ? "start-model picked" : "start-model"} role="button" tabIndex={0} data-id={x.id} key={x.id}
-      onClick={() => loadModel(x.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && loadModel(x.id)}>
+      onClick={() => loadModel(x.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void loadModel(x.id); } }}>
       <div><b>{x.name}</b><span>{x.sub}</span></div>
       <span className="acts"><CopyAction x={x} /><span className="go">{go}</span></span>
     </div>

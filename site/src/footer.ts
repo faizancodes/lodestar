@@ -1,5 +1,6 @@
 import { drawMarks, type Put } from "../../web/src/art/glyphs";
 import { compassStar } from "../../web/src/art/mark";
+import { clamp, hash } from "./util";
 
 // The foot of the page: the lodestar rising over the horizon at the centre of a great astrolabe, its rings turning
 // at their own rates, meridians fanning out from it, and the sky round it scattered with stars that slowly wheel
@@ -7,17 +8,19 @@ import { compassStar } from "../../web/src/art/mark";
 const CELL = 4;
 const STARS = 420;
 
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
-const clamp = (x: number) => Math.max(0, Math.min(1, x));
-
 // "Lodestar" in the page's face, as coverage per cell, filling the band below the horizon (which sits at 0.58 × 0.78)
 function spell(cols: number, rows: number) {
-  const c = document.createElement("canvas"), g = c.getContext("2d", { willReadFrequently: true })!;
+  const out = new Float32Array(Math.max(0, cols * rows));
+  const top = rows * 0.58 * 0.78 + rows * 0.09, room = rows - top - rows * 0.06;
+  if (cols <= 0 || rows <= 0 || room <= 0) return out;
+  const c = document.createElement("canvas"), g = c.getContext("2d", { willReadFrequently: true });
+  if (!g) return out;
   c.width = cols;
   c.height = rows;
-  const family = getComputedStyle(document.body).fontFamily, top = rows * 0.58 * 0.78 + rows * 0.09, room = rows - top - rows * 0.06;
+  const family = getComputedStyle(document.body).fontFamily;
   g.font = `600 100px ${family}`;
   const m = g.measureText("Lodestar"), cap = m.actualBoundingBoxAscent;
+  if (m.width <= 0 || cap <= 0) return out;
   const px = Math.min((cols * 0.88) / m.width, room / cap) * 100;
   g.font = `600 ${px}px ${family}`;
   g.letterSpacing = `${-px * 0.03}px`;
@@ -26,21 +29,23 @@ function spell(cols: number, rows: number) {
   g.fillStyle = "#fff";
   const h = g.measureText("Lodestar").actualBoundingBoxAscent;
   g.fillText("Lodestar", cols / 2, top + (room - h) * 0.4 + h); // centred in its band, a little high
-  const d = g.getImageData(0, 0, cols, rows).data, out = new Float32Array(cols * rows);
+  const d = g.getImageData(0, 0, cols, rows).data;
   for (let i = 0; i < out.length; i++) out[i] = d[i * 4 + 3] / 255;
   return out;
 }
 
 export function startFooter(canvas: HTMLCanvasElement) {
-  let cols = 0, rowsAll = 0, grid = new Float32Array(0), name = new Float32Array(0), ctx!: CanvasRenderingContext2D;
+  let cols = 0, rowsAll = 0, grid = new Float32Array(0), name = new Float32Array(0), ctx: CanvasRenderingContext2D | null = null, color = "";
 
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
     if (!w || !h) return false;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
-    ctx = canvas.getContext("2d")!;
+    ctx = canvas.getContext("2d");
+    if (!ctx) return false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    color = getComputedStyle(canvas).color;
     cols = Math.ceil(w / CELL);
     rowsAll = Math.ceil(h / CELL);
     grid = new Float32Array(cols * rowsAll);
@@ -58,15 +63,18 @@ export function startFooter(canvas: HTMLCanvasElement) {
 
   // the cursor, in cells, eased; on: how present it is
   let mx = 0, my = 0, tmx = 0, tmy = 0, on = 0, here = false;
-  canvas.addEventListener("pointermove", (e) => {
+  const onMove = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
     tmx = (e.clientX - r.left) / CELL;
     tmy = (e.clientY - r.top) / CELL;
     if (!here) ((mx = tmx), (my = tmy), (here = true));
-  });
-  canvas.addEventListener("pointerleave", () => (here = false));
+  };
+  const onLeave = () => (here = false);
+  canvas.addEventListener("pointermove", onMove);
+  canvas.addEventListener("pointerleave", onLeave);
 
   const draw = (t: number) => {
+    if (!ctx) return;
     grid.fill(0);
     mx += (tmx - mx) * 0.2;
     my += (tmy - my) * 0.2;
@@ -102,16 +110,19 @@ export function startFooter(canvas: HTMLCanvasElement) {
     // a few constellations among them
     for (let k = 0; k < 7; k++) {
       let p = Math.floor(hash(k, 9) * n);
+      const visited = new Set<number>([p]);
       for (let s = 0; s < 4; s++) {
         let best = -1, bd = Infinity;
         for (let q = 0; q < n; q += 3) {
+          if (visited.has(q)) continue;
           const d = Math.hypot(sky[q][0] - sky[p][0], sky[q][1] - sky[p][1]);
-          if (q !== p && d > 8 && d < bd) ((bd = d), (best = q));
+          if (d > 8 && d < bd) ((bd = d), (best = q));
         }
         if (best < 0 || bd > 34) break;
         const [x1, y1] = sky[p], [x2, y2] = sky[best];
         for (let j = 0; j <= bd; j += 2) at(x1 + ((x2 - x1) * j) / bd, y1 + ((y2 - y1) * j) / bd, 0.2);
         at(x2, y2, 0.75);
+        visited.add(best);
         p = best;
       }
     }
@@ -163,15 +174,16 @@ export function startFooter(canvas: HTMLCanvasElement) {
         if (b >= 0.06) lens(cx + dx, cy - star * 0.35 + dy, b * pulse * (0.8 + 0.2 * Math.sin(Math.hypot(dx, dy) / S * 0.9 - t * 3.2)));
       }
 
-    ctx.fillStyle = getComputedStyle(canvas).color;
+    ctx.fillStyle = color;
     drawMarks(ctx, grid, cols, rowsAll, CELL);
   };
 
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches, t0 = performance.now();
-  let raf = 0, last = 0, seen = false;
+  let raf = 0, last = 0, seen = false, disposed = false;
+  const nowT = () => (still ? 4 : (performance.now() - t0) / 1000);
   const tick = (now: number) => {
     raf = 0;
-    if (!seen || document.hidden) return;
+    if (!seen || document.hidden || disposed) return;
     raf = requestAnimationFrame(tick);
     if (now - last < 40) return; // ~25 fps
     last = now;
@@ -180,9 +192,23 @@ export function startFooter(canvas: HTMLCanvasElement) {
   const run = () => (still ? draw(4) : raf || (raf = requestAnimationFrame(tick)));
 
   size();
-  document.fonts.ready.then(() => size() && draw((performance.now() - t0) / 1000));
-  new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(canvas);
-  document.addEventListener("visibilitychange", () => !document.hidden && run());
+  document.fonts.ready.then(() => !disposed && size() && draw(nowT()));
+  const io = new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run()));
+  io.observe(canvas);
+  const onVis = () => !document.hidden && run();
+  document.addEventListener("visibilitychange", onVis);
   let rt: ReturnType<typeof setTimeout> | undefined;
-  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => size() && draw((performance.now() - t0) / 1000), 150); });
+  const onResize = () => { clearTimeout(rt); rt = setTimeout(() => size() && draw(nowT()), 150); };
+  addEventListener("resize", onResize);
+
+  return () => {
+    disposed = true;
+    cancelAnimationFrame(raf);
+    clearTimeout(rt);
+    io.disconnect();
+    canvas.removeEventListener("pointermove", onMove);
+    canvas.removeEventListener("pointerleave", onLeave);
+    document.removeEventListener("visibilitychange", onVis);
+    removeEventListener("resize", onResize);
+  };
 }

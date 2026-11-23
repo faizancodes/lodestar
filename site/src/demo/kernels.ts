@@ -2,10 +2,13 @@
 // to f32 as they're read; activations are f32 and the KV cache is f16, two to a u32. Shapes are override constants,
 // so one shader serves every matrix; how many rows to run comes from a small uniform (Step) per pass.
 
-const COMMON = /* wgsl */ `
-struct Step { T: u32, pos0: u32, row0: u32, pad: u32 }
+const BF_HELPER = /* wgsl */ `
 fn bf(w: u32, hi: bool) -> f32 { return bitcast<f32>(select(w << 16u, w & 0xffff0000u, hi)); }
 `;
+
+const COMMON = /* wgsl */ `
+struct Step { T: u32, pos0: u32, row0: u32, pad: u32 }
+` + BF_HELPER;
 
 // a token's row of the embedding, which is split into chunks of CHUNK rows to stay under the binding size limit
 export const EMBED = COMMON + /* wgsl */ `
@@ -122,8 +125,8 @@ override KVH: u32;
   vc[dst] = pack2x16float(vec2f(v[src], v[src + 1u]));
 }`;
 
-// causal attention for each query head and token, over the cache up to the token's own position (grouped: GROUP query
-// heads share a key/value head)
+// causal attention for each query head and token, over the cache up to the token's own position (grouped: NH / KVH
+// query heads share a key/value head)
 export const ATTN = COMMON + /* wgsl */ `
 override NH: u32; override KVH: u32; override CTX: u32;
 @group(0) @binding(0) var<uniform> st: Step;
@@ -205,7 +208,7 @@ var<workgroup> part: array<f32, 256>;
 }`;
 
 // every down_proj column's norm ([D, N] weights): how far a neuron's unit activation moves the residual stream
-export const COLNORM = COMMON + /* wgsl */ `
+export const COLNORM = BF_HELPER + /* wgsl */ `
 override D: u32; override N: u32;
 @group(0) @binding(0) var<storage, read> W: array<u32>;
 @group(0) @binding(1) var<storage, read_write> out: array<f32>;
@@ -218,7 +221,7 @@ override D: u32; override N: u32;
 }`;
 
 // one neuron's down_proj column, into row `row` of out: what it writes into the residual stream
-export const COLUMN = COMMON + /* wgsl */ `
+export const COLUMN = BF_HELPER + /* wgsl */ `
 override D: u32; override N: u32;
 struct Col { n: u32, row: u32, sign: f32, pad: u32 }
 @group(0) @binding(0) var<storage, read> W: array<u32>;

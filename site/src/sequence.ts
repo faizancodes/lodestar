@@ -1,6 +1,7 @@
 import { createDecoder } from "../../web/src/art/decode";
 import { drawMarks, type Put } from "../../web/src/art/glyphs";
 import type { Frame } from "./scenes";
+import { clamp } from "./util";
 
 // The features as one scroll sequence: a stage pinned for the length of the section, one canvas on it, and a step
 // per feature. Scrolling moves a progress p through the steps; each scene plays its story as its step's u runs
@@ -15,7 +16,7 @@ export function startSequence(root: HTMLElement, scenes: ((f: Frame) => void)[])
   const meter = root.querySelector<HTMLElement>(".rail-fill");
   const N = scenes.length;
 
-  let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
+  let cols = 0, rows = 0, grid = new Float32Array(0), ctx: CanvasRenderingContext2D | null = null, color = "";
   let pointer: { x: number; y: number } | null = null, weight = 1;
 
   const size = () => {
@@ -23,8 +24,10 @@ export function startSequence(root: HTMLElement, scenes: ((f: Frame) => void)[])
     if (!w || !h) return false;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
-    ctx = canvas.getContext("2d")!;
+    ctx = canvas.getContext("2d");
+    if (!ctx) return false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    color = getComputedStyle(canvas).color;
     cols = Math.ceil(w / CELL);
     rows = Math.ceil(h / CELL);
     grid = new Float32Array(cols * rows);
@@ -59,6 +62,7 @@ export function startSequence(root: HTMLElement, scenes: ((f: Frame) => void)[])
 
   let p = target(), lastT = 0;
   const frame = (t: number, snap = false) => {
+    if (!ctx) return;
     const goal = target(), dt = Math.min(0.25, Math.max(0, t - lastT));
     lastT = t;
     p = snap ? goal : p + (goal - p) * (1 - Math.exp(-dt * 5)); // eased, so the scrub glides
@@ -76,7 +80,7 @@ export function startSequence(root: HTMLElement, scenes: ((f: Frame) => void)[])
     }
     weight = 1;
 
-    ctx.fillStyle = getComputedStyle(canvas).color;
+    ctx.fillStyle = color;
     drawMarks(ctx, grid, cols, rows, CELL);
   };
 
@@ -92,24 +96,45 @@ export function startSequence(root: HTMLElement, scenes: ((f: Frame) => void)[])
   };
   const run = () => raf || (raf = requestAnimationFrame(tick));
 
-  canvas.addEventListener("pointermove", (e) => {
+  const onMove = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
     pointer = { x: (e.clientX - r.left) / CELL, y: (e.clientY - r.top) / CELL };
-  });
-  canvas.addEventListener("pointerleave", () => (pointer = null));
-  new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(root);
-  document.addEventListener("visibilitychange", () => !document.hidden && run());
+  };
+  const onLeave = () => (pointer = null);
+  canvas.addEventListener("pointermove", onMove);
+  canvas.addEventListener("pointerleave", onLeave);
+  const io = new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run()));
+  io.observe(root);
+  const onVis = () => !document.hidden && run();
+  document.addEventListener("visibilitychange", onVis);
   let rt: ReturnType<typeof setTimeout> | undefined;
-  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => size() && frame(2, true), 150); });
+  const onResize = () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => size() && frame(reduced ? 2 : lastT || 2, true), 150);
+  };
+  addEventListener("resize", onResize);
 
   // the rail jumps to a step's middle
-  ticks.forEach((a, k) => a.addEventListener("click", (e) => {
-    e.preventDefault();
-    const top = root.getBoundingClientRect().top + scrollY, run = root.offsetHeight - innerHeight;
-    scrollTo({ top: top + ((k + 0.45) / N) * run, behavior: reduced ? "auto" : "smooth" });
-  }));
+  const tickHandlers = ticks.map((a, k) => {
+    const fn = (e: MouseEvent) => {
+      e.preventDefault();
+      const top = root.getBoundingClientRect().top + scrollY, runDist = root.offsetHeight - innerHeight;
+      scrollTo({ top: top + ((k + 0.45) / N) * runDist, behavior: reduced ? "auto" : "smooth" });
+    };
+    a.addEventListener("click", fn);
+    return [a, fn] as const;
+  });
 
   if (size()) frame(2, true);
-}
 
-function clamp(x: number, a: number, b: number) { return Math.max(a, Math.min(b, x)); }
+  return () => {
+    cancelAnimationFrame(raf);
+    clearTimeout(rt);
+    io.disconnect();
+    canvas.removeEventListener("pointermove", onMove);
+    canvas.removeEventListener("pointerleave", onLeave);
+    document.removeEventListener("visibilitychange", onVis);
+    removeEventListener("resize", onResize);
+    for (const [a, fn] of tickHandlers) a.removeEventListener("click", fn);
+  };
+}

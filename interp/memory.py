@@ -1,50 +1,92 @@
-"""How much memory the Mac has, what's using it, and whether a model will fit next to it.
+"""Memory footprint inspection and model-fit estimation for macOS unified memory.
 
-A loaded model's weights live in GPU memory, which a process's resident size doesn't count: a Python process holding
-an 8B model shows ~50 MB resident but ~18 GB of footprint. So everything here reads the footprint (what Activity
-Monitor's Memory column shows), through libproc.
+A loaded model's weights live in GPU memory, which a process's resident set size (RSS) does not count: a Python
+process holding an 8B model shows ~50 MB resident but ~18 GB of physical footprint. Everything here reads the physical
+footprint (matching Activity Monitor's Memory column) through macOS's ``libproc`` API.
 """
+
+from __future__ import annotations
+
 import ctypes
 import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import psutil
 
-GB = 1024 ** 3
+
+GB = 1024**3
 BIG = 6 * GB  # a process this size is holding a model, or something as heavy
 SWAP_OK = 2 * GB  # how far past free memory a load may go, swapping a little
 SWAP_DISK = 10 * GB  # free disk below which swap can't grow
-try:
-    _libproc = ctypes.CDLL("/usr/lib/libproc.dylib")  # in the dyld shared cache, so it loads though no file is there
-except OSError:
-    _libproc = None
+_SWAP_BURST_BYTES = 64 * 1024**2
+_SWAP_HOLD_SECONDS = 20.0
+_RUSAGE_INFO_V0 = 0
+_PRESSURE_LEVELS = {1: "normal", 2: "warn", 4: "critical"}
 
 
-class _Rusage(ctypes.Structure):  # rusage_info_v0, enough to reach ri_phys_footprint
-    _fields_ = [("uuid", ctypes.c_uint8 * 16)] + [(n, ctypes.c_uint64) for n in (
-        "user_time", "system_time", "pkg_idle_wkups", "interrupt_wkups", "pageins", "wired_size", "resident_size",
-        "phys_footprint", "proc_start_abstime", "proc_exit_abstime")]
+class _Rusage(ctypes.Structure):
+    """Subset of macOS ``rusage_info_v0`` up to ``ri_phys_footprint``."""
+
+    _fields_ = [
+        ("uuid", ctypes.c_uint8 * 16),
+        *(
+            (name, ctypes.c_uint64)
+            for name in (
+                "user_time",
+                "system_time",
+                "pkg_idle_wkups",
+                "interrupt_wkups",
+                "pageins",
+                "wired_size",
+                "resident_size",
+                "phys_footprint",
+                "proc_start_abstime",
+                "proc_exit_abstime",
+            )
+        ),
+    ]
 
 
-def footprint(pid):
-    """A process's memory footprint in bytes, or None when it can't be read (another user's process, or gone)."""
+def _load_libproc() -> ctypes.CDLL | None:
+    try:
+        # Lives in the macOS dyld shared cache, so CDLL loads it even when no file exists on disk.
+        lib = ctypes.CDLL("/usr/lib/libproc.dylib")
+        lib.proc_pid_rusage.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p]
+        lib.proc_pid_rusage.restype = ctypes.c_int
+        return lib
+    except (OSError, AttributeError):
+        return None
+
+
+_libproc = _load_libproc()
+_swap_lock = threading.Lock()
+_last_swap_out: int | None = None
+_swapping_until: float = 0.0
+
+
+def footprint(pid: int) -> int | None:
+    """Return a process's physical memory footprint in bytes, or ``None`` if unreadable."""
     if _libproc is None:
         return None
 
-    ru = _Rusage()
-    return ru.phys_footprint if _libproc.proc_pid_rusage(pid, 0, ctypes.byref(ru)) == 0 else None
+    rusage = _Rusage()
+    if _libproc.proc_pid_rusage(pid, _RUSAGE_INFO_V0, ctypes.byref(rusage)) == 0:
+        return int(rusage.phys_footprint)
+    return None
 
 
-def _label(p):
-    """A name a person would recognise: Python processes by their script, the rest by their app."""
-    name = p.info["name"] or "?"
-
+def _label(proc: psutil.Process) -> str:
+    """Return a human-readable process label (script name for Python processes, app name otherwise)."""
+    name = proc.info["name"] or "?"
     if name.lower().startswith("python"):
-        script = next((a for a in (p.info["cmdline"] or [])[1:] if not a.startswith("-")), None)
+        cmdline = proc.info["cmdline"] or []
+        script = next((arg for arg in cmdline[1:] if not arg.startswith("-")), None)
         if script:
             return f"Python ({Path(script).name})"
         return "Python"
@@ -52,52 +94,59 @@ def _label(p):
     return name.split(" (")[0].split(":")[0].strip()
 
 
-def _others(min_bytes=256 * 1024 ** 2):
-    """Every other readable process using at least min_bytes, biggest first."""
-    me, out = os.getpid(), []
+def _others(min_bytes: int = 256 * 1024**2) -> list[dict[str, Any]]:
+    """Return every other readable process using at least ``min_bytes``, largest first."""
+    my_pid = os.getpid()
+    out: list[dict[str, Any]] = []
 
-    for p in psutil.process_iter(["pid", "name", "cmdline"]):
-        if p.info["pid"] == me:
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+        pid = proc.info["pid"]
+        if pid == my_pid:
             continue
 
         try:
-            f = footprint(p.info["pid"])
-            if f and f >= min_bytes:
-                out.append({"pid": p.info["pid"], "name": _label(p), "bytes": f})
+            mem = footprint(pid)
+            if mem and mem >= min_bytes:
+                out.append({"pid": pid, "name": _label(proc), "bytes": mem})
         except (psutil.Error, OSError):
             continue
 
-    return sorted(out, key=lambda x: -x["bytes"])
+    return sorted(out, key=lambda item: -item["bytes"])
 
 
-def pressure():
-    """macOS's own verdict: 1 normal, 2 warning, 4 critical."""
+def pressure() -> str:
+    """Read macOS's VM memory pressure verdict: ``"normal"``, ``"warn"``, or ``"critical"``."""
     try:
-        r = subprocess.run(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"], capture_output=True, text=True,
-                           timeout=2)
-        return {1: "normal", 2: "warn", 4: "critical"}.get(int(r.stdout.strip()), "normal")
+        result = subprocess.run(
+            ["sysctl", "-n", "kern.memorystatus_vm_pressure_level"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        return _PRESSURE_LEVELS.get(int(result.stdout.strip()), "normal")
     except (OSError, ValueError, subprocess.SubprocessError):
         return "normal"
 
 
-_last_swap = {"out": None, "at": 0.0, "swapping_until": 0.0}
+def _swapping() -> bool:
+    """Return whether pages were swapped out recently, latching true for 20 s to prevent UI flicker."""
+    global _last_swap_out, _swapping_until
+    now = time.time()
+    swap_out = psutil.swap_memory().sout
+
+    with _swap_lock:
+        prev = _last_swap_out
+        _last_swap_out = swap_out
+        if prev is not None and swap_out - prev > _SWAP_BURST_BYTES:
+            _swapping_until = now + _SWAP_HOLD_SECONDS
+        return now < _swapping_until
 
 
-def _swapping():
-    """Whether pages went out to swap since the last look. Stays true for 20 s after, so a burst doesn't flicker."""
-    now, out = time.time(), psutil.swap_memory().sout
-    prev = _last_swap["out"]
-    _last_swap.update(out=out, at=now)
-
-    if prev is not None and out - prev > 64 * 1024 ** 2:
-        _last_swap["swapping_until"] = now + 20
-
-    return now < _last_swap["swapping_until"]
-
-
-def snapshot():
-    """For the meter beside the model picker."""
-    vm, sw = psutil.virtual_memory(), psutil.swap_memory()
+def snapshot() -> dict[str, Any]:
+    """Return a system and process memory summary for the sidebar memory meter."""
+    vm = psutil.virtual_memory()
+    sw = psutil.swap_memory()
     others = _others()
     me = footprint(os.getpid()) or 0
 
@@ -112,23 +161,25 @@ def snapshot():
     }
 
 
-def _files(model, hf_cache):
-    p = Path(model)
-    if p.is_dir():
-        return p, list(p.glob("*.safetensors")) or list(p.glob("*.bin"))
-    snaps = sorted((hf_cache / f"models--{model.replace('/', '--')}" / "snapshots").glob("*"))
+def _files(model: str | Path, hf_cache: Path) -> tuple[Path | None, list[Path]]:
+    path = Path(model)
+    if path.is_dir():
+        return path, list(path.glob("*.safetensors")) or list(path.glob("*.bin"))
+    cache_dir = hf_cache / f"models--{str(model).replace('/', '--')}" / "snapshots"
+    snaps = sorted(cache_dir.glob("*")) if cache_dir.exists() else []
     return (snaps[-1], list(snaps[-1].glob("*.safetensors"))) if snaps else (None, [])
 
 
-def weights_bytes(model, hf_cache):
-    """The size of a model's weights on disk, or None when it isn't here yet (a download)."""
-    return sum(f.stat().st_size for f in _files(model, hf_cache)[1]) or None
+def weights_bytes(model: str | Path, hf_cache: Path) -> int | None:
+    """Return the total weight size on disk in bytes, or ``None`` if the model is not cached locally."""
+    return sum(file.stat().st_size for file in _files(model, hf_cache)[1]) or None
 
 
-def streamed_bytes(model, hf_cache):
-    """For Inkling 2 Mini, which can stream its experts from disk (interp/inkling.py): what the rest of its text model
-    holds once loaded. None for every other model."""
+def streamed_bytes(model: str | Path, hf_cache: Path) -> int | None:
+    """Return non-expert text-model bytes for Inkling 2 Mini (which streams experts from disk), else ``None``."""
     root, files = _files(model, hf_cache)
+    if root is None:
+        return None
     try:
         if json.loads((root / "config.json").read_text()).get("model_type") != "inkling2_loop":
             return None
@@ -136,80 +187,95 @@ def streamed_bytes(model, hf_cache):
         return None
 
     total = 0
-    for f in files:
-        if f.name == "mtp.safetensors":
+    for file in files:
+        if file.name == "mtp.safetensors":
             continue
-        with open(f, "rb") as fh:
+        with open(file, "rb") as fh:
             header = json.loads(fh.read(int.from_bytes(fh.read(8), "little")))
-        total += sum(v["data_offsets"][1] - v["data_offsets"][0] for k, v in header.items()
-                     if k.startswith("model.llm.") and ".mlp.experts." not in k)
+        total += sum(
+            v["data_offsets"][1] - v["data_offsets"][0]
+            for k, v in header.items()
+            if k.startswith("model.llm.") and ".mlp.experts." not in k
+        )
     return total
 
 
-def fit(model, hf_cache, loaded_bytes=0):
-    """Whether a model fits beside everything else that's running. loaded_bytes: what the model it replaces holds,
-    which comes free when the new one loads."""
+def _held_bytes(weight_bytes: float) -> float:
+    return weight_bytes * 1.08 + 0.8 * GB
+
+
+def fit(model: str | Path, hf_cache: Path, loaded_bytes: int = 0) -> dict[str, Any]:
+    """Estimate whether ``model`` fits in RAM alongside other running processes.
+
+    Args:
+        model: Hugging Face model ID or local model directory path.
+        hf_cache: Path to the local Hugging Face hub cache.
+        loaded_bytes: Bytes currently held by a loaded model that will be unloaded before loading ``model``.
+
+    Returns:
+        Dictionary describing fit status and estimated memory requirements.
+    """
     disk = weights_bytes(model, hf_cache)
     if disk is None:
         return {"known": False, "fits": True}
 
-    # the engine keeps small models (under ~2.5B parameters, ~5 GB in bf16) in float32, doubling them; then the
-    # activations, caches and the Python runtime come on top
-    held = lambda b: b * 1.08 + 0.8 * GB
-    need = held(disk * (2 if disk < 5e9 else 1))
+    # The engine keeps small models (under ~2.5B parameters, ~5 GB in bf16) in float32, doubling weight size;
+    # activations, KV caches, and the Python runtime sit on top.
+    need = _held_bytes(disk * (2 if disk < 5e9 else 1))
 
-    # Footprints count memory that's been compressed or swapped out, so summing every process overshoots the Mac's
-    # RAM. What decides whether a model fits is the other heavy processes (another model, mostly): count those, and
-    # set aside a quarter of the RAM for macOS and the everyday apps.
-    total = psutil.virtual_memory().total
+    # Footprints include compressed/swapped memory, so summing every process overshoots physical RAM.
+    # Count other heavy processes (typically other models) and reserve a quarter of RAM for macOS and everyday apps,
+    # capped by macOS's own available memory reading when that is lower.
+    vm = psutil.virtual_memory()
+    total = vm.total
     heavy = _others(BIG)
-    used = sum(o["bytes"] for o in heavy)
+    used = sum(proc["bytes"] for proc in heavy)
     me = max((footprint(os.getpid()) or 0) - loaded_bytes, 0)
-    free = total * 0.75 - used - me
-    # ...but many small apps, compressed memory and the kernel can leave far less than that: on a 32 GB Mac with
-    # nothing heavy open, macOS had 14 GB available against 24 GB by the count above. Take what macOS says is
-    # available (plus what the model being replaced holds) when that's lower.
-    free = min(free, psutil.virtual_memory().available + loaded_bytes)
+    free = min(total * 0.75 - used - me, vm.available + loaded_bytes)
 
-    # Past a little swap, macOS can stall outright rather than slow down: a load that big, under memory pressure
-    # already, or with too little disk for swap to grow is refused, with no way to load it anyway.
-    level, disk_free = pressure(), shutil.disk_usage(Path.home()).free
+    level = pressure()
+    disk_free = shutil.disk_usage(Path.home()).free
 
-    def verdict(need):
+    def _verdict(required: float) -> str | None:
         if level == "critical":
             return "macOS is already short of memory."
-        if need > free + SWAP_OK:
+        if required > free + SWAP_OK:
             return "Loading it would push macOS so far into swap that the Mac could freeze."
-        if need > free and disk_free < SWAP_DISK:
+        if required > free and disk_free < SWAP_DISK:
             return "The disk is too full for macOS to swap."
         return None
 
-    blocked, stream = verdict(need), None
+    blocked = _verdict(need)
+    stream: int | None = None
     rest = streamed_bytes(model, hf_cache) if need > free or blocked else None
     if rest is not None:
-        # Inkling's experts can stay on disk instead, with a GPU cache of the ones used lately: a third of what's free,
-        # leaving the rest to macOS's file cache, which holds the experts read from disk
         stream = int(min(max(free * 0.3, 2 * GB), 6 * GB))  # at least a layer's experts
-        need = held(rest + stream) + 2 * GB  # plus read buffers and the GPU allocator's working blocks (measured)
-        blocked = verdict(need)
+        need = _held_bytes(rest + stream) + 2 * GB  # plus read buffers and GPU allocator working blocks
+        blocked = _verdict(need)
 
-    return {"known": True, "fits": need <= free and blocked is None, "blocked": blocked, "need": need,
-            "free": max(free, 0), "total": total, "used": used, "others": heavy[:3], "stream": stream}
+    return {
+        "known": True,
+        "fits": need <= free and blocked is None,
+        "blocked": blocked,
+        "need": need,
+        "free": max(free, 0),
+        "total": total,
+        "used": used,
+        "others": heavy[:3],
+        "stream": stream,
+    }
 
 
-def headroom(min_bytes=3 * GB):
-    """Whether there's room for a heavy job (a backward pass) beside what's loaded: no pressure and some memory
-    still available."""
+def headroom(min_bytes: int = 3 * GB) -> bool:
+    """Return whether there is room for a heavy job (e.g. a backward pass) beside what is loaded."""
     return pressure() == "normal" and psutil.virtual_memory().available >= min_bytes
 
 
-def cap_gpu():
-    """Cap this process's GPU memory at what it holds now plus what macOS has available (and the little swap a load
-    may use). Past the cap, PyTorch raises an out-of-memory error, which the app reports; without it, a model or a
-    backward pass that outgrows memory swaps until the whole Mac stalls."""
+def cap_gpu() -> float:
+    """Cap MPS memory to current allocation plus available RAM and swap margin so OOM raises instead of stalling."""
     import torch
 
     torch.mps.empty_cache()
     cap = torch.mps.driver_allocated_memory() + psutil.virtual_memory().available + SWAP_OK
     torch.mps.set_per_process_memory_fraction(min(max(cap / torch.mps.recommended_max_memory(), 0.1), 2.0))
-    return cap
+    return float(cap)

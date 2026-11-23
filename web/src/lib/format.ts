@@ -32,7 +32,7 @@ export function pushes(items: Item[], dirs: Direction[] | null | undefined, sign
 }
 
 /** Where a word search starts a neuron: its direct push noticeable, not yet a loop. */
-export const searchDose = (score: number) => Math.sign(score) * Math.min(1, +(0.15 / Math.abs(score)).toFixed(2));
+export const searchDose = (score: number) => (score === 0 ? 0 : Math.sign(score) * Math.min(1, +(0.15 / Math.abs(score)).toFixed(2)));
 
 // the words a neuron pushes toward, without repeats like "cookie · Cookie · cookies"
 const PLURAL = /s$/;
@@ -63,12 +63,13 @@ export function styleShift(pairs: { baseline?: string; target?: string }[]) {
 
 export const cleanReply = (t: string) => t.replace(/<think>[\s\S]*?(<\/think>|$)/g, "").replace(/^\s+/, "");
 
+const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+
 export const ablDefaultName = (model: string | undefined, coef: number, category?: string) => category
-  ? `${modelName(model || "model")}-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "category"}-abliterated`
+  ? `${modelName(model || "model")}-${slugify(category) || "category"}-abliterated`
   : `${modelName(model || "model")}-abliterated` + (coef === 1 ? "" : `-${coef}`);
 export const steerDefaultName = (model: string | undefined, recipeName: string) => {
   const base = modelName(model || "model").replace(/[^A-Za-z0-9._ -]+/g, "");
-  const what = (recipeName || "steered").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
-  return `${base}-${what || "steered"}`;
+  return `${base}-${slugify(recipeName || "steered") || "steered"}`;
 };
 

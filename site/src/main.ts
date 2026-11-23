@@ -29,14 +29,18 @@ function hero() {
       readout.textContent = `L${layer} · n${neuron}`;
     },
   });
-  setInterval(() => {
-    const v = Math.sin(performance.now() / 900) * 0.6 + (Math.random() - 0.5) * 0.25;
-    act.textContent = (v < 0 ? "−" : "+") + Math.abs(v).toFixed(3);
-  }, 120);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduced) {
+    setInterval(() => {
+      if (document.hidden) return;
+      const v = Math.sin(performance.now() / 900) * 0.6 + (Math.random() - 0.5) * 0.25;
+      act.textContent = (v < 0 ? "−" : "+") + Math.abs(v).toFixed(3);
+    }, 120);
+  }
 
   // the title types in, each letter decoding through the marks
   const title = $("#hero-title"), text = title.textContent!, dec = createDecoder();
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (reduced) return;
   title.style.minHeight = `${title.offsetHeight}px`;
   let n = 0;
   const type = () => {
@@ -54,12 +58,14 @@ function copyInstall() {
   // the whole row copies; its button is there for the eye and the keyboard (its click bubbles up to the row)
   for (const row of document.querySelectorAll<HTMLLIElement>(".term li")) {
     const btn = row.querySelector<HTMLButtonElement>(".cp")!, code = row.querySelector("code")!.textContent!;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     row.addEventListener("click", async () => {
       if (getSelection()?.toString()) return; // they were selecting it by hand
       try { await navigator.clipboard.writeText(code); } catch { return; }
+      clearTimeout(timer);
       btn.classList.add("done");
       btn.setAttribute("aria-label", "Copied");
-      setTimeout(() => (btn.classList.remove("done"), btn.setAttribute("aria-label", "Copy")), 1400);
+      timer = setTimeout(() => (btn.classList.remove("done"), btn.setAttribute("aria-label", "Copy")), 1400);
     });
   }
 }

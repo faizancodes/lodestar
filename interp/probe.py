@@ -23,6 +23,7 @@ moves the states enough to change a score by several standard deviations.
 
 Each model's probes live in DATA/probes/<model>/ as <id>.json (spec, metrics, map) and <id>.npz (vectors).
 """
+import itertools
 import json
 import re
 import time
@@ -32,6 +33,8 @@ import numpy as np
 
 from .directions import make_id, slug
 from .engine import Cancelled
+from .utils import atomic_write_json
+
 
 FOLDS, INNER, SHUFFLES, SEED = 5, 4, 10, 0
 MIN_PER_SIDE = 12
@@ -78,16 +81,16 @@ def pick_layer(Xtr, ytr, seed):
     for a, b in folds(ytr, INNER, seed):
         s[:, b] = dom(Xtr[a], ytr[a], Xtr[b])
     layers = range(1, Xtr.shape[1]) if Xtr.shape[1] > 1 else range(1)  # 0 is the embedding: same for every prompt end
-    return max(layers, key=lambda l: auc(s[l], ytr))
+    return max(layers, key=lambda layer_idx: auc(s[layer_idx], ytr))
 
 
 def nested(X, y, splits, seed=SEED):
     """Out-of-sample scores for every test row, each from the layer its own training rows picked."""
     out, picked = np.full(len(y), np.nan), []
     for tr, te in splits:
-        l = pick_layer(X[tr], y[tr], seed)
-        picked.append(int(l))
-        out[te] = dom(X[tr], y[tr], X[te])[l]
+        layer_idx = pick_layer(X[tr], y[tr], seed)
+        picked.append(int(layer_idx))
+        out[te] = dom(X[tr], y[tr], X[te])[layer_idx]
     return out, picked
 
 
@@ -111,12 +114,12 @@ def word_features(tok, texts):
     """The prompt's tokens and pairs of tokens (present or not), and two counts: tokens, and tokens beyond one per
     word (how fragmented the words are, which flags made-up names)."""
     ids = [tok(t, add_special_tokens=False).input_ids for t in texts]
-    grams = [set(x) | {(a, b) for a, b in zip(x, x[1:])} for x in ids]
+    grams = [set(x) | set(itertools.pairwise(x)) for x in ids]
     vocab = {g: i for i, g in enumerate(sorted({g for gs in grams for g in gs}, key=str))}
     B = np.zeros((len(texts), len(vocab)), np.float32)
     for r, gs in enumerate(grams):
         B[r, [vocab[g] for g in gs]] = 1
-    counts = np.array([[len(x), len(x) - len(t.split())] for x, t in zip(ids, texts)], np.float32)
+    counts = np.array([[len(x), len(x) - len(t.split())] for x, t in zip(ids, texts, strict=True)], np.float32)
     return B, counts
 
 
@@ -126,8 +129,11 @@ def words_only(B, counts, y, splits):
     for tr, te in splits:
         keep = B[tr].any(0)
         mu, sd = counts[tr].mean(0), counts[tr].std(0) + 1e-6
-        F = lambda idx: np.hstack([B[idx][:, keep], (counts[idx] - mu) / sd, np.full((len(idx), 1), 10.0)])
-        out[te] = F(te) @ logistic(F(tr), y[tr].astype(float))
+
+        def _features(idx, keep=keep, mu=mu, sd=sd):
+            return np.hstack([B[idx][:, keep], (counts[idx] - mu) / sd, np.full((len(idx), 1), 10.0)])
+
+        out[te] = _features(te) @ logistic(_features(tr), y[tr].astype(float))
     return out
 
 
@@ -200,7 +206,7 @@ def analyze(X, y, groups, B, counts):
     thr = np.percentile(s_cv[y == 0], 90)
     m["caught"] = float((s_cv[y == 1] > thr).mean())
 
-    layer = max(set(picked), key=lambda l: (picked.count(l), l))
+    layer = max(set(picked), key=lambda layer_idx: (picked.count(layer_idx), layer_idx))
     m["layer"] = int(layer)
     return {k: round(v, 3) if isinstance(v, float) else v for k, v in m.items()}, s_cv, layer
 
@@ -215,27 +221,27 @@ def state_map(X, y):
     pts = np.zeros((L1, n, 2), np.float32)
     prev = None
 
-    for l in range(L1):
-        x = X[:, l]
-        mu[l] = x.mean(0)
+    for layer_idx in range(L1):
+        x = X[:, layer_idx]
+        mu[layer_idx] = x.mean(0)
         dl = x[y == 1].mean(0) - x[y == 0].mean(0)
-        d[l] = dl / (np.linalg.norm(dl) + 1e-9)
+        d[layer_idx] = dl / (np.linalg.norm(dl) + 1e-9)
 
         xo = np.zeros(n)
         for tr, te in kf:
             dd = x[tr][y[tr] == 1].mean(0) - x[tr][y[tr] == 0].mean(0)
             xo[te] = (x[te] - x[tr].mean(0)) @ (dd / (np.linalg.norm(dd) + 1e-9))
 
-        c = x - mu[l]
-        r = c - np.outer(c @ d[l], d[l])
-        e[l] = np.linalg.svd(r, full_matrices=False)[2][0]
-        yo = c @ e[l]
+        c = x - mu[layer_idx]
+        r = c - np.outer(c @ d[layer_idx], d[layer_idx])
+        e[layer_idx] = np.linalg.svd(r, full_matrices=False)[2][0]
+        yo = c @ e[layer_idx]
         if prev is not None and yo.std() > 1e-6 and prev.std() > 1e-6 and np.corrcoef(yo, prev)[0, 1] < 0:
-            e[l], yo = -e[l], -yo
+            e[layer_idx], yo = -e[layer_idx], -yo
         prev = yo
 
-        sx[l], sy[l] = max(xo.std(), 1e-6), max(yo.std(), 1e-6)
-        pts[l] = np.stack([xo / sx[l], yo / sy[l]], 1)
+        sx[layer_idx], sy[layer_idx] = max(xo.std(), 1e-6), max(yo.std(), 1e-6)
+        pts[layer_idx] = np.stack([xo / sx[layer_idx], yo / sy[layer_idx]], 1)
 
     return pts, {"mu": mu, "d": d, "e": e, "sx": sx, "sy": sy}
 
@@ -252,7 +258,7 @@ def run(eng, lib, spec, cancel=None):
     y = np.array([it["side"] for it in items])
     groups = np.array([it["group"] or "" for it in items])
     B, counts = word_features(eng.tok, texts)
-    metrics, s_cv, layer = analyze(X, y, groups, B, counts)
+    metrics, _s_cv, layer = analyze(X, y, groups, B, counts)
 
     yield _ev("stage", stage="map", label="Mapping every layer")
     pts, vec = state_map(X, y)
@@ -277,8 +283,8 @@ def score(eng, probe_vec, text):
     st = np.asarray(eng.prompt_end_states([text], n_pos=eng.prompt_end_len()), np.float32)[0].mean(1)
     c = st - probe_vec["mu"]
     xs = (c * probe_vec["d"]).sum(1)
-    l = int(probe_vec["layer"])
-    z = xs[l] / float(probe_vec["sd"])
+    layer_idx = int(probe_vec["layer"])
+    z = xs[layer_idx] / float(probe_vec["sd"])
     p = 1 / (1 + np.exp(-(float(probe_vec["a"]) * z + float(probe_vec["b"]))))
     path = np.stack([xs / probe_vec["sx"], (c * probe_vec["e"]).sum(1) / probe_vec["sy"]], 1)
     return {"p": round(float(p), 4), "z": round(float(z), 3), "path": np.round(path, 2).tolist()}
@@ -313,12 +319,13 @@ class Library:
         return json.loads(f.read_text())
 
     def vectors(self, pid):
-        return dict(np.load(self._f(pid, "npz")))
+        with np.load(self._f(pid, "npz")) as archive:
+            return dict(archive)
 
     def save(self, entry, vec):
         self.dir.mkdir(parents=True, exist_ok=True)
         np.savez(self._f(entry["id"], "npz"), **vec)
-        self._f(entry["id"], "json").write_text(json.dumps(entry, ensure_ascii=False))
+        atomic_write_json(self._f(entry["id"], "json"), entry, indent=None, ensure_ascii=False)
 
     def delete(self, pid):
         for ext in ("json", "npz"):

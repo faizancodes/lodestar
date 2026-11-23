@@ -1,5 +1,6 @@
 import { drawMarks, type Put } from "../../web/src/art/glyphs";
 import { compassStar } from "../../web/src/art/mark";
+import { clamp, dot, hash, norm, type V3 as V } from "./util";
 
 // The hero: an endless fall into an armillary sphere of the model. Each sphere is a lattice of neurons turning in
 // perspective, faint at the back and bright at the front, lit where two slow foci of attention pass, held in gimbal
@@ -14,12 +15,6 @@ const K = 2.7;        // how much bigger each sphere is than the one inside it
 const PERIOD = 6;     // seconds to fall through one sphere
 const TILT = 0.41;    // the ticked ring's tilt against the equator
 
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
-const clamp = (x: number) => Math.max(0, Math.min(1, x));
-type V = [number, number, number];
-const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const norm = (a: V): V => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-
 // neurons spread evenly over the unit sphere
 const lattice: V[] = Array.from({ length: NODES }, (_, i) => {
   const y = 1 - (2 * (i + 0.5)) / NODES, r = Math.sqrt(1 - y * y), a = i * Math.PI * (3 - Math.sqrt(5));
@@ -30,7 +25,7 @@ const lattice: V[] = Array.from({ length: NODES }, (_, i) => {
  *  depth: called with the sphere the camera has reached, each time it passes one. */
 export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [number, number]; boost?: () => number; depth?: (level: number) => void } = {}) {
   const { at = () => [0.5, 0.5], boost = () => 0, depth } = opts;
-  let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
+  let cols = 0, rows = 0, grid = new Float32Array(0), ctx: CanvasRenderingContext2D | null = null, color = "";
 
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
@@ -38,8 +33,10 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
     if (canvas.width === Math.round(w * dpr) && canvas.height === Math.round(h * dpr)) return false;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
-    ctx = canvas.getContext("2d")!;
+    ctx = canvas.getContext("2d");
+    if (!ctx) return false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    color = getComputedStyle(canvas).color;
     cols = Math.ceil(w / CELL);
     rows = Math.ceil(h / CELL);
     grid = new Float32Array(cols * rows);
@@ -56,14 +53,17 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
 
   // the pointer, as -1..1 across the canvas, eased
   let px = 0, py = 0, tx = 0, ty = 0;
-  addEventListener("pointermove", (e) => {
+  const onPointer = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
     tx = clamp((e.clientX - r.left) / r.width) * 2 - 1;
     ty = clamp((e.clientY - r.top) / r.height) * 2 - 1;
-  }, { passive: true });
+  };
+  addEventListener("pointermove", onPointer, { passive: true });
 
   let z = 0.35, lastT = -1, lastLevel = NaN;
   const draw = (t: number) => {
+    if (!ctx) return;
     grid.fill(0);
     const [fx, fy] = at(), cx = cols * fx, cy = rows * fy;
     const Rs = Math.min(rows * 0.3, cols * 0.27);
@@ -181,7 +181,7 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
         put(cx + dx, cy + dy, b * pulse * (0.8 + 0.2 * Math.sin(r * 0.9 - t * 3.2)));
       }
 
-    ctx.fillStyle = getComputedStyle(canvas).color;
+    ctx.fillStyle = color;
     drawMarks(ctx, grid, cols, rows, CELL);
   };
 
@@ -198,9 +198,20 @@ export function startLodestar(canvas: HTMLCanvasElement, opts: { at?: () => [num
   const run = () => (still ? draw(4) : raf || (raf = requestAnimationFrame(tick)));
 
   if (size()) run();
-  new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(canvas);
-  document.addEventListener("visibilitychange", () => !document.hidden && run());
+  const io = new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run()));
+  io.observe(canvas);
+  const onVis = () => !document.hidden && run();
+  document.addEventListener("visibilitychange", onVis);
   // resize the bitmap whenever the canvas's box changes, not just on a window resize: on a phone the box settles after
   // the first frame (the viewport units shift as the browser's bars appear), and a stale bitmap draws stretched
-  new ResizeObserver(() => size() && (still ? draw(4) : lastT >= 0 ? draw(lastT) : run())).observe(canvas);
+  const ro = new ResizeObserver(() => size() && (still ? draw(4) : lastT >= 0 ? draw(lastT) : run()));
+  ro.observe(canvas);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    io.disconnect();
+    ro.disconnect();
+    removeEventListener("pointermove", onPointer);
+    document.removeEventListener("visibilitychange", onVis);
+  };
 }

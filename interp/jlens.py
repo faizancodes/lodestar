@@ -1,33 +1,36 @@
-"""The J-lens (Anthropic, "Verbalizable Representations Form a Global Workspace in Language Models", 2026): a logit
-lens corrected for what the layers after it do to the stream.
+"""The J-lens: a logit lens corrected for downstream layer Jacobians.
 
-The logit lens reads layer l's residual h straight through the final norm and unembedding, as if nothing came after
-it, so middle layers mostly read as noise. The J-lens first maps h to the last layer with J_l, the Jacobian of the
-last layer's residual with respect to layer l's, averaged over prompts, source positions t and every later position
-t' >= t:
+Implements the J-lens from Anthropic's "Verbalizable Representations Form a Global Workspace in Language Models"
+(2026). Rather than projecting layer ``l``'s residual ``h`` directly through the final norm and unembedding, the
+J-lens first maps ``h`` to the final layer via ``J_l``, the Jacobian of the final-layer residual with respect to
+layer ``l``'s residual averaged over prompts, source positions ``t``, and all later positions ``t' >= t``::
 
     J_l = E[ d h_final,t' / d h_l,t ],    lens(h) = softmax(W_U norm(J_l h))
 
-What it reads out is what the paper calls the J-space: the few concepts a layer holds ready for the model to put
-into words, which is often not the next token.
-
-Computing it: a backward pass from <e_k, sum_t' h_final,t'> gives, at every layer and every source position at
-once, row k of the sum over t' >= t of those Jacobians. One pass per basis vector e_k fills every layer's matrix;
-the rows are batched (one prompt per row of the batch, a different one each time, so the average over prompts comes
-from the rows too). That is hidden-size backward passes in all: a few minutes on a 1-4B model, longer on an 8B.
-
-Each model's lens is saved in DATA/jlens/<model>.safetensors as J [L, H, H] float16.
+Each model's lens is persisted to ``DATA/jlens/<model>.safetensors`` as ``J`` with shape ``[L, H, H]`` in float16.
 """
+
+from __future__ import annotations
+
+import threading
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
 from safetensors.torch import load_file, save_file
 
 from .engine import Cancelled
+from .utils import slug, unwrap_tensor
 
-# Text to average over: varied, ordinary writing (the paper uses a pretraining-like sample), a few as chat turns.
+
+if TYPE_CHECKING:
+    from .engine import Engine
+
+
+# Varied ordinary prose and code used to estimate the average layer-to-output Jacobian.
 PASSAGES = [
     "The history of the region is long and varied. Farmers settled the river valley first, then traders arrived, and "
     "by the twelfth century the town had a market, a bridge, and a quarrel with its neighbours over tolls. The bridge "
@@ -72,136 +75,192 @@ PASSAGES = [
     "that results rises to build chains of explosive volcanoes such as those around the Pacific. Others, like Hawaii, "
     "sit over hot spots far from any boundary.",
 ]
+
 QA = [
-    ("How do I keep basil alive indoors?",
-     "Basil wants light more than anything: put it in the sunniest window you have, ideally six hours of direct sun a "
-     "day. Water when the top of the soil feels dry, and pinch off the flower buds as soon as they appear, because "
-     "once it flowers the leaves turn bitter and the plant stops growing. Harvest from the top, just above a pair of "
-     "leaves, and it will branch out and grow bushier."),
-    ("Why is the sky blue?",
-     "Sunlight contains every colour, and as it passes through the atmosphere it scatters off the gas molecules in the "
-     "air. Shorter wavelengths scatter much more strongly than longer ones, so blue light is scattered across the "
-     "whole sky while red and yellow mostly pass straight through. When you look anywhere other than at the sun, you "
-     "see that scattered blue light. At sunset the light travels through more air, and the blues are scattered away."),
-    ("Can you explain what a hash map is?",
-     "A hash map stores pairs of keys and values so that you can look a value up by its key quickly. It keeps an array "
-     "of buckets, runs each key through a hash function to get a number, and uses that number to pick a bucket. Two "
-     "keys can land in the same bucket, so each bucket holds a short list, or the map probes for the next free slot. "
-     "As long as the buckets stay sparse, lookups take constant time on average."),
-    ("Write a short poem about autumn.",
-     "The maples burn along the lane,\nthe light goes amber, low and thin,\nthe geese write lines across the rain\nand "
-     "every door lets woodsmoke in.\nThe garden lets its colour go,\nthe apples soften where they fall,\nand somewhere "
-     "underneath, below,\nthe roots are listening for it all."),
+    (
+        "How do I keep basil alive indoors?",
+        "Basil wants light more than anything: put it in the sunniest window you have, ideally six hours of direct sun a "
+        "day. Water when the top of the soil feels dry, and pinch off the flower buds as soon as they appear, because "
+        "once it flowers the leaves turn bitter and the plant stops growing. Harvest from the top, just above a pair of "
+        "leaves, and it will branch out and grow bushier.",
+    ),
+    (
+        "Why is the sky blue?",
+        "Sunlight contains every colour, and as it passes through the atmosphere it scatters off the gas molecules in the "
+        "air. Shorter wavelengths scatter much more strongly than longer ones, so blue light is scattered across the "
+        "whole sky while red and yellow mostly pass straight through. When you look anywhere other than at the sun, you "
+        "see that scattered blue light. At sunset the light travels through more air, and the blues are scattered away.",
+    ),
+    (
+        "Can you explain what a hash map is?",
+        "A hash map stores pairs of keys and values so that you can look a value up by its key quickly. It keeps an array "
+        "of buckets, runs each key through a hash function to get a number, and uses that number to pick a bucket. Two "
+        "keys can land in the same bucket, so each bucket holds a short list, or the map probes for the next free slot. "
+        "As long as the buckets stay sparse, lookups take constant time on average.",
+    ),
+    (
+        "Write a short poem about autumn.",
+        "The maples burn along the lane,\nthe light goes amber, low and thin,\nthe geese write lines across the rain\nand "
+        "every door lets woodsmoke in.\nThe garden lets its colour go,\nthe apples soften where they fall,\nand somewhere "
+        "underneath, below,\nthe roots are listening for it all.",
+    ),
 ]
 
 
-def corpus(eng, T):
-    """Token rows of exactly T tokens (the passages and the chat turns, cut to length; short ones are dropped)."""
-    rows = [eng.encode(p) for p in PASSAGES]
-    for q, a in QA:
-        rows.append(eng.chat_ids(q) + eng.encode(a))
-    rows = [r[:T] for r in rows if len(r) >= T]
+def corpus(eng: Engine, seq_len: int) -> list[list[int]]:
+    """Build tokenized rows of exact length ``seq_len`` from passages and chat QA turns."""
+    rows = [eng.encode(passage) for passage in PASSAGES]
+    for question, answer in QA:
+        rows.append(eng.chat_ids(question) + eng.encode(answer))
+    rows = [row[:seq_len] for row in rows if len(row) >= seq_len]
     if not rows:
         raise RuntimeError("No passage is long enough for the lens's context length.")
     return rows
 
 
-def path_for(root, model_id):
-    from .directions import slug
+def path_for(root: str | Path, model_id: str) -> Path:
+    """Return the ``.safetensors`` file path storing ``model_id``'s J-lens under ``root``."""
     return Path(root) / f"{slug(model_id)}.safetensors"
 
 
 @torch.no_grad()
-def _scale(J):
-    """Rescale each layer's matrix to unit mean singular value squared (Frobenius / sqrt(H)): averaging over pairs
-    shrinks it by the number of later positions, and the final norm then rescales anyway, but a tiny J h would sit
-    under the norm's epsilon."""
-    H = J.shape[-1]
-    return J / (J.flatten(1).norm(dim=1) / H ** 0.5).clamp(min=1e-12)[:, None, None]
+def _scale(jacobians: torch.Tensor) -> torch.Tensor:
+    """Rescale each layer's matrix to unit RMS singular value (Frobenius norm / sqrt(H)).
+
+    Averaging over position pairs shrinks the norm, and while the final norm rescales activations anyway,
+    a very small ``J h`` would sit near the normalization epsilon.
+    """
+    hidden = jacobians.shape[-1]
+    scale = (jacobians.flatten(1).norm(dim=1) / (hidden**0.5)).clamp(min=1e-12)
+    return jacobians / scale[:, None, None]
 
 
-def compute(eng, cancel=None, progress=None, T=64, batch=8, skip=1):
-    """J [L, H, H] float32 cpu. progress(done, total) is called after every backward pass. `skip` leading positions
-    (the attention sink, whose norm is enormous) are left out of both ends of the average."""
-    L, H = len(eng.layers), eng.hidden
+def compute(
+    eng: Engine,
+    cancel: threading.Event | None = None,
+    progress: Callable[[int, int, float], None] | None = None,
+    T: int = 64,
+    batch: int = 8,
+    skip: int = 1,
+) -> torch.Tensor:
+    """Compute per-layer J-lens Jacobians ``[L, H, H]`` as float32 on CPU.
+
+    Args:
+        eng: Loaded :class:`~interp.engine.Engine`.
+        cancel: Optional event signalling cancellation.
+        progress: Optional callback ``(done, total, elapsed_seconds)`` invoked after each batch.
+        T: Sequence length per corpus row.
+        batch: Number of basis coordinates processed per backward pass.
+        skip: Number of leading positions (attention sinks) excluded from the average.
+
+    Returns:
+        Normalized Jacobian tensor of shape ``[L, H, H]`` on CPU.
+    """
+    num_layers = eng.num_layers
+    hidden_size = eng.hidden_size
     rows = corpus(eng, T)
-    J = torch.zeros(L, H, H)
-    S = torch.arange(skip, T)
-    pairs = len(S) * (len(S) + 1) / 2  # (t, t') with t <= t', both kept
-    emb = eng.model.get_input_embeddings()
+    jacobians = torch.zeros(num_layers, hidden_size, hidden_size)
+    kept_positions = torch.arange(skip, T)
+    num_pairs = len(kept_positions) * (len(kept_positions) + 1) / 2  # (t, t') with t <= t', both kept
+    embed = eng.model.get_input_embeddings()
 
-    caps = {}
-    hooks = [layer.register_forward_hook(lambda m, i, o, l=l: caps.__setitem__(l, o[0] if isinstance(o, tuple) else o))
-             for l, layer in enumerate(eng.layers)]
-    # the stream the head reads: the last layer's output, or for Inkling, the head's own mix of block states
-    target = L - 1
+    caps: dict[int | str, torch.Tensor] = {}
+
+    def _make_capture(key: int | str):
+        def _hook(_mod: torch.nn.Module, _inp: tuple, out: torch.Tensor | tuple[torch.Tensor, ...]) -> None:
+            caps[key] = unwrap_tensor(out)
+
+        return _hook
+
+    hooks = [layer.register_forward_hook(_make_capture(layer_idx)) for layer_idx, layer in enumerate(eng.layers)]
+    target: int | str = num_layers - 1
     if eng.ink:
         target = "head"
-        hooks.append(eng.ink["text"].final_input.register_forward_hook(lambda m, i, o: caps.__setitem__("head", o[0])))
-    done, t0, model = 0, time.perf_counter(), eng.model
+        hooks.append(eng.ink["text"].final_input.register_forward_hook(_make_capture("head")))
+
+    done = 0
+    t0 = time.perf_counter()
+    model = eng.model
+
     try:
-        for k0 in range(0, H, batch):
-            if (cancel is not None and cancel.is_set()) or eng.model is not model:  # stopped, or another model opened
+        for k0 in range(0, hidden_size, batch):
+            if (cancel is not None and cancel.is_set()) or eng.model is not model:
                 raise Cancelled()
 
-            ks = list(range(k0, min(H, k0 + batch)))
-            B = len(ks)
-            ids = torch.tensor([rows[(k0 // batch * batch + b) % len(rows)] for b in range(B)])
+            ks = list(range(k0, min(hidden_size, k0 + batch)))
+            batch_size = len(ks)
+            ids = torch.tensor([rows[(k0 + offset) % len(rows)] for offset in range(batch_size)])
             caps.clear()
-            # every GPU step under the lock, down to making and freeing a tensor there: MPS is one thread at a time
+            # Keep every GPU allocation and free under the engine lock (MPS is single-threaded).
             with eng.lock, torch.enable_grad():
-                x = emb(ids.to(eng.dev)).detach().requires_grad_(True)
+                x = embed(ids.to(eng.dev)).detach().requires_grad_(True)
                 eng.backbone(inputs_embeds=x, use_cache=False)
-                hs = [caps[l] for l in range(L)]
+                hs = [caps[layer_idx] for layer_idx in range(num_layers)]
                 out = caps[target]
-                # probe b reads coordinate ks[b] of the head's stream, summed over the kept positions
-                probe = torch.zeros(B, T, H, device=eng.dev, dtype=out.dtype)
-                probe[torch.arange(B)[:, None], S[None, :], torch.tensor(ks)[:, None]] = 1
+                # Probe b reads coordinate ks[b] of the head's stream summed over kept positions.
+                probe = torch.zeros(batch_size, T, hidden_size, device=eng.dev, dtype=out.dtype)
+                probe[torch.arange(batch_size)[:, None], kept_positions[None, :], torch.tensor(ks)[:, None]] = 1
                 grads = torch.autograd.grad((out * probe).sum(), hs if eng.ink else hs[:-1])
-                for l, g in enumerate(grads):
-                    J[l, ks] = (g[:, skip:].float().sum(1) / pairs).cpu()  # row k of J_l
+                for layer_idx, grad in enumerate(grads):
+                    jacobians[layer_idx, ks] = (grad[:, skip:].float().sum(1) / num_pairs).cpu()
                 del grads, hs, out, x, probe
                 caps.clear()
 
-            if not eng.ink:  # the last layer's stream is the head's
-                J[L - 1, ks] = torch.eye(H)[ks] * (len(S) / pairs)
+            if not eng.ink:
+                # Final layer's Jacobian with respect to itself is scaled identity (diagonal entries only).
+                jacobians[num_layers - 1, ks, ks] = len(kept_positions) / num_pairs
 
-            done += B
-            if progress:
-                progress(done, H, time.perf_counter() - t0)
+            done += batch_size
+            if progress is not None:
+                progress(done, hidden_size, time.perf_counter() - t0)
     finally:
-        for h in hooks:
-            h.remove()
+        for handle in hooks:
+            handle.remove()
 
-    return _scale(J)
+    return _scale(jacobians)
 
 
-def save(J, path):
+def save(jacobians: torch.Tensor, path: Path) -> None:
+    """Save a computed J-lens tensor as float16 ``.safetensors``."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    save_file({"J": J.half().contiguous()}, str(path))
+    save_file({"J": jacobians.half().contiguous()}, str(path))
 
 
-def load(path, eng):
-    """The saved lens on the device in the model's dtype, or None if there isn't one that fits this model."""
+def load(path: Path, eng: Engine) -> torch.Tensor | None:
+    """Load a saved J-lens onto ``eng.dev`` in the model's dtype, or ``None`` if absent or shape-mismatched."""
     if not path.exists():
         return None
-    J = load_file(str(path))["J"]
-    L, H = len(eng.layers), eng.hidden
-    if tuple(J.shape) != (L, H, H):
+    jacobians = load_file(str(path))["J"]
+    if tuple(jacobians.shape) != (eng.num_layers, eng.hidden_size, eng.hidden_size):
         return None
-    return J.to(eng.dev, eng.model.dtype)
+    return jacobians.to(eng.dev, eng.model.dtype)
 
 
-def read(eng, J, resid, k=5):
-    """Top-k J-lens tokens and probabilities at every layer and position: (ids [L, T, k], p [L, T, k]) numpy.
-    resid: [L, T, H] (or {layer: [T, H]}), each layer's residual after it."""
-    ids, ps = [], []
+def read(
+    eng: Engine,
+    jacobians: torch.Tensor,
+    resid: torch.Tensor | Sequence[torch.Tensor] | dict[int, torch.Tensor],
+    k: int = 5,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Decode top-``k`` J-lens token IDs and probabilities at every layer and position.
+
+    Args:
+        eng: Loaded :class:`~interp.engine.Engine`.
+        jacobians: J-lens tensor of shape ``[L, H, H]`` on the model device.
+        resid: Per-layer residual stream of shape ``[L, T, H]`` (or mapping ``layer -> [T, H]``).
+        k: Number of top tokens to return per layer and position.
+
+    Returns:
+        Tuple ``(ids, probs)`` of numpy arrays, each of shape ``[L, T, k]``.
+    """
+    ids: list[np.ndarray] = []
+    probs: list[np.ndarray] = []
     with torch.inference_mode():
-        for l in range(len(eng.layers)):
-            r = resid[l].to(J.dtype)
-            lg = eng._head(eng.final_norm(r @ J[l].T))
-            top = torch.softmax(lg, -1).topk(k, dim=-1)
+        for layer_idx in range(eng.num_layers):
+            layer_resid = resid[layer_idx].to(jacobians.dtype)
+            logits = eng._head(eng.final_norm(layer_resid @ jacobians[layer_idx].T))
+            top = torch.softmax(logits, dim=-1).topk(k, dim=-1)
             ids.append(top.indices.cpu().numpy())
-            ps.append(top.values.cpu().numpy())
-            del lg
-    return np.stack(ids), np.stack(ps)
+            probs.append(top.values.cpu().numpy())
+            del logits
+    return np.stack(ids), np.stack(probs)

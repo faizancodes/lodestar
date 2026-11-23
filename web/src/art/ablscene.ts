@@ -1,5 +1,5 @@
-import { drawMarks } from "./glyphs";
-import type { Put } from "./glyphs";
+import { drawMarks, type Put } from "./glyphs";
+import { hash } from "./math";
 
 // Abliterate's loading scenes, in the same ASCII-mark style as the scan: one small scene per analysis stage.
 //   0 read     prompts slide through the model's layers and leave their last word's state in a tally
@@ -7,8 +7,6 @@ import type { Put } from "./glyphs";
 //   2 trial    candidate layers are tried in turn; each sends four requests that come back answered or refused
 //   3 check    replies are written out line by line, then judged
 const COLS = 150, ROWS = 40, CELL = 4.2;
-
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 
 function line(put: Put, x0: number, y0: number, x1: number, y1: number, b: number, every = 1, upto = 1) {
   const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);

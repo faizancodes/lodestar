@@ -10,7 +10,7 @@ let ids = 0;
 /** Each panel's element, for scrolling to it and for Esc (which closes the last one on the page). */
 export const panelEls = new Map<number, HTMLElement>();
 
-export const panelAt = (anchor: string) => get().panels.find((p) => p.anchor === anchor);
+const panelAt = (anchor: string) => get().panels.find((p) => p.anchor === anchor);
 export const alive = (id: number) => get().panels.some((p) => p.id === id);
 
 /** Opens a panel under `anchor`, or reuses the one there; returns its id, or null when this closed it. */
@@ -21,12 +21,10 @@ export function openPanel(anchor: string, title: string, kind: Panel["kind"]): n
     return null;
   }
 
-  let id: number;
+  const id = ++ids;
   if (p) {
-    id = p.id;
-    set({ panels: get().panels.map((x) => (x === p ? { ...x, kind, title } : x)) });
+    set({ panels: get().panels.map((x) => (x === p ? { ...x, id, kind, title } : x)) });
   } else {
-    id = ++ids;
     set({ panels: [...get().panels, { id, anchor, kind, title, body: { node: null, n: 0, reveal: false } }] });
   }
 

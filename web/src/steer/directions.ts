@@ -2,7 +2,7 @@
 // two kinds of prompt), read off its residual stream. Pushing along it over a band of middle layers moves the whole
 // behaviour.
 import { flushSync } from "react-dom";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
 import { bandText, fmt } from "../lib/format";
 import { stream } from "../lib/stream";
 import type { Direction } from "../lib/types";
@@ -24,8 +24,8 @@ export function turnOnDir(d: Direction) {
 
 export async function deleteDir(d: Direction) {
   if (!confirm(`Delete the direction “${d.name}”?`)) return;
-  try { await api(`/api/directions/${encodeURIComponent(d.id)}`, null, "DELETE"); } catch (err) { return toast((err as Error).message, true); }
-  refreshDirs();
+  try { await api(`/api/directions/${encodeURIComponent(d.id)}`, null, "DELETE"); } catch (err) { return toast(errorMessage(err), true); }
+  void refreshDirs();
 }
 
 const focus = (id: string) => document.getElementById(id)?.focus();
@@ -38,7 +38,7 @@ export function toggleDn() {
 
 export async function dnExample() {
   let ex: { name: string; pos: string[]; neg: string[] };
-  try { ex = (await api<{ example: typeof ex }>("/api/directions/defaults")).example; } catch (e) { return toast((e as Error).message, true); }
+  try { ex = (await api<{ example: typeof ex }>("/api/directions/defaults")).example; } catch (e) { return toast(errorMessage(e), true); }
   setDn({ kind: "persona", name: ex.name, pos: ex.pos.join("\n"), neg: ex.neg.join("\n") });
 }
 
@@ -59,7 +59,10 @@ export async function findDirection() {
       say((label = ev.label as string) + "…", true);
       if (ev.stage === "try") flushSync(() => setDn({ result: { facts: [], q: "", tries: (tries = [sink(), sink(), sink()]) }, typing: true }));
     } else if (ev.type === "progress") say(`${label} · ${ev.done} of ${ev.total}`, true);
-    else if (ev.type === "trydelta") streamInto(tries[ev.index as number], ev.delta as string);
+    else if (ev.type === "trydelta") {
+      const target = tries[ev.index as number];
+      if (target) streamInto(target, ev.delta as string);
+    }
     else if (ev.type === "result") setDn({ made: ev as Dn["made"] });
   });
 
@@ -67,7 +70,7 @@ export async function findDirection() {
   const m = dn().made;
   if (!ok || !m) return say("Stopped. Nothing was saved.", false);
 
-  const band = m.band, at = (a: number[]) => Math.min(...band.map((l) => a[l]));
+  const band = m.band, at = (a: number[]) => (band.length ? Math.min(...band.map((l) => a[l])) : 0);
   say("", false);
   setDn({
     result: {
@@ -76,7 +79,7 @@ export async function findDirection() {
     },
   });
 
-  refreshDirs();
+  void refreshDirs();
 }
 
 export function turnOnMade() {
@@ -85,16 +88,17 @@ export function turnOnMade() {
 }
 
 export async function importDirs() {
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
   const path = dn().path.trim();
-  if (!path || app().busy) return focus("dn-path");
+  if (!path) return focus("dn-path");
 
   say("Importing…", true);
   try {
     const r = await api<{ added: { name: string }[] }>("/api/directions/import", { path });
     say(`Imported ${r.added.map((d) => d.name).join(", ") || "nothing"}.`, false);
-  } catch (e) { return say((e as Error).message, false); }
+  } catch (e) { return say(errorMessage(e), false); }
 
-  refreshDirs();
+  void refreshDirs();
 }
 
 export const TRIES = [-4, 0, 4].map((k) => (k ? fmt(k, 0) : "Normal"));

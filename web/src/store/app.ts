@@ -7,7 +7,7 @@ export type Tab = (typeof TABS)[number] | "home" | "arch";
 
 function remembered(): Tab {
   const t = load("tab");
-  return TABS.includes(t as never) || t === "home" || t === "arch" ? (t as Tab) : "steer";
+  return (TABS as readonly string[]).includes(t ?? "") || t === "home" || t === "arch" ? (t as Tab) : "steer";
 }
 
 type Toast = { msg: string; err: boolean; n: number }; // n changes on every toast, so a repeat shows again

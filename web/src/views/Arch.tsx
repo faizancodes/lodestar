@@ -32,7 +32,7 @@ export function Arch({ hidden }: { hidden: boolean }) {
       });
       attach(s);
       dispose = () => (attach(null), s.dispose());
-    });
+    }).catch(() => {});
     return () => ((gone = true), dispose());
   }, [hidden, d]);
 
@@ -52,7 +52,7 @@ export function Arch({ hidden }: { hidden: boolean }) {
       <div className="a3-main">
         <Top />
         <div className="a3-stage" ref={host}>
-          <Tip />
+          <Tip stage={host} />
           {!d && <div className="a3-wait">Reading the model…</div>}
         </div>
         {d && <Bottom d={d} />}
@@ -91,7 +91,7 @@ function Top() {
   );
 }
 
-function Tip() {
+function Tip({ stage }: { stage: React.RefObject<HTMLDivElement | null> }) {
   const hv = useArch((s) => s.hover), d = useArch((s) => s.detail), run = useArch((s) => s.run), t = useArch((s) => s.token), acts = useArch((s) => s.acts);
   if (!hv || !d) return null;
   const k = hv.pick;
@@ -109,7 +109,7 @@ function Tip() {
     const v = run?.heads[k.layer][t]?.[k.head];
     sub = v != null ? `wrote ${v.toFixed(1)} at “${tok(run!.tokens[t])}”` : `Layer ${k.layer}`;
   }
-  const r = document.querySelector(".a3-stage")?.getBoundingClientRect();
+  const r = stage.current?.getBoundingClientRect();
   return (
     <div className="a3-tip" style={{ transform: `translate(${hv.x - (r?.left ?? 0) + 14}px, ${hv.y - (r?.top ?? 0) + 14}px)` }}>
       <b>{main}</b>{sub && <span>{sub}</span>}
@@ -121,7 +121,7 @@ function Bottom({ d }: { d: ArchDetail }) {
   const f = useArch((s) => s.focus), run = useArch((s) => s.run), t = useArch((s) => s.token), reply = useArch((s) => s.reply);
   const open = f.level === "layer" || f.level === "part" ? f.layer : -1;
   const w = run ? d.layers.map((_, l) => (run.attn[l][t] ?? 0) + (run.mlp[l][t] ?? 0)) : null;
-  const wm = w ? Math.max(...w) : 1;
+  const wm = w ? Math.max(1e-6, ...w) : 1;
   return (
     <div className="a3-bottom">
       {reply != null && <Reply text={reply} />}
@@ -143,11 +143,11 @@ function Bottom({ d }: { d: ArchDetail }) {
 
 // the reply as it's written, decoding in mark by mark like Chat's
 function Reply({ text }: { text: string }) {
-  const ref = useRef<HTMLDivElement>(null), dec = useRef(createDecoder());
+  const ref = useRef<HTMLDivElement>(null), dec = useRef<ReturnType<typeof createDecoder> | null>(null);
   useLayoutEffect(() => {
     const el = ref.current!;
     el.innerHTML = text ? md(cleanReply(text)) : `<span class="dots"><i></i><i></i><i></i></span>`;
-    if (text) dec.current.update(el);
+    if (text) (dec.current ??= createDecoder()).update(el);
     el.scrollTop = el.scrollHeight;
   }, [text]);
   return <div className="a3-reply md" ref={ref} />;
@@ -250,7 +250,7 @@ function ModelPane({ d }: { d: ArchDetail }) {
       <Head title={modelName(d.model)} sub={`${d.type} · ${d.dtype}`} />
       <Sec title="Parameters" right={<span className="a3-at">{short(total)}</span>}>
         <div className="a3-split">{parts.map(([k, v]) => (
-          <div key={k}><span>{k}</span><Bar v={v / total} /><span className="mono">{short(v)}</span></div>
+          <div key={k}><span>{k}</span><Bar v={v / Math.max(1, total)} /><span className="mono">{short(v)}</span></div>
         ))}</div>
       </Sec>
       <Sec title="Shape">
@@ -269,7 +269,7 @@ function ModelPane({ d }: { d: ArchDetail }) {
           ["Unembedding", d.tied ? "The embedding, reused" : "Its own weights"],
         ]} />
       </Sec>
-      {acts && <Sec title="Strongest neurons" right={<AtToken />}>
+      {acts && acts.top.length > 0 && <Sec title="Strongest neurons" right={<AtToken />}>
         <TopNeurons rows={acts.top.slice(0, 12).map((r) => ({ layer: r.layer, neuron: r.neuron, v: r.impact / Math.abs(acts.top[0].impact || 1) }))} />
       </Sec>}
     </>
@@ -369,7 +369,7 @@ function MlpPane({ d, l }: { d: ArchDetail; l: number }) {
         <TopNeurons rows={layerTop(acts, l, d.neurons).map(([n, v]) => ({ layer: l, neuron: n, v }))} />
       </Sec>}
       {!!big.length && <Sec title="Write the most">
-        <TopNeurons rows={big.map(([n, v]) => ({ layer: l, neuron: n, v: v / big[0][1] }))} />
+        <TopNeurons rows={big.map(([n, v]) => ({ layer: l, neuron: n, v: v / (big[0][1] || 1) }))} />
       </Sec>}
       {block && <Sec title="Tensors"><Tensors list={block.tensors} strip={`${block.name}.`} /></Sec>}
     </>
@@ -377,14 +377,24 @@ function MlpPane({ d, l }: { d: ArchDetail; l: number }) {
 }
 
 function histogram(v: number[], k: number) {
-  const lo = Math.min(...v), hi = Math.max(...v), bins = new Array(k).fill(0);
-  for (const x of v) bins[Math.min(k - 1, Math.floor(((x - lo) / (hi - lo || 1)) * k))]++;
-  return { lo, hi, bins, max: Math.max(...bins) };
+  if (!v.length) return { lo: 0, hi: 0, bins: new Array<number>(k).fill(0), max: 1 };
+  let lo = Infinity, hi = -Infinity;
+  for (const x of v) {
+    if (x < lo) lo = x;
+    if (x > hi) hi = x;
+  }
+  const bins = new Array<number>(k).fill(0);
+  const span = hi - lo || 1;
+  for (const x of v) bins[Math.min(k - 1, Math.floor(((x - lo) / span) * k))]++;
+  let max = 1;
+  for (const b of bins) if (b > max) max = b;
+  return { lo, hi, bins, max };
 }
 
 function NeuronPane() {
   const n = useArch((s) => s.neuron)!, run = useArch((s) => s.run), t = useArch((s) => s.token), toast = useApp((s) => s.toastMsg);
-  const am = n.acts ? Math.max(1e-6, ...n.acts.map(Math.abs)) : 1;
+  let am = 1e-6;
+  if (n.acts) for (const x of n.acts) am = Math.max(am, Math.abs(x));
   const steer = () => (addItems([{ layer: n.layer, neuron: n.neuron, dose: 1, lens: n.lens.up.slice(0, 6) }]), toast(`Neuron ${n.layer}:${n.neuron} added to Steer`));
   return (
     <>

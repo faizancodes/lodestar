@@ -10,7 +10,7 @@ export type Msg = ChatMessage & { stopped?: boolean; cols?: Col[]; wps?: number;
 export type Reading = { ids: string[]; names: string[]; toks: { t: string; v: number[] }[] };
 
 // What shaped a reply: the neurons and directions pushed, each with its dose, and whether refusals were erased
-export type Pushed = { label: string; dose: number; erase?: boolean };
+type Pushed = { label: string; dose: number; erase?: boolean };
 export type Mods = { steer?: Pushed[]; abl?: boolean };
 
 // Compare's side-by-side replies: the plain model, and each switch that was on, alone. Each column carries on its
@@ -47,7 +47,14 @@ type Chat = {
 export const useChat = create<Chat>((set) => ({
   v: 0,
   gv: 0,
-  gauges: (() => { try { return JSON.parse(load("chat-gauges") || "[]"); } catch { return []; } })(),
+  gauges: (() => {
+    try {
+      const parsed = JSON.parse(load("chat-gauges") || "[]");
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+    } catch {
+      return [];
+    }
+  })(),
   id: null,
   list: null,
   messages: [],

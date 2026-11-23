@@ -1,5 +1,5 @@
-import { drawMarks } from "./glyphs";
-import type { Put } from "./glyphs";
+import { drawMarks, type Put } from "./glyphs";
+import { hash } from "./math";
 
 // The small scenes on the home screen's cards, one per page, in the same ASCII marks as everything else. Each is a
 // still until its card is hovered, then plays (~20 fps) until the pointer leaves.
@@ -9,7 +9,6 @@ import type { Put } from "./glyphs";
 //               flow streams along them
 //   chat        two bubbles drawn in dots: theirs dim, the model's bright, its reply typing out behind a caret
 const CELL = 3.2;
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
 
 export type HomeArt = "abliterate" | "steer" | "chat";
 
@@ -101,14 +100,18 @@ const ART: Record<HomeArt, (put: Put, cols: number, rows: number, t: number) => 
   },
 };
 
-function render(canvas: HTMLCanvasElement, kind: HomeArt, t: number) {
+function render(canvas: HTMLCanvasElement, kind: HomeArt, t: number, color?: string) {
   const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
   if (!w || !h || !ART[kind]) return;
 
-  if (canvas.width !== Math.round(w * dpr)) ((canvas.width = Math.round(w * dpr)), (canvas.height = Math.round(h * dpr)));
+  const rw = Math.round(w * dpr), rh = Math.round(h * dpr);
+  if (canvas.width !== rw || canvas.height !== rh) {
+    canvas.width = rw;
+    canvas.height = rh;
+  }
   const ctx = canvas.getContext("2d")!;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = getComputedStyle(canvas).color;
+  ctx.fillStyle = color ?? getComputedStyle(canvas).color;
 
   const cols = Math.floor(w / CELL), rows = Math.floor(h / CELL), grid = new Float32Array(cols * rows);
   const put: Put = (x, y, b) => {
@@ -123,28 +126,49 @@ function render(canvas: HTMLCanvasElement, kind: HomeArt, t: number) {
   drawMarks(ctx, grid, cols, rows, CELL);
 }
 
-/** Draws a card's scene as a still, and plays it while `card` is hovered or focused. */
-export function drawHomeArt(canvas: HTMLCanvasElement, kind: HomeArt, card?: HTMLElement | null) {
+/** Draws a card's scene as a still, plays it while `card` is hovered or focused, and returns a cleanup callback. */
+export function drawHomeArt(canvas: HTMLCanvasElement, kind: HomeArt, card?: HTMLElement | null): () => void {
   render(canvas, kind, 0);
-
-  if (!card || card.dataset.artBound) return;
-  card.dataset.artBound = "1";
+  if (!card) return () => {};
 
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let raf = 0, t0 = 0, last = 0;
+  let raf = 0, t0 = 0, last = 0, color = "";
+
+  const stop = () => {
+    cancelAnimationFrame(raf);
+    raf = 0;
+    render(canvas, kind, 0);
+  };
 
   const tick = (now: number) => {
+    if (!canvas.isConnected || canvas.closest("[hidden]")) {
+      raf = 0;
+      return;
+    }
     raf = requestAnimationFrame(tick);
     if (now - last < 50) return;
     last = now;
-    render(canvas, kind, (now - t0) / 1000 + 0.01);
+    render(canvas, kind, (now - t0) / 1000 + 0.01, color);
   };
 
-  const start = () => !still && !raf && ((t0 = performance.now()), (raf = requestAnimationFrame(tick)));
-  const stop = () => (cancelAnimationFrame(raf), (raf = 0), render(canvas, kind, 0));
+  const start = () => {
+    if (still || raf) return;
+    color = getComputedStyle(canvas).color;
+    t0 = performance.now();
+    raf = requestAnimationFrame(tick);
+  };
 
   card.addEventListener("mouseenter", start);
   card.addEventListener("focus", start);
   card.addEventListener("mouseleave", stop);
   card.addEventListener("blur", stop);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    raf = 0;
+    card.removeEventListener("mouseenter", start);
+    card.removeEventListener("focus", start);
+    card.removeEventListener("mouseleave", stop);
+    card.removeEventListener("blur", stop);
+  };
 }

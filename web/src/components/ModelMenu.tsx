@@ -8,7 +8,7 @@ export function ModelMenu() {
 
   // a click anywhere outside closes it
   useEffect(() => {
-    const close = (e: MouseEvent) => !(e.target as Element).closest("#model-menu") && useApp.getState().menu.open && toggleModelMenu(false);
+    const close = (e: MouseEvent) => e.target instanceof Element && !e.target.closest("#model-menu") && useApp.getState().menu.open && toggleModelMenu(false);
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, []);

@@ -1,14 +1,14 @@
 // The Architecture page's state and moves: where the 3D view is focused, the text last run through the model, and
 // what's picked. The scene itself lives in scene.ts (loaded with three.js only when the page first opens).
 import { create } from "zustand";
-import { api } from "../lib/api";
+import { api, cancelRun } from "../lib/api";
 import { stream } from "../lib/stream";
 import type { ArchActs, ArchDetail, ArchLive, ArchNeuron, ArchRun } from "../lib/types";
 import { setTab } from "../shell/engine";
 import { useApp } from "../store/app";
 import type { Focus, Part, Pick, Scene } from "./scene";
 
-export type Acts = { q: Int8Array; peak: number[]; top: ArchActs["top"] };
+type Acts = { q: Int8Array; peak: number[]; top: ArchActs["top"] };
 
 type State = {
   model: string | null; // whose detail this is
@@ -45,26 +45,46 @@ export function attach(s: Scene | null) {
   marks();
 }
 
+let loadingDetail: { mid: string; promise: Promise<ArchDetail | null> } | null = null;
+
 /** The loaded model's structure, fetched once per model, then each layer's neuron sizes in the background. */
-export async function loadDetail() {
+export async function loadDetail(): Promise<ArchDetail | null> {
   const mid = useApp.getState().info?.model ?? null;
-  if (!mid || (get().model === mid && get().detail)) return get().detail;
-  set({ model: mid, detail: null, norms: [], focus: { level: "model" }, run: null, acts: null, neuron: null, head: null });
-  const d = await api<ArchDetail>("/api/arch");
-  if (useApp.getState().info?.model !== mid) return null;
-  set({ detail: d });
-  void (async () => {
-    for (let l = 0; l < d.layers.length; l++) {
-      if (get().model !== mid) return;
-      const r = await api<{ norms: number[] }>(`/api/arch/neurons?layer=${l}`).catch(() => null);
-      if (!r || get().model !== mid) return;
-      const norms = [...get().norms];
-      norms[l] = r.norms;
-      set({ norms });
-      scene?.setNorms(l, r.norms);
+  if (!mid) return null;
+  if (get().model === mid && get().detail) return get().detail;
+  if (loadingDetail && loadingDetail.mid === mid) return loadingDetail.promise;
+
+  const promise = (async (): Promise<ArchDetail | null> => {
+    set({ model: mid, detail: null, norms: [], focus: { level: "model" }, run: null, acts: null, neuron: null, head: null });
+    let d: ArchDetail;
+    try {
+      d = await api<ArchDetail>("/api/arch");
+    } catch {
+      if (get().model === mid) set({ model: null });
+      return null;
     }
+    if (useApp.getState().info?.model !== mid) return null;
+    set({ detail: d });
+    void (async () => {
+      for (let l = 0; l < d.layers.length; l++) {
+        if (get().model !== mid) return;
+        const r = await api<{ norms: number[] }>(`/api/arch/neurons?layer=${l}`).catch(() => null);
+        if (!r || get().model !== mid) return;
+        const norms = [...get().norms];
+        norms[l] = r.norms;
+        set({ norms });
+        scene?.setNorms(l, r.norms);
+      }
+    })();
+    return d;
   })();
-  return d;
+
+  loadingDetail = { mid, promise };
+  try {
+    return await promise;
+  } finally {
+    if (loadingDetail?.promise === promise) loadingDetail = null;
+  }
 }
 
 export function go(f: Focus) {
@@ -185,7 +205,7 @@ export async function runText() {
 /** Stops the model writing, and the view playing what it already wrote. */
 export function stopRun() {
   stopped = true;
-  return api("/api/cancel", {});
+  cancelRun();
 }
 
 export function clearRun() {
@@ -205,8 +225,17 @@ export async function pickToken(t: number) {
 /** The strongest neurons of one layer at the chosen token: [neuron, impact relative to the layer's peak]. */
 export function layerTop(acts: Acts, layer: number, N: number, k = 8): [number, number][] {
   const out: [number, number][] = [];
-  for (let i = 0; i < N; i++) out.push([i, acts.q[layer * N + i] / 127]);
-  return out.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, k);
+  const base = layer * N;
+  for (let i = 0; i < N; i++) {
+    const v = acts.q[base + i] / 127;
+    const av = Math.abs(v);
+    if (out.length === k && av <= Math.abs(out[k - 1][1])) continue;
+    let pos = out.length;
+    while (pos > 0 && Math.abs(out[pos - 1][1]) < av) pos--;
+    out.splice(pos, 0, [i, v]);
+    if (out.length > k) out.pop();
+  }
+  return out;
 }
 
 export const PART_NAMES: Record<Part, string> = { attn: "Attention", mlp: "MLP", norm1: "Norm before attention", norm2: "Norm before the MLP" };

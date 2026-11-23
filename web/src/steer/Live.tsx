@@ -9,13 +9,18 @@ import { attach, type Sink } from "./sink";
 /** A status line: empty until first set; then, while it runs, a lit strip with the Lodestar spinner, and once it
  * ends plain text. */
 export function LiveLine({ id, className, live }: { id?: string; className: string; live: Live }) {
-  const el = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), spin = useRef<(() => void) | null>(null);
+  const el = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const spin = useRef<{ canvas: HTMLCanvasElement; kick: () => void } | null>(null);
 
   useEffect(() => {
-    if (!live) return;
-    spin.current ??= startSpinner(canvas.current!, () => !!el.current?.classList.contains("live"));
-    if (live.running) spin.current();
-  });
+    const c = canvas.current;
+    if (!live || !c) return;
+    if (spin.current?.canvas !== c) {
+      spin.current = { canvas: c, kick: startSpinner(c, () => !!el.current?.classList.contains("live")) };
+    }
+    if (live.running) spin.current.kick();
+  }, [live?.running, !!live]);
 
   if (!live) return <div id={id} className={className} ref={el} />;
 
@@ -41,15 +46,17 @@ export function Ans({ s, typing }: { s: Sink; typing: boolean }) {
 }
 
 /** Text that decodes in as it changes, like a chat reply. */
-export function Decoded({ as: Tag = "div", text, ...rest }: HTMLAttributes<HTMLElement> & { as?: "div" | "p"; text: string }) {
-  const ref = useRef<HTMLElement>(null), dec = useRef<ReturnType<typeof createDecoder> | null>(null);
+export function Decoded({ as = "div", text, ...rest }: HTMLAttributes<HTMLElement> & { as?: "div" | "p"; text: string }) {
+  const divRef = useRef<HTMLDivElement>(null);
+  const pRef = useRef<HTMLParagraphElement>(null);
+  const dec = useRef<ReturnType<typeof createDecoder> | null>(null);
 
   useLayoutEffect(() => {
-    const el = ref.current!;
-    if (el.textContent === text) return;
+    const el = as === "p" ? pRef.current : divRef.current;
+    if (!el || el.textContent === text) return;
     el.textContent = text;
     (dec.current ??= createDecoder()).update(el);
-  });
+  }, [as, text]);
 
-  return <Tag ref={ref as never} {...rest} />;
+  return as === "p" ? <p ref={pRef} {...rest} /> : <div ref={divRef} {...rest} />;
 }

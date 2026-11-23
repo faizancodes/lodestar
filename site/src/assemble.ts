@@ -1,4 +1,5 @@
 import { drawMarks, type Put } from "../../web/src/art/glyphs";
+import { clamp, ease, hash, type V3 as V } from "./util";
 
 // Get Lodestar: a model coming down from the hub and assembling itself, layer by layer. Its weights fall from a
 // ticked ring above and settle into a tower of layer plates turning slowly in perspective, bottom first. Once it
@@ -6,7 +7,7 @@ import { drawMarks, type Put } from "../../web/src/art/glyphs";
 // as dust, top first, and the next model comes down: another size, another depth. The pointer tilts the tower.
 const CELL = 4;
 
-export type Model = { name: string; layers: number; width: number }; // width: the plate's grid, its hidden size
+type Model = { name: string; layers: number; width: number }; // width: the plate's grid, its hidden size
 const MODELS: Model[] = [
   { name: "Llama-3.1-8B", layers: 32, width: 11 },
   { name: "Qwen3-4B", layers: 36, width: 9 },
@@ -16,11 +17,6 @@ const MODELS: Model[] = [
   { name: "Llama-3.2-3B", layers: 28, width: 8 },
 ];
 const LOAD = 0.32, RUN = 7, LIFT = 2.4; // seconds per plate loading, running, lifting away
-
-const hash = (...v: number[]) => { let h = 0; for (const x of v) h = Math.sin(h * 1.7 + x * 12.9898 + 78.233) * 43758.5453; return h - Math.floor(h); };
-const clamp = (x: number) => Math.max(0, Math.min(1, x));
-const ease = (x: number) => { x = clamp(x); return x * x * (3 - 2 * x); };
-type V = [number, number, number];
 
 // how far the scene reaches from its centre, in units of its scale: up to the ring, down to the bottom plate's near
 // corner, out to the gimbal rings, for the widest model at either end of the pointer's tilt. The view fits to this.
@@ -41,15 +37,17 @@ const REACH = (() => {
 
 /** status: called with the model on the tower and how many of its layers are in, whenever either changes. */
 export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Model, loaded: number) => void } = {}) {
-  let cols = 0, rows = 0, grid = new Float32Array(0), ctx!: CanvasRenderingContext2D;
+  let cols = 0, rows = 0, grid = new Float32Array(0), ctx: CanvasRenderingContext2D | null = null, color = "";
 
   const size = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight, dpr = devicePixelRatio || 1;
     if (!w || !h) return false;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
-    ctx = canvas.getContext("2d")!;
+    ctx = canvas.getContext("2d");
+    if (!ctx) return false;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    color = getComputedStyle(canvas).color;
     cols = Math.ceil(w / CELL);
     rows = Math.ceil(h / CELL);
     grid = new Float32Array(cols * rows);
@@ -65,11 +63,13 @@ export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Mo
   };
 
   let px = 0, tx = 0, py = 0, ty = 0;
-  addEventListener("pointermove", (e) => {
+  const onPointer = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
     tx = clamp((e.clientX - r.left) / r.width) * 2 - 1;
     ty = clamp((e.clientY - r.top) / r.height) * 2 - 1;
-  }, { passive: true });
+  };
+  addEventListener("pointermove", onPointer, { passive: true });
 
   // where each model's turn starts, so the cycle can be read from the clock
   const span = (m: Model) => plates(m) * LOAD + 0.8 + RUN + LIFT;
@@ -77,9 +77,10 @@ export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Mo
   let shown = "";
 
   const draw = (t: number) => {
+    if (!ctx) return;
     grid.fill(0);
     let c = t % MODELS.reduce((s, m) => s + span(m), 0), mi = 0;
-    while (c > span(MODELS[mi])) c -= span(MODELS[mi++]);
+    while (mi < MODELS.length - 1 && c > span(MODELS[mi])) c -= span(MODELS[mi++]);
     const m = MODELS[mi], N = plates(m), g = m.width - 3, loadT = N * LOAD + 0.8;
 
     px += (tx - px) * 0.05;
@@ -221,7 +222,7 @@ export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Mo
       for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) line([a * h * 1.12, y0, b * h * 1.12], [a * h * 1.12, y1, b * h * 1.12], 0.1, 3);
     }
 
-    ctx.fillStyle = getComputedStyle(canvas).color;
+    ctx.fillStyle = color;
     drawMarks(ctx, grid, cols, rows, CELL);
   };
 
@@ -240,8 +241,20 @@ export function startAssembly(canvas: HTMLCanvasElement, opts: { status?: (m: Mo
   const run = () => (still ? draw(span(MODELS[0]) - LIFT - 2) : raf || (raf = requestAnimationFrame(tick)));
 
   size();
-  new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run())).observe(canvas);
-  document.addEventListener("visibilitychange", () => !document.hidden && run());
+  const io = new IntersectionObserver(([e]) => ((seen = e.isIntersecting), seen && run()));
+  io.observe(canvas);
+  const onVis = () => !document.hidden && run();
+  document.addEventListener("visibilitychange", onVis);
   let rt: ReturnType<typeof setTimeout> | undefined;
-  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => size() && (still ? run() : draw(clock)), 150); });
+  const onResize = () => { clearTimeout(rt); rt = setTimeout(() => size() && (still ? run() : draw(clock)), 150); };
+  addEventListener("resize", onResize);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    clearTimeout(rt);
+    io.disconnect();
+    removeEventListener("pointermove", onPointer);
+    document.removeEventListener("visibilitychange", onVis);
+    removeEventListener("resize", onResize);
+  };
 }

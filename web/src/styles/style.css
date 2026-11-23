@@ -138,7 +138,6 @@ button, input, textarea, select { font: inherit; color: inherit; }
   transition: background 0.15s;
 }
 .model-pick:hover, .model-pick[aria-expanded="true"] { background: rgba(237, 237, 237, 0.07); }
-.model-pick:disabled { opacity: 0.6; cursor: default; }
 .mp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .mp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; letter-spacing: -0.015em; }
 .mp-caret {
@@ -422,7 +421,7 @@ input[type="range"]:focus { box-shadow: none; }
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px var(--ascii); }
 input[type="checkbox"] { accent-color: var(--accent); }
 output { font-family: var(--mono); font-size: 12px; min-width: 42px; text-align: right; }
-label.mini, label.check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+label.check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
 kbd { margin-left: 4px; font-family: var(--mono); font-size: 11px; opacity: 0.65; }
 
 .btn {
@@ -487,9 +486,6 @@ body.busy .btn[data-cancel] { display: inline-flex; }
 .adv summary { cursor: pointer; font-size: 12.5px; color: var(--text-2); margin-bottom: 16px; }
 .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
 .adv-grid input { width: 100% !important; }
-.progress { height: 6px; margin-top: 12px; border: 1px solid var(--rule-2); border-radius: 3px; overflow: hidden; background: var(--bg); }
-.progress i { display: block; width: 0; height: 100%; background: var(--dotfill); transition: width 0.3s; }
-
 
 .found { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .found-row {
@@ -503,8 +499,6 @@ body.busy .btn[data-cancel] { display: inline-flex; }
   background: var(--well);
 }
 .found-row .who { display: flex; gap: 8px; align-items: baseline; min-width: 0; cursor: pointer; }
-.found-row .lens { grid-column: 1; }
-.found-row .dir { grid-row: 1 / span 2; grid-column: 2; font-family: var(--mono); font-size: 11.5px; color: var(--text-2); }
 .found-row .btn { grid-row: 1 / span 2; grid-column: 3; }
 .found-row.in .btn { opacity: 0.4; pointer-events: none; }
 
@@ -571,7 +565,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .plan.done .plan-steps { display: none; }
 .tl-sugg:empty, body.busy .tl-sugg, body.busy .tl-newq { display: none; }
 .run-q { margin: 0 0 12px 2px; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
-.run-q span { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 8px; }
 .cols { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 14px; }
 .out { display: flex; flex-direction: column; min-height: 140px; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); overflow: hidden; }
 .out-h { display: flex; align-items: center; padding: 9px 10px 9px 16px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1px solid var(--rule); color: var(--text-2); }
@@ -716,8 +709,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .abl-scene[hidden] { display: none; }
 .abl-scene canvas { display: block; width: 100%; max-width: 630px; height: auto; aspect-ratio: 150 / 40; color: var(--ascii); animation: rise 0.25s ease-out; }
 .abl-scene canvas.swap { animation: fade-in 0.35s ease-out; }
-.abl .adv { margin: 20px 0 0; }
-.abl .adv summary { margin-bottom: 16px; }
 
 /* what Find it reads, the questions in two counts with Edit beside them, and the button */
 .abl-find { display: flex; align-items: center; gap: 10px; }
@@ -825,8 +816,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .flow .step-h h3 { font-size: 19px; }
 .step-sub { margin: 6px 0 0; max-width: 640px; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
 
-/* strength: a periwinkle fill up to a white handle, ticks below, a large readout */
-
 /* a neuron's strength: the fill grows out from the middle, periwinkle when pushed up, red when pushed down */
 .rc-row input.lr { -webkit-appearance: none; appearance: none; height: 20px; margin: 0; background: transparent; cursor: pointer; }
 .rc-row input.lr::-webkit-slider-runnable-track {
@@ -893,7 +882,6 @@ body.busy .tl-comp .send.stop { display: grid; }
 .lens-h h4 { margin: 0; }
 .jl-setup { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 0; border-top: 1px solid var(--rule); }
 .jl-note { font-size: 12.5px; line-height: 1.5; color: var(--muted); max-width: 340px; }
-.jl-note.bad { color: var(--bad); }
 .jl-setup .bar.wide { width: 100%; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .jl-setup .bar.wide i { display: block; height: 100%; background: var(--ascii); transition: width 0.4s; }
 
@@ -1116,7 +1104,7 @@ h3, .panel-h h3, .plan-h b, .saved-model b { font-family: var(--sans); font-weig
 /* reading: body text, explanations and everything the model writes are in Geist, set on body */
 .page-h p, .status-line, .start-status, .empty, .plan-now { font-size: 14px; }
 .field { font-size: 13.5px; font-weight: 500; }
-.field .opt, label.mini, label.check { font-size: 13px; }
+.field .opt, label.check { font-size: 13px; }
 
 /* controls and labels are Geist too; mono is kept for data: numbers, neuron ids, token readouts, code */
 .tab { font-size: 13.5px; font-weight: 500; letter-spacing: -0.01em; }

@@ -2,7 +2,7 @@
 import { flushSync } from "react-dom";
 import { setAblActive } from "../abl/engine";
 import { createDecoder } from "../art/decode";
-import { api } from "../lib/api";
+import { api, cancelRun, errorMessage } from "../lib/api";
 import { cleanReply, dirReady, isDir, isWord, itemKey, pushes, searchDose } from "../lib/format";
 import { md } from "../lib/markdown";
 import { save } from "../lib/storage";
@@ -69,8 +69,11 @@ let decoders: ReturnType<typeof createDecoder>[] = []; // the replies being writ
 // the parts of a reply that stream: the message itself, or its columns side by side
 const parts = (m: Msg): { content: string; wps?: number; cut?: boolean; read?: Reading }[] => m.cols ?? [m];
 
+let chatGen = 0; // incremented on newChat/openChat so a cancelled stream cannot mutate or save the replacement chat
+
 function updateLastBot() {
   const m = get().messages[get().messages.length - 1];
+  if (!m) return;
 
   lastMds().forEach((el, i) => {
     const part = parts(m)[i];
@@ -92,7 +95,7 @@ function updateLastBot() {
 const render = () => flushSync(touchChat);
 
 /** What Compare puts side by side: the plain model, then each switch that's on, alone. */
-export function compareCols(): Omit<Col, "content">[] {
+function compareCols(): Omit<Col, "content">[] {
   const a = app();
   const cols: Omit<Col, "content">[] = [{ key: "plain", label: "Plain" }];
 
@@ -117,7 +120,7 @@ function history(key: ColKey) {
 }
 
 /** The gauges that can be read now: the ones picked whose direction exists for the loaded model. */
-export const gaugeDirs = () => {
+const gaugeDirs = () => {
   const dirs = app().dirs ?? [];
   return get().gauges.flatMap((id) => dirs.filter((d) => d.id === id && d.ready));
 };
@@ -195,8 +198,10 @@ async function reply(more = false) {
   follow = true;
   toBottom(true);
 
+  const myGen = chatGen;
   let raf = 0;
   const ok = await stream("/api/chat", body, (ev) => {
+    if (myGen !== chatGen) return;
     if (ev.type === "done") {
       const cut = ev.cut as boolean | boolean[];
       live.forEach((p, i) => (p.cut = Array.isArray(cut) ? cut[i] : cut));
@@ -205,6 +210,7 @@ async function reply(more = false) {
     if (ev.type !== "delta") return;
 
     const part = live[many ? (ev.row as number) : 0];
+    if (!part) return;
     part.content += ev.delta as string;
     const rs = ev.read as number[][] | undefined;
     if (rs?.length && part.read) part.read.toks.push({ t: ev.delta as string, v: part.read.ids.map((_, d) => rs.reduce((a, r) => a + r[d], 0) / rs.length) });
@@ -214,6 +220,10 @@ async function reply(more = false) {
 
   cancelAnimationFrame(raf);
   set({ streaming: false });
+  if (myGen !== chatGen) {
+    decoders = [];
+    return;
+  }
 
   for (const p of live) {
     const r = rateOf(p);
@@ -224,7 +234,7 @@ async function reply(more = false) {
   if (!kept) get().messages.pop();
   else if (!ok) m.stopped = true;
   render();
-  if (kept) saveChat();
+  if (kept) void saveChat();
 
   lastMds().forEach((el, i) => decoders[i]?.update(el)); // let the last few letters finish decoding
   decoders = [];
@@ -240,13 +250,14 @@ export function sendChat(text?: string) {
   get().messages.push({ role: "user", content: text });
   flushSync(() => set({ input: "" }));
   growInput();
-  reply();
+  void reply();
 }
 
 export function retry() {
   if (get().streaming) return;
+  if (app().busy) return toast("Something is already running. Stop it first.", true);
   get().messages.pop();
-  reply();
+  void reply();
 }
 
 /** Carry on writing a reply that ran out of length. */
@@ -254,7 +265,7 @@ export function continueReply() {
   const m = get().messages[get().messages.length - 1];
   if (get().streaming || !m || m.role !== "assistant" || !cutParts(m).length) return;
   if (app().busy) return toast("Something is already running. Stop it first.", true);
-  reply(true);
+  void reply(true);
 }
 
 export async function copyReply(text: string) {
@@ -262,13 +273,15 @@ export async function copyReply(text: string) {
 }
 
 export function growInput() {
-  const t = input()!;
+  const t = input();
+  if (!t) return;
   t.style.height = "auto";
   t.style.height = Math.min(t.scrollHeight, 220) + "px";
 }
 
 export function newChat() {
-  if (get().streaming) api("/api/cancel", {});
+  chatGen++;
+  if (get().streaming) cancelRun();
   set({ messages: [], id: null }); // the last one is already saved
   render();
   input()?.focus();
@@ -299,7 +312,7 @@ async function saveChat() {
     });
     refreshChats();
   } catch (e) {
-    toast("Couldn’t save the chat: " + (e as Error).message, true);
+    toast("Couldn’t save the chat: " + errorMessage(e), true);
   }
 }
 
@@ -313,11 +326,12 @@ export async function openChat(id: string) {
   if (get().streaming) return toast("A reply is still coming. Stop it first.", true);
 
   let c: Saved;
-  try { c = await api<Saved>(`/api/chats/${id}`); } catch (e) { return toast((e as Error).message, true); }
+  try { c = await api<Saved>(`/api/chats/${id}`); } catch (e) { return toast(errorMessage(e), true); }
 
+  chatGen++;
   set({ id: c.id, messages: c.messages, system: c.system ?? "", temp: c.temp ?? "0.7", max: c.max ?? "512", steer: c.steer ?? true, compare: !!c.compare });
   if (c.recipe) useApp.setState({ recipe: c.recipe });
-  if (app().abl?.ready && ablActive(app()) !== !!c.abl) setAblActive(!!c.abl);
+  if (app().abl?.ready && ablActive(app()) !== !!c.abl) void setAblActive(!!c.abl);
 
   setTab("chat");
   render();
@@ -325,10 +339,10 @@ export async function openChat(id: string) {
 }
 
 export async function deleteChat(id: string) {
-  try { await api(`/api/chats/${id}`, null, "DELETE"); } catch (e) { return toast((e as Error).message, true); }
+  try { await api(`/api/chats/${id}`, null, "DELETE"); } catch (e) { return toast(errorMessage(e), true); }
 
   if (get().id === id) set({ id: null });
-  refreshChats();
+  void refreshChats();
 }
 
 export const toggleSteer = () => set({ steer: !get().steer });
@@ -381,7 +395,7 @@ export async function findNeurons() {
     const r = await api<WordSearch>(`/api/search?word=${encodeURIComponent(word)}&k=24&skip_last=${skip}`);
     set({ found: { ...r, word } });
   } catch (e) {
-    set({ addErr: (e as Error).message });
+    set({ addErr: errorMessage(e) });
   } finally {
     set({ finding: false });
   }
@@ -415,16 +429,41 @@ export const recipeNeurons = (items: ReturnType<typeof app>["recipe"]["items"]) 
 // Other apps reach the loaded model at /v1 (see interp/server.py). Its default model steers the way Chat does, so the
 // server is told whenever that changes: the recipe, its directions, or Chat's Steered switch.
 let served = "";
+let lastServeDeps: { loaded: boolean; model?: string; items: unknown; dirs: unknown; steer: boolean } | null = null;
 function syncServe() {
   const a = app();
-  if (!a.info?.loaded) return void (served = "");
+  const loaded = !!a.info?.loaded;
+  const model = a.info?.model;
+  const items = a.recipe.items;
+  const dirs = a.dirs;
+  const steer = get().steer;
 
-  const body = { pushes: get().steer ? pushes(a.recipe.items, a.dirs, 1) : [] };
-  const k = JSON.stringify(body) + a.info.model;
+  if (
+    lastServeDeps &&
+    lastServeDeps.loaded === loaded &&
+    lastServeDeps.model === model &&
+    lastServeDeps.items === items &&
+    lastServeDeps.dirs === dirs &&
+    lastServeDeps.steer === steer
+  ) {
+    return;
+  }
+  lastServeDeps = { loaded, model, items, dirs, steer };
+
+  if (!loaded) {
+    served = "";
+    return;
+  }
+
+  const body = { pushes: steer ? pushes(items, dirs, 1) : [] };
+  const k = JSON.stringify(body) + model;
   if (k === served) return;
 
   served = k;
-  api("/api/serve", body).catch(() => (served = ""));
+  api("/api/serve", body).catch(() => {
+    served = "";
+    lastServeDeps = null;
+  });
 }
 useApp.subscribe(syncServe);
 useChat.subscribe(syncServe);

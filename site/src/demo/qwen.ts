@@ -3,116 +3,165 @@ import * as K from "./kernels";
 // Qwen3-0.6B on WebGPU, with the app's hooks: neuron pushes at the input of each MLP's down_proj, the refusal
 // direction taken out of each layer's output, and the residual stream and neurons captured at any token.
 export const CFG = { H: 1024, L: 28, NH: 16, KVH: 8, HD: 128, N: 3072, V: 151936, CTX: 2048 };
-const { H, L, NH, KVH, N, V, CTX } = CFG;
-const QD = NH * 128, KD = KVH * 128;
+const { H, L, NH, KVH, HD, N, V, CTX } = CFG;
+const QD = NH * HD, KD = KVH * HD;
 const CHUNK = V / 4;                 // embedding rows per buffer: 4 buffers keep each under the default binding limit
 const CHUNK_BYTES = CHUNK * H * 2;
 const TT = 8;                        // tokens per matmul tile (kernels.ts)
-const LENS = 8;                      // neurons read through the unembedding at once
+export const LENS = 8;               // neurons read through the unembedding at once
 
 export const REPO = "https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main";
 const WEIGHTS = `${REPO}/model.safetensors`;
 const CACHE = "lodestar-demo-v1";
 
-export type Push = { layer: number; neuron: number; dose: number };
-export type Load = { done: number; total: number; lit: number[] };
-export type Lens = { id: number; p: number }[];
+type Push = { layer: number; neuron: number; dose: number };
+type Load = { done: number; total: number; lit: number[] };
+type Lens = { id: number; p: number }[];
 export type Inspect = { lens: Lens[]; neurons: { layer: number; neuron: number; score: number }[] };
 
 type Bytes = Uint8Array<ArrayBuffer>;
-type Tensor = { name: string; begin: number; end: number; shape: number[] };
+type Tensor = { name: string; begin: number; end: number };
+type SafetensorsEntry = { data_offsets?: [number, number] };
 const S = GPUBufferUsage.STORAGE, CPY = GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
 
 export async function gpu(): Promise<GPUDevice | string> {
   if (!("gpu" in navigator)) return "This browser has no WebGPU.";
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
-  if (!adapter) return "No GPU adapter is available to this page.";
-  return adapter.requestDevice();
+  try {
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+    if (!adapter) return "No GPU adapter is available to this page.";
+    return await adapter.requestDevice();
+  } catch (e) {
+    return e instanceof Error ? e.message : "Couldn't initialize WebGPU.";
+  }
 }
 
 /** The safetensors header: where each tensor sits in the file's data, and where the data starts. */
-async function header() {
-  const n = new DataView(await (await fetch(WEIGHTS, { headers: { Range: "bytes=0-7" } })).arrayBuffer()).getUint32(0, true);
-  const json = await (await fetch(WEIGHTS, { headers: { Range: `bytes=8-${7 + n}` } })).json();
-  const tensors: Tensor[] = Object.entries(json).filter(([k]) => k !== "__metadata__").map(([name, v]: [string, any]) =>
-    ({ name, begin: v.data_offsets[0], end: v.data_offsets[1], shape: v.shape }));
+async function header(signal?: AbortSignal) {
+  const lenRes = await fetch(WEIGHTS, { headers: { Range: "bytes=0-7" }, signal });
+  if (!lenRes.ok) throw new Error(`Couldn't read weight header length (${lenRes.status}).`);
+  const n = new DataView(await lenRes.arrayBuffer()).getUint32(0, true);
+  const hdrRes = await fetch(WEIGHTS, { headers: { Range: `bytes=8-${7 + n}` }, signal });
+  if (!hdrRes.ok) throw new Error(`Couldn't read weight header (${hdrRes.status}).`);
+  const json = (await hdrRes.json()) as Record<string, SafetensorsEntry>;
+  const tensors: Tensor[] = Object.entries(json)
+    .filter(([k, v]) => k !== "__metadata__" && Array.isArray(v?.data_offsets))
+    .map(([name, v]) => ({ name, begin: v.data_offsets![0], end: v.data_offsets![1] }));
   return { base: 8 + n, tensors };
 }
 
 export class Qwen {
-  dev: GPUDevice;
-  w = new Map<string, GPUBuffer>();
-  embed: GPUBuffer[] = [];
-  unit = new Float32Array(L * N);    // activation per unit dose, as the app's engine.unit
-  resid: Float32Array<ArrayBuffer>;
-  ablVec: Float32Array<ArrayBuffer>;
   erase = false;
+
+  private dev: GPUDevice;
+  private w = new Map<string, GPUBuffer>();
+  private embed: GPUBuffer[] = [];
+  private unit = new Float32Array(L * N); // activation per unit dose, as the app's engine.unit
+  private resid: Float32Array<ArrayBuffer>;
+  private ablVec: Float32Array<ArrayBuffer>;
+  private ablCoef: number;
 
   private buf: Record<string, GPUBuffer> = {};
   private kc: GPUBuffer[] = [];
   private vc: GPUBuffer[] = [];
   private pipes = new Map<string, GPUComputePipeline>();
   private groups = new Map<string, GPUBindGroup>();
+  private opQueue: Promise<unknown> = Promise.resolve();
 
   constructor(dev: GPUDevice, pack: { resid_p50: string; abl: { vec: string; coef: number } }) {
     this.dev = dev;
     this.resid = f32(pack.resid_p50);
     this.ablVec = f32(pack.abl.vec);
+    this.ablCoef = pack.abl.coef;
+  }
+
+  /** Serialize GPU compute operations that share scratch buffers. */
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.opQueue.then(fn, fn);
+    this.opQueue = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  /** Destroy all GPU buffers owned by this model instance. */
+  dispose() {
+    for (const b of this.embed) b.destroy();
+    this.embed = [];
+    for (const b of this.w.values()) b.destroy();
+    this.w.clear();
+    for (const b of Object.values(this.buf)) b.destroy();
+    this.buf = {};
+    for (const b of this.kc) b.destroy();
+    this.kc = [];
+    for (const b of this.vc) b.destroy();
+    this.vc = [];
+    this.groups.clear();
   }
 
   // ---------------------------------------------------------------- loading
   /** Stream the weights from Hugging Face (or this browser's cache of them) straight into GPU buffers. */
   async load(progress: (p: Load) => void, signal?: AbortSignal) {
-    const { base, tensors } = await header();
-    const used = tensors.filter((t) => t.name !== "lm_head.weight"); // tied to the embedding, which is stored twice
-    used.sort((a, b) => a.begin - b.begin);
-    const from = used[0].begin, to = used[used.length - 1].end;
+    try {
+      const { base, tensors } = await header(signal);
+      const used = tensors.filter((t) => t.name !== "lm_head.weight"); // tied to the embedding, which is stored twice
+      used.sort((a, b) => a.begin - b.begin);
+      const from = used[0].begin, to = used[used.length - 1].end;
 
-    for (const t of used) {
-      if (t.name === "model.embed_tokens.weight") {
-        for (let c = 0; c < 4; c++) this.embed.push(this.dev.createBuffer({ size: CHUNK_BYTES, usage: S | CPY }));
-      } else {
-        this.w.set(t.name, this.dev.createBuffer({ size: t.end - t.begin, usage: S | CPY }));
-      }
-    }
-
-    const layerOf = (name: string) => +(/layers\.(\d+)\./.exec(name)?.[1] ?? -1);
-    const total = to - from, lit = new Array(L).fill(0), layerBytes = new Array(L).fill(0);
-    for (const t of used) if (layerOf(t.name) >= 0) layerBytes[layerOf(t.name)] += t.end - t.begin;
-
-    const body = await this.body(base + from, total, signal);
-    const reader = body.getReader();
-    let cur = from, ti = 0, pending: Bytes = new Uint8Array(0);
-
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      let data: Bytes = value;
-      if (pending.length) { data = new Uint8Array(pending.length + value.length); data.set(pending); data.set(value, pending.length); }
-      const take = Math.min(data.length - (data.length % 4), to - cur);
-      let off = 0;
-
-      while (off < take) {
-        while (used[ti].end <= cur) ti++;
-        const t = used[ti], n = Math.min(take - off, t.end - cur), at = cur - t.begin;
-        if (t.name === "model.embed_tokens.weight") this.writeEmbed(at, data, off, n);
-        else this.dev.queue.writeBuffer(this.w.get(t.name)!, at, data, off, n);
-        const l = layerOf(t.name);
-        if (l >= 0) lit[l] += n / layerBytes[l];
-        cur += n; off += n;
+      for (const t of used) {
+        if (t.name === "model.embed_tokens.weight") {
+          for (let c = 0; c < 4; c++) this.embed.push(this.dev.createBuffer({ size: CHUNK_BYTES, usage: S | CPY }));
+        } else {
+          this.w.set(t.name, this.dev.createBuffer({ size: t.end - t.begin, usage: S | CPY }));
+        }
       }
 
-      pending = data.slice(take);
-      progress({ done: cur - from, total, lit });
-    }
+      const layerOf = (name: string) => +(/layers\.(\d+)\./.exec(name)?.[1] ?? -1);
+      const total = to - from, lit = new Array(L).fill(0), layerBytes = new Array(L).fill(0);
+      for (const t of used) if (layerOf(t.name) >= 0) layerBytes[layerOf(t.name)] += t.end - t.begin;
 
-    if (cur < to) throw new Error("The download stopped early.");
-    await this.setup();
+      const body = await this.body(base + from, signal);
+      const reader = body.getReader();
+      let cur = from, ti = 0, pending: Bytes = new Uint8Array(0);
+
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          let data: Bytes = value;
+          if (pending.length) { data = new Uint8Array(pending.length + value.length); data.set(pending); data.set(value, pending.length); }
+          const take = Math.min(data.length - (data.length % 4), to - cur);
+          let off = 0;
+
+          while (off < take) {
+            while (used[ti].end <= cur) ti++;
+            const t = used[ti], n = Math.min(take - off, t.end - cur), at = cur - t.begin;
+            if (t.name === "model.embed_tokens.weight") this.writeEmbed(at, data, off, n);
+            else this.dev.queue.writeBuffer(this.w.get(t.name)!, at, data, off, n);
+            const l = layerOf(t.name);
+            if (l >= 0) lit[l] += n / layerBytes[l];
+            cur += n; off += n;
+          }
+
+          progress({ done: cur - from, total, lit });
+          if (cur >= to) {
+            await reader.cancel().catch(() => {});
+            break;
+          }
+          pending = data.slice(take);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (cur < to) throw new Error("The download stopped early.");
+      await this.setup();
+    } catch (e) {
+      this.dispose();
+      throw e;
+    }
   }
 
   /** The bytes from `start` to the end of the file: from this browser's cache if they're there, else downloaded
    * once and cached as they arrive. */
-  private async body(start: number, size: number, signal?: AbortSignal): Promise<ReadableStream<Bytes>> {
+  private async body(start: number, signal?: AbortSignal): Promise<ReadableStream<Bytes>> {
     const key = `${WEIGHTS}?from=${start}`;
     const cache = await caches.open(CACHE).catch(() => null);
     const hit = await cache?.match(key);
@@ -125,7 +174,7 @@ export class Qwen {
     if (!cache) return body;
 
     const [mine, keep] = body.tee();
-    cache.put(key, new Response(keep, { headers: { "Content-Length": String(size) } })).catch(() => cache.delete(key));
+    cache.put(key, new Response(keep)).catch(() => cache.delete(key));
     return mine;
   }
 
@@ -152,7 +201,7 @@ export class Qwen {
       this.vc.push(this.dev.createBuffer({ size: CTX * KD * 2, usage: S }));
     }
     this.dev.queue.writeBuffer(this.buf.vec, 0, this.ablVec);
-    this.dev.queue.writeBuffer(this.buf.abl, 0, new Float32Array([1, 0, 0, 0]));
+    this.dev.queue.writeBuffer(this.buf.abl, 0, new Float32Array([this.ablCoef, 0, 0, 0]));
     this.step("lensSt", L, 0, 0);
     await this.measure();
   }
@@ -216,6 +265,8 @@ export class Qwen {
     pass.end();
     this.dev.queue.submit([enc.finish()]);
     const dnorm = await this.read(this.buf.dnorm, L * N);
+    this.buf.dnorm.destroy();
+    delete this.buf.dnorm;
     for (let l = 0; l < L; l++) for (let n = 0; n < N; n++) this.unit[l * N + n] = this.resid[l] / Math.max(dnorm[l * N + n], 1e-6);
   }
 
@@ -273,19 +324,21 @@ export class Qwen {
   }
 
   /** Run T new tokens at pos0 and return the next token's logits. */
-  private async next(ids: number[], pos0: number) {
-    const T = ids.length;
-    this.dev.queue.writeBuffer(this.buf.ids, 0, new Uint32Array(ids));
-    this.step("st", T, pos0, 0);
-    this.step("head", 1, 0, T - 1);
+  private next(ids: number[], pos0: number) {
+    return this.enqueue(() => {
+      const T = ids.length;
+      this.dev.queue.writeBuffer(this.buf.ids, 0, new Uint32Array(ids));
+      this.step("st", T, pos0, 0);
+      this.step("head", 1, 0, T - 1);
 
-    const enc = this.dev.createCommandEncoder();
-    const pass = this.layers(enc, T);
-    this.norm(pass, "head", "x", this.w.get("model.norm.weight")!, "model.norm.weight", "hn", 1);
-    this.head(pass, "head", "hn", "logits", 1);
-    pass.end();
-    this.dev.queue.submit([enc.finish()]);
-    return this.read(this.buf.logits, V);
+      const enc = this.dev.createCommandEncoder();
+      const pass = this.layers(enc, T);
+      this.norm(pass, "head", "x", this.w.get("model.norm.weight")!, "model.norm.weight", "hn", 1);
+      this.head(pass, "head", "hn", "logits", 1);
+      pass.end();
+      this.dev.queue.submit([enc.finish()]);
+      return this.read(this.buf.logits, V);
+    });
   }
 
   /** Each next token in turn, until an end token, `max` tokens, or the signal. */
@@ -298,73 +351,89 @@ export class Qwen {
       const tok = sample(logits, opts.temp);
       if (opts.stop.has(tok)) return;
       yield tok;
-      logits = await this.next([tok], pos++);
+      if (i + 1 < opts.max && pos + 1 < CTX && !opts.signal?.aborted) {
+        logits = await this.next([tok], pos++);
+      } else {
+        pos++;
+      }
     }
   }
 
   /** What the model holds at row `at` of `ids`: the logit lens after each layer, and the neurons firing hardest, in
    * dose units (how far each moves the residual stream, against a typical residual's size). */
-  async inspect(ids: number[], at: number): Promise<Inspect> {
-    const T = at + 1;
-    this.dev.queue.writeBuffer(this.buf.ids, 0, new Uint32Array(ids.slice(0, T)));
-    this.step("st", T, 0, 0);
+  inspect(ids: number[], at: number): Promise<Inspect> {
+    return this.enqueue(async () => {
+      const T = at + 1;
+      this.dev.queue.writeBuffer(this.buf.ids, 0, new Uint32Array(ids.slice(0, T)));
+      this.step("st", T, 0, 0);
 
-    const enc = this.dev.createCommandEncoder();
-    const pass = this.layers(enc, T, at);
-    this.norm(pass, "lensSt", "cap", this.w.get("model.norm.weight")!, "model.norm.weight", "lensN", L);
-    this.head(pass, "lensSt", "lensN", "lensLogits", L);
-    pass.end();
-    this.dev.queue.submit([enc.finish()]);
+      const enc = this.dev.createCommandEncoder();
+      const pass = this.layers(enc, T, at);
+      this.norm(pass, "lensSt", "cap", this.w.get("model.norm.weight")!, "model.norm.weight", "lensN", L);
+      this.head(pass, "lensSt", "lensN", "lensLogits", L);
+      pass.end();
+      this.dev.queue.submit([enc.finish()]);
 
-    const [logits, acts] = await Promise.all([this.read(this.buf.lensLogits, L * V), this.read(this.buf.acts, L * N)]);
-    const lens = Array.from({ length: L }, (_, l) => topP(logits.subarray(l * V, (l + 1) * V), 3));
+      const [logits, acts] = await Promise.all([this.read(this.buf.lensLogits, L * V), this.read(this.buf.acts, L * N)]);
+      const lens = Array.from({ length: L }, (_, l) => topP(logits.subarray(l * V, (l + 1) * V), 3));
 
-    const all: { layer: number; neuron: number; score: number }[] = [];
-    for (let l = 0; l < L; l++) for (let n = 0; n < N; n++) {
-      const score = acts[l * N + n] / this.unit[l * N + n];
-      if (Math.abs(score) > 0.05) all.push({ layer: l, neuron: n, score });
-    }
-    all.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
-    return { lens, neurons: all.slice(0, 8) };
+      const all: { layer: number; neuron: number; score: number }[] = [];
+      for (let l = 0; l < L; l++) for (let n = 0; n < N; n++) {
+        const score = acts[l * N + n] / this.unit[l * N + n];
+        if (Math.abs(score) > 0.05) all.push({ layer: l, neuron: n, score });
+      }
+      all.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+      return { lens, neurons: all.slice(0, 8) };
+    });
   }
 
   /** The tokens each neuron's push moves the model toward: its down_proj column (negated for a negative push),
    * through the final norm and the unembedding. */
-  async neuronLens(items: { layer: number; neuron: number; sign: number }[]) {
-    items = items.slice(0, LENS);
-    if (!items.length) return [];
-    const enc = this.dev.createCommandEncoder();
-    let pass = enc.beginComputePass();
-    const p = this.pipe("COLUMN", { D: H, N });
+  neuronLens(items: { layer: number; neuron: number; sign: number }[]) {
+    const batch = items.slice(0, LENS);
+    if (!batch.length) return Promise.resolve<number[][]>([]);
+    return this.enqueue(async () => {
+      const uniforms: GPUBuffer[] = [];
+      try {
+        const enc = this.dev.createCommandEncoder();
+        const pass = enc.beginComputePass();
+        const p = this.pipe("COLUMN", { D: H, N });
 
-    items.forEach((it, r) => {
-      const u = this.dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.dev.queue.writeBuffer(u, 0, new Uint32Array([it.neuron, r, 0, 0]));
-      this.dev.queue.writeBuffer(u, 8, new Float32Array([it.sign]));
-      const g = this.dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
-        { binding: 0, resource: { buffer: this.w.get(`model.layers.${it.layer}.mlp.down_proj.weight`)! } },
-        { binding: 1, resource: { buffer: u } }, { binding: 2, resource: { buffer: this.buf.cols } }] });
-      this.run(pass, p, g, H / 64);
+        batch.forEach((it, r) => {
+          const u = this.dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+          uniforms.push(u);
+          this.dev.queue.writeBuffer(u, 0, new Uint32Array([it.neuron, r, 0, 0]));
+          this.dev.queue.writeBuffer(u, 8, new Float32Array([it.sign]));
+          const g = this.dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+            { binding: 0, resource: { buffer: this.w.get(`model.layers.${it.layer}.mlp.down_proj.weight`)! } },
+            { binding: 1, resource: { buffer: u } }, { binding: 2, resource: { buffer: this.buf.cols } }] });
+          this.run(pass, p, g, H / 64);
+        });
+
+        this.step("colSt", batch.length, 0, 0);
+        this.norm(pass, "colSt", "cols", this.w.get("model.norm.weight")!, "model.norm.weight", "colsN", batch.length);
+        this.head(pass, "colSt", "colsN", "colLogits", batch.length);
+        pass.end();
+        this.dev.queue.submit([enc.finish()]);
+        const logits = await this.read(this.buf.colLogits, batch.length * V);
+        return batch.map((_, r) => topP(logits.subarray(r * V, (r + 1) * V), 6).map((x) => x.id));
+      } finally {
+        for (const u of uniforms) u.destroy();
+      }
     });
-
-    this.step("colSt", items.length, 0, 0);
-    this.norm(pass, "colSt", "cols", this.w.get("model.norm.weight")!, "model.norm.weight", "colsN", items.length);
-    this.head(pass, "colSt", "colsN", "colLogits", items.length);
-    pass.end();
-    this.dev.queue.submit([enc.finish()]);
-    const logits = await this.read(this.buf.colLogits, items.length * V);
-    return items.map((_, r) => topP(logits.subarray(r * V, (r + 1) * V), 6).map((x) => x.id));
   }
 
   private async read(src: GPUBuffer, floats: number) {
     const st = this.dev.createBuffer({ size: floats * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-    const enc = this.dev.createCommandEncoder();
-    enc.copyBufferToBuffer(src, 0, st, 0, floats * 4);
-    this.dev.queue.submit([enc.finish()]);
-    await st.mapAsync(GPUMapMode.READ);
-    const out = new Float32Array(st.getMappedRange().slice(0));
-    st.destroy();
-    return out;
+    try {
+      const enc = this.dev.createCommandEncoder();
+      enc.copyBufferToBuffer(src, 0, st, 0, floats * 4);
+      this.dev.queue.submit([enc.finish()]);
+      await st.mapAsync(GPUMapMode.READ);
+      return new Float32Array(st.getMappedRange().slice(0));
+    } finally {
+      st.destroy();
+    }
   }
 }
 
@@ -386,8 +455,7 @@ function skip(n: number) {
   });
 }
 
-/** The k likeliest tokens with their probabilities. */
-export function topP(logits: Float32Array, k: number): Lens {
+function topK(logits: Float32Array, k: number) {
   const best: { id: number; l: number }[] = [];
   let mx = -Infinity;
   for (let i = 0; i < logits.length; i++) {
@@ -399,6 +467,12 @@ export function topP(logits: Float32Array, k: number): Lens {
       if (best.length > k) best.pop();
     }
   }
+  return { best, mx };
+}
+
+/** The k likeliest tokens with their probabilities. */
+function topP(logits: Float32Array, k: number): Lens {
+  const { best, mx } = topK(logits, k);
   let z = 0;
   for (let i = 0; i < logits.length; i++) z += Math.exp(logits[i] - mx);
   return best.map((b) => ({ id: b.id, p: Math.exp(b.l - mx) / z }));
@@ -406,12 +480,12 @@ export function topP(logits: Float32Array, k: number): Lens {
 
 /** Qwen3's recommended sampling without thinking (top-k 20, top-p 0.8) at `temp`; greedy at 0. */
 function sample(logits: Float32Array, temp: number) {
-  const top = topP(logits, 20);
-  if (temp <= 0) return top[0].id;
-  const w = top.map((t) => Math.pow(t.p, 1 / temp)), z = w.reduce((a, b) => a + b, 0);
+  const { best, mx } = topK(logits, 20);
+  if (temp <= 0) return best[0].id;
+  const w = best.map((b) => Math.exp((b.l - mx) / temp)), z = w.reduce((a, b) => a + b, 0);
   let cum = 0;
   const keep: { id: number; w: number }[] = [];
-  for (let i = 0; i < top.length; i++) { keep.push({ id: top[i].id, w: w[i] / z }); cum += w[i] / z; if (cum >= 0.8) break; }
+  for (let i = 0; i < best.length; i++) { keep.push({ id: best[i].id, w: w[i] / z }); cum += w[i] / z; if (cum >= 0.8) break; }
   const zk = keep.reduce((a, b) => a + b.w, 0);
   let r = Math.random() * zk;
   for (const k of keep) if ((r -= k.w) <= 0) return k.id;

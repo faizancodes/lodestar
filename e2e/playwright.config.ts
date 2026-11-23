@@ -31,7 +31,7 @@ export default defineConfig({
   },
   projects: [{ name: "webkit", use: { browserName: "webkit" } }],
   webServer: RECORD ? undefined : {
-    command: `uv run --project .. python harness/mock.py ${PORT} ${UI_DIR}`,
+    command: `uv run --project .. python harness/mock.py ${PORT} "${UI_DIR}"`,
     url: `http://127.0.0.1:${PORT}/__fixture/log`,
     reuseExistingServer: false,
     timeout: 60_000,

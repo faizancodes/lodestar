@@ -4,11 +4,11 @@ import "../../../web/src/styles/fonts/fonts.css";
 import "../../../web/src/styles/style.css";
 import "./demo.css";
 import { startSideArt } from "../../../web/src/art/glyphs";
-import { finishScene, setLayers, setProgress, startScene, stopScene, wake } from "../../../web/src/art/loader";
+import { finishScene, setLayers, startScene, stopScene, wake } from "../../../web/src/art/loader";
 import { markSVG } from "../../../web/src/art/mark";
 import { cleanReply, esc, fmt, lensLabel, nid, showTok } from "../../../web/src/lib/format";
 import { md } from "../../../web/src/lib/markdown";
-import { CFG, gpu, Qwen, type Inspect } from "./qwen";
+import { CFG, gpu, LENS, Qwen, type Inspect } from "./qwen";
 import { STOP, Tok, type Msg } from "./tok";
 
 type Pin = { layer: number; neuron: number; dose: number; lens?: string };
@@ -56,9 +56,22 @@ async function boot() {
     return;
   }
 
-  const go = () => load(dev);
-  pick.addEventListener("click", go, { once: true });
-  pick.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && go(), { once: true });
+  attachPick(pick, dev);
+}
+
+function attachPick(pick: HTMLElement, dev: GPUDevice) {
+  const onClick = () => {
+    pick.removeEventListener("click", onClick);
+    pick.removeEventListener("keydown", onKey);
+    load(dev);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    onClick();
+  };
+  pick.addEventListener("click", onClick);
+  pick.addEventListener("keydown", onKey);
 }
 
 function status(cls: string, msg: string) {
@@ -90,23 +103,31 @@ async function load(dev: GPUDevice) {
   const timer = setInterval(clock, 1000);
 
   try {
-    const [pack, tok] = await Promise.all([fetch("./demo/qwen3-0.6b.json").then((r) => r.json()), Tok.load()]);
+    const [pack, tok] = await Promise.all([
+      fetch("./demo/qwen3-0.6b.json").then((r) => {
+        if (!r.ok) throw new Error(`Couldn't load demo config (${r.status}).`);
+        return r.json();
+      }),
+      Tok.load(),
+    ]);
     const qwen = new Qwen(dev, pack);
     await qwen.load((p) => {
       setLayers(CFG.L, p.lit);
-      setProgress(p.done / p.total);
       line = `Reading weights · ${(p.done / 1e9).toFixed(1)} of ${(p.total / 1e9).toFixed(1)} GB`;
     });
     Object.assign(st, { qwen, tok });
   } catch (e) {
     clearInterval(timer);
     stopScene();
+    startScene($<HTMLCanvasElement>("#start-art"));
     start.classList.remove("loading");
-    $("#pick").classList.remove("picked");
-    $("#pick").getAnimations().forEach((a) => a.cancel());
-    status("err", "Couldn’t load: " + (e as Error).message);
-    $("#start-status").textContent = (e as Error).message;
-    $("#pick").addEventListener("click", () => load(dev), { once: true });
+    const pick = $("#pick");
+    pick.classList.remove("picked");
+    pick.getAnimations().forEach((a) => a.cancel());
+    const msg = e instanceof Error ? e.message : String(e);
+    status("err", "Couldn’t load: " + msg);
+    $("#start-status").textContent = msg;
+    attachPick(pick, dev);
     return;
   }
 
@@ -154,21 +175,26 @@ async function send(text: string) {
   toBottom(true);
 
   const t0 = performance.now();
+  const pieces: string[] = [];
+  let prevDecoded = "";
   try {
     const max = +$<HTMLInputElement>("#chat-max").value, temp = +$<HTMLInputElement>("#chat-temp").value;
     for await (const id of qwen.generate(prompt, { max, temp, stop: STOP, signal: st.abort.signal })) {
       bot.ids.push(id);
-      bot.content = tok.decode(bot.ids);
+      const next = tok.decode(bot.ids);
+      bot.content = next;
+      pieces.push(next.slice(prevDecoded.length));
+      prevDecoded = next;
       const secs = (performance.now() - t0) / 1000;
       if (secs > 0.5) bot.wps = words(bot.content) / secs;
       renderLast();
     }
   } catch (e) {
-    bot.error = (e as Error).message;
+    bot.error = e instanceof Error ? e.message : String(e);
   }
 
   bot.stopped = st.abort.signal.aborted;
-  bot.pieces = bot.ids.map((_, k) => tok.decode(bot.ids.slice(0, k + 1)).slice(tok.decode(bot.ids.slice(0, k)).length));
+  bot.pieces = pieces;
   st.busy = false;
   st.abort = null;
   renderAll();
@@ -205,7 +231,8 @@ async function pickToken(m: number, k: number) {
     st.picked.data = data;
     st.picked.lens = lens.map((ids) => lensLabel(ids.map((i) => st.tok!.decode([i]))));
   } catch (e) {
-    if (st.picked) st.picked.err = (e as Error).message;
+    if (st.picked?.m !== m || st.picked.k !== k) return;
+    st.picked.err = e instanceof Error ? e.message : String(e);
   }
   renderSide();
 }
@@ -219,23 +246,35 @@ function togglePin(layer: number, neuron: number, dose: number, lens?: string) {
 
 async function labelPins() {
   const want = st.pins.filter((p) => p.lens === undefined);
-  if (!want.length || !st.qwen) return;
+  if (!want.length || !st.qwen || !st.tok) return;
   want.forEach((p) => (p.lens = ""));
-  const lens = await st.qwen.neuronLens(want.map((p) => ({ layer: p.layer, neuron: p.neuron, sign: Math.sign(p.dose) })));
-  want.forEach((p, i) => (p.lens = lensLabel(lens[i].map((id) => st.tok!.decode([id])))));
+  try {
+    for (let i = 0; i < want.length; i += LENS) {
+      const chunk = want.slice(i, i + LENS);
+      const lens = await st.qwen.neuronLens(chunk.map((p) => ({ layer: p.layer, neuron: p.neuron, sign: Math.sign(p.dose) })));
+      chunk.forEach((p, j) => (p.lens = lensLabel(lens[j].map((id) => st.tok!.decode([id])))));
+    }
+  } catch {
+    want.forEach((p) => { if (!p.lens) p.lens = undefined; });
+  }
   renderSide();
 }
 
 // "L9 N2578 +1.2", several separated by commas: as the app's Neurons box takes them
 function addNeurons(text: string) {
+  const fail = (msg: string) => {
+    st.addErr = msg;
+    renderSide();
+  };
   const out: Pin[] = [];
   for (const part of text.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)) {
     const m = /^L?\s*(\d+)\s*[·:/\s]\s*N?\s*(\d+)(?:\s+([+−–-]?\s*\d*\.?\d+))?$/i.exec(part);
-    if (!m) return void (st.addErr = `Couldn’t read “${part}”. Write a layer, a neuron and a dose, like L9 N2578 +1.2.`);
+    if (!m) return fail(`Couldn’t read “${part}”. Write a layer, a neuron and a dose, like L9 N2578 +1.2.`);
     const [layer, neuron] = [+m[1], +m[2]], dose = m[3] ? parseFloat(m[3].replace(/[−–]/, "-").replace(/\s/g, "")) : 1;
-    if (layer >= CFG.L) return void (st.addErr = `Qwen3-0.6B has layers 0 to ${CFG.L - 1}.`);
-    if (neuron >= CFG.N) return void (st.addErr = `Each layer has neurons 0 to ${CFG.N - 1}.`);
-    if (dose) out.push({ layer, neuron, dose });
+    if (layer >= CFG.L) return fail(`Qwen3-0.6B has layers 0 to ${CFG.L - 1}.`);
+    if (neuron >= CFG.N) return fail(`Each layer has neurons 0 to ${CFG.N - 1}.`);
+    if (!Number.isFinite(dose) || !dose) return fail(`Dose must be a non-zero number (got “${part}”).`);
+    out.push({ layer, neuron, dose });
   }
 
   st.addErr = "";
@@ -407,7 +446,11 @@ function wire() {
     if (a === "retry") retry();
     if (a === "copy") {
       const b = t.closest<HTMLElement>("[data-a]")!;
-      await navigator.clipboard.writeText(cleanReply((st.msgs[+b.dataset.i!] as Bot).content)).catch(() => {});
+      try {
+        await navigator.clipboard.writeText(cleanReply((st.msgs[+b.dataset.i!] as Bot).content));
+      } catch {
+        return;
+      }
       b.textContent = "Copied";
       setTimeout(() => (b.textContent = "Copy"), 1400);
     }
@@ -428,8 +471,9 @@ function wire() {
     if (!pin) return;
     if (a === "del") st.pins.splice(st.pins.indexOf(pin), 1);
     if (a === "less" || a === "more") {
-      const d = Math.round((pin.dose + (a === "more" ? 0.25 : -0.25)) / 0.25) * 0.25;
-      if (!d) return;
+      const step = a === "more" ? 0.25 : -0.25;
+      let d = Math.round((pin.dose + step) / 0.25) * 0.25;
+      if (!d) d = step;
       if (Math.sign(d) !== Math.sign(pin.dose)) pin.lens = undefined;
       pin.dose = d;
     }
@@ -456,10 +500,12 @@ function wire() {
     r.addEventListener("input", fill);
     fill();
   }
-  document.addEventListener("click", (e) => !(e.target as Element).closest("#chat-opts") && $("#chat-opts").removeAttribute("open"));
+  document.addEventListener("click", (e) => {
+    if (!(e.target instanceof Element) || !e.target.closest("#chat-opts")) $("#chat-opts").removeAttribute("open");
+  });
 }
 
 // for poking at the engine from the console while developing
-if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) Object.assign(window, { demo: { st, send } });
+if (import.meta.env.DEV) Object.assign(window, { demo: { st, send } });
 
 boot();

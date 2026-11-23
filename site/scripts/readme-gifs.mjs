@@ -35,28 +35,56 @@ async function cdp() {
   const profile = mkdtempSync(join(tmpdir(), "lodestar-chrome-"));
   const chrome = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
     "--hide-scrollbars", "--force-device-scale-factor=1", "about:blank"], { stdio: "ignore" });
-  let page;
-  for (let k = 0; k < 50 && !page; k++) {
-    await sleep(200);
-    page = await fetch(`http://127.0.0.1:${PORT}/json/list`).then((r) => r.json()).then((l) => l.find((t) => t.type === "page")).catch(() => null);
-  }
-  if (!page) throw new Error("Chrome didn't start");
-  const ws = new WebSocket(page.webSocketDebuggerUrl);
-  await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-  let id = 0;
-  const waiting = new Map();
-  ws.addEventListener("message", (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && waiting.has(m.id)) (waiting.get(m.id)(m), waiting.delete(m.id));
-  });
-  const send = (method, params = {}) => new Promise((r) => { waiting.set(++id, r); ws.send(JSON.stringify({ id, method, params })); })
-    .then((m) => { if (m.error) throw new Error(`${method}: ${m.error.message}`); return m.result; });
-  const close = async () => {
-    ws.close();
-    const gone = new Promise((r) => chrome.once("exit", r));
+  const stopChrome = async () => {
+    const gone = new Promise((r) => (chrome.exitCode !== null ? r() : chrome.once("exit", r)));
     chrome.kill();
     await gone; // before its profile goes, or it is still writing there
     rmSync(profile, { recursive: true, force: true });
+  };
+  let ws;
+  try {
+    let page;
+    for (let k = 0; k < 50 && !page; k++) {
+      await sleep(200);
+      page = await fetch(`http://127.0.0.1:${PORT}/json/list`).then((r) => r.json()).then((l) => l.find((t) => t.type === "page")).catch(() => null);
+    }
+    if (!page) throw new Error("Chrome didn't start");
+    ws = new WebSocket(page.webSocketDebuggerUrl);
+    await new Promise((resolveOpen, rejectOpen) => {
+      ws.addEventListener("open", resolveOpen, { once: true });
+      ws.addEventListener("error", () => rejectOpen(new Error("Chrome DevTools WebSocket error")), { once: true });
+    });
+  } catch (e) {
+    ws?.close();
+    await stopChrome();
+    throw e;
+  }
+  let id = 0;
+  const waiting = new Map();
+  const failPending = (reason) => {
+    for (const [, { reject }] of waiting) reject(new Error(reason));
+    waiting.clear();
+  };
+  ws.addEventListener("message", (e) => {
+    const m = JSON.parse(e.data);
+    if (m.id && waiting.has(m.id)) {
+      const { resolve } = waiting.get(m.id);
+      waiting.delete(m.id);
+      resolve(m);
+    }
+  });
+  ws.addEventListener("error", () => failPending("Chrome DevTools WebSocket error"));
+  ws.addEventListener("close", () => failPending("Chrome DevTools WebSocket closed"));
+  const send = (method, params = {}) => new Promise((resolve, reject) => {
+    waiting.set(++id, { resolve, reject });
+    ws.send(JSON.stringify({ id, method, params }));
+  }).then((m) => {
+    if (m.error) throw new Error(`${method}: ${m.error.message}`);
+    return m.result;
+  });
+  const close = async () => {
+    ws.close();
+    await stopChrome();
   };
   return { send, close };
 }
@@ -67,22 +95,25 @@ const { send, close } = await cdp();
 try {
   for (const job of JOBS.filter((j) => !only.length || only.includes(j.name))) {
     const dir = mkdtempSync(join(tmpdir(), `lodestar-${job.name}-`));
-    await send("Emulation.setDeviceMetricsOverride", { width: job.w, height: job.h, deviceScaleFactor: 1, mobile: false });
-    await send("Page.navigate", { url: `${SITE}/${job.url}` });
-    await sleep(2500); // modules, fonts, the first observer callbacks
-    if (job.warm) for (let t = 0; t < job.warm; t += 1000 / job.fps) await send("Runtime.evaluate", { expression: job.frame(0, job.fps) });
-    const n = Math.round(job.fps * job.seconds);
-    for (let i = 0; i < n; i++) {
-      await send("Runtime.evaluate", { expression: job.frame(i, job.fps) });
-      const { data } = await send("Page.captureScreenshot", { format: "png" });
-      writeFileSync(join(dir, `${String(i).padStart(4, "0")}.png`), Buffer.from(data, "base64"));
+    try {
+      await send("Emulation.setDeviceMetricsOverride", { width: job.w, height: job.h, deviceScaleFactor: 1, mobile: false });
+      await send("Page.navigate", { url: `${SITE}/${job.url}` });
+      await sleep(2500); // modules, fonts, the first observer callbacks
+      if (job.warm) for (let t = 0; t < job.warm; t += 1000 / job.fps) await send("Runtime.evaluate", { expression: job.frame(0, job.fps) });
+      const n = Math.round(job.fps * job.seconds);
+      for (let i = 0; i < n; i++) {
+        await send("Runtime.evaluate", { expression: job.frame(i, job.fps) });
+        const { data } = await send("Page.captureScreenshot", { format: "png" });
+        writeFileSync(join(dir, `${String(i).padStart(4, "0")}.png`), Buffer.from(data, "base64"));
+      }
+      const scale = job.scale ? `scale=${job.scale}:-1:flags=lanczos,` : "";
+      const out = join(OUT, `${job.name}.gif`);
+      execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(job.fps), "-i", join(dir, "%04d.png"), "-filter_complex",
+        `[0:v]${scale}split[a][b];[a]palettegen=max_colors=32:stats_mode=full[p];[b][p]paletteuse=dither=none:diff_mode=rectangle`, out]);
+      console.log(`${job.name}.gif`, `${n} frames`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
-    const scale = job.scale ? `scale=${job.scale}:-1:flags=lanczos,` : "";
-    const out = join(OUT, `${job.name}.gif`);
-    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(job.fps), "-i", join(dir, "%04d.png"), "-filter_complex",
-      `[0:v]${scale}split[a][b];[a]palettegen=max_colors=32:stats_mode=full[p];[b][p]paletteuse=dither=none:diff_mode=rectangle`, out]);
-    rmSync(dir, { recursive: true, force: true });
-    console.log(`${job.name}.gif`, `${n} frames`);
   }
 } finally {
   await close();
