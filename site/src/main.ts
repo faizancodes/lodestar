@@ -52,7 +52,7 @@ function hero() {
 // ---------------------------------------------------------------- the rest
 function copyInstall() {
   // the whole row copies; its button is there for the eye and the keyboard (its click bubbles up to the row)
-  for (const row of document.querySelectorAll<HTMLLIElement>("#get .term li")) {
+  for (const row of document.querySelectorAll<HTMLLIElement>(".term li")) {
     const btn = row.querySelector<HTMLButtonElement>(".cp")!, code = row.querySelector("code")!.textContent!;
     row.addEventListener("click", async () => {
       if (getSelection()?.toString()) return; // they were selecting it by hand

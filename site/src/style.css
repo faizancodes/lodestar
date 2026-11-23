@@ -145,12 +145,13 @@ p { margin: 0; }
 .get h2 { font-size: clamp(34px, 4.4vw, 56px); line-height: 1.02; }
 .get p { margin-top: 18px; max-width: 380px; font-size: 16px; line-height: 1.6; color: var(--text-2); }
 .get .cta { margin-top: 30px; }
+.term.install { max-width: 780px; margin-top: clamp(24px, 3.6svh, 44px); }
+.term.install + .cta { margin-top: 16px; }
 .term { margin: 0; padding: 6px; list-style: none; border: 1px solid var(--rule-2); border-radius: 12px; background: var(--panel); box-shadow: 0 30px 80px -30px rgba(195, 207, 245, 0.12); }
 .term li { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 0 6px 0 14px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
 .term li + li { box-shadow: 0 -1px 0 var(--rule); }
 .term li:hover { background: var(--panel-2); box-shadow: none; }
 .term li:hover + li { box-shadow: none; }
-.term .n { flex: none; width: 14px; font: 500 11.5px/1 var(--mono); color: var(--ascii); opacity: 0.7; }
 .term code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font: 13px/1.5 var(--mono); color: var(--text); }
 .term code::-webkit-scrollbar { display: none; }
 .cp { flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--muted); cursor: pointer; opacity: 0.55; transition: opacity 0.15s, color 0.15s, background 0.15s; }
