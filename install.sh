@@ -30,7 +30,7 @@ ditto -x -k "$tmp/Lodestar.zip" "$tmp"
 pkill -f "$DEST/Lodestar.app/Contents/" 2>/dev/null || true  # an update replaces the running app
 rm -rf "$DEST/Lodestar.app"
 mv "$tmp/Lodestar.app" "$DEST/"
-xattr -dr com.apple.quarantine "$DEST/Lodestar.app" 2>/dev/null || true
+/usr/bin/xattr -dr com.apple.quarantine "$DEST/Lodestar.app" >/dev/null 2>&1 || true  # macOS's own: a pip "xattr" earlier on PATH has no -r
 
 echo "Setting up Python and its packages (about 1 GB the first time)…"
 "$DEST/Lodestar.app/Contents/MacOS/Lodestar" --setup
