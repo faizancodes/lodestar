@@ -40,4 +40,10 @@ echo "Setting up Python and its packages (about 1 GB the first time)…"
 "$DEST/Lodestar.app/Contents/MacOS/Lodestar" --setup
 
 echo "Installed $DEST/Lodestar.app"
+if [ -n "$EXPERIMENT" ] && [[ ! "$EXPERIMENT" =~ ^https?:// ]]; then
+  REMOTE="https://raw.githubusercontent.com/faizancodes/lodestar/main/experiments/${EXPERIMENT}.lodestar.json"
+  if curl -fsI "$REMOTE" >/dev/null 2>&1; then
+    EXPERIMENT="$REMOTE"
+  fi
+fi
 [ -n "${LODESTAR_NO_OPEN:-}" ] || open "$DEST/Lodestar.app" ${EXPERIMENT:+--args --open "$EXPERIMENT"}
